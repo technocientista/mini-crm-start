@@ -1,0 +1,84 @@
+<div id="{{ modal_id }}" class="modal-overlay dashboard-modal">
+    <div class="modal-card modal-extra-large">
+        <div class="modal-header">
+            <div>
+                <h2>{{ modal_title }}</h2>
+                <p class="muted-text">{{ modal_description }}</p>
+            </div>
+
+            <button type="button" class="modal-close" onclick="fecharModalDashboard('{{ modal_id }}')">
+                ×
+            </button>
+        </div>
+
+        <div class="table-wrapper dashboard-modal-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Categoria</th>
+                        <th>Marca</th>
+                        <th>SKU</th>
+                        <th>Estoque atual</th>
+                        <th>Estoque mínimo</th>
+                        <th>Venda</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for produto in produtos_data.rows %}
+                        <tr>
+                            <td>{{ produto.nome }}</td>
+                            <td>{{ produto.categoria or '-' }}</td>
+                            <td>{{ produto.marca or '-' }}</td>
+                            <td>{{ produto.sku or '-' }}</td>
+                            <td>{{ produto.estoque_atual }}</td>
+                            <td>{{ produto.estoque_minimo }}</td>
+                            <td>R$ {{ "%.2f"|format(produto.preco_venda) }}</td>
+                            <td>
+                                <div class="table-actions">
+                                    <a 
+                                        href="{{ url_for('produto_editar', produto_id=produto.id) }}" 
+                                        class="small-button"
+                                        title="Editar produto"
+                                    >
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.04a1 1 0 0 0 0-1.41l-2.51-2.51a1 1 0 0 0-1.41 0l-1.96 1.96 3.75 3.75 2.13-1.79z"/>
+                                        </svg>
+                                    </a>
+
+                                    <a 
+                                        href="{{ url_for('estoque') }}?busca={{ produto.sku }}#lista-estoque" 
+                                        class="small-button"
+                                        title="Ver no estoque"
+                                    >
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M21 16V8l-9-5-9 5v8l9 5 9-5zM12 5.3 18.6 9 12 12.7 5.4 9 12 5.3zM5 10.7l6 3.3v4.7l-6-3.3v-4.7zm8 8V14l6-3.3v4.7l-6 3.3z"/>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="empty-state">
+                                Nenhum produto encontrado.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% set pagination_endpoint = 'dashboard' %}
+        {% set pagination_args = {'modal': modal_id} %}
+        {% set pagination_page_param = produtos_data.page_param %}
+        {% set pagination_page = produtos_data.page %}
+        {% set pagination_total_pages = produtos_data.total_pages %}
+        {% set pagination_total_records = produtos_data.total %}
+        {% set pagination_anchor = None %}
+
+        {% include 'partials/pagination.html' %}
+    </div>
+</div>

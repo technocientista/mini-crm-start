@@ -1,0 +1,112 @@
+<div id="{{ modal_id }}" class="modal-overlay dashboard-modal">
+    <div class="modal-card modal-extra-large">
+        <div class="modal-header">
+            <div>
+                <h2>{{ modal_title }}</h2>
+                <p class="muted-text">{{ modal_description }}</p>
+            </div>
+
+            <button type="button" class="modal-close" onclick="fecharModalDashboard('{{ modal_id }}')">
+                ×
+            </button>
+        </div>
+
+        <div class="table-wrapper dashboard-modal-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Telefone</th>
+                        <th>Última compra</th>
+                        <th>Compras</th>
+                        <th>Total comprado</th>
+                        <th>Tags</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for cliente in clientes_data.rows %}
+                        {% if mensagem_tipo == 'reativar' %}
+                            {% set mensagem = 'Olá, ' ~ cliente.nome ~ '! Tudo bem? Aqui é da ' ~ (config_loja.nome_loja if config_loja else 'Start Eletrônicos') ~ '. Sentimos sua falta por aqui! Temos novidades esperando por você 😊' %}
+                        {% elif mensagem_tipo == 'vip' %}
+                            {% set mensagem = 'Olá, ' ~ cliente.nome ~ '! Tudo bem? Aqui é da ' ~ (config_loja.nome_loja if config_loja else 'Start Eletrônicos') ~ '. Você é um cliente especial para a gente. Temos novidades e condições especiais para você!' %}
+                        {% elif mensagem_tipo == 'sem_compra' %}
+                            {% set mensagem = 'Olá, ' ~ cliente.nome ~ '! Tudo bem? Aqui é da ' ~ (config_loja.nome_loja if config_loja else 'Start Eletrônicos') ~ '. Vi que você ainda não comprou com a gente. Posso te ajudar a encontrar algum acessório ou produto?' %}
+                        {% elif mensagem_tipo == 'recentes_30' %}
+                            {% set mensagem = 'Olá, ' ~ cliente.nome ~ '! Tudo bem? Aqui é da ' ~ (config_loja.nome_loja if config_loja else 'Start Eletrônicos') ~ '. Obrigado pela sua compra recente! Qualquer dúvida ou necessidade, estamos à disposição.' %}
+                        {% else %}
+                            {% set mensagem = 'Olá, ' ~ cliente.nome ~ '! Tudo bem? Aqui é da ' ~ (config_loja.nome_loja if config_loja else 'Start Eletrônicos') ~ '. Passando para atualizar seu cadastro e entender melhor seus interesses.' %}
+                        {% endif %}
+
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('cliente_detalhe', cliente_id=cliente.id) }}" class="table-link">
+                                    {{ cliente.nome }}
+                                </a>
+                            </td>
+
+                            <td>{{ cliente.telefone }}</td>
+
+                            <td>
+                                {% if cliente.ultima_compra %}
+                                    {{ cliente.ultima_compra|datetime_br }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+
+                            <td>{{ cliente.quantidade_compras }}</td>
+
+                            <td>R$ {{ "%.2f"|format(cliente.total_comprado) }}</td>
+
+                            <td>{{ cliente.tags or '-' }}</td>
+
+                            <td>
+                                <div class="table-actions">
+                                    <a 
+                                        href="{{ url_for('cliente_detalhe', cliente_id=cliente.id) }}" 
+                                        class="small-button"
+                                        title="Ver cliente"
+                                    >
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-1.8a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"/>
+                                        </svg>
+                                    </a>
+
+                                    <a 
+                                        href="{{ whatsapp_link(cliente.telefone, mensagem) }}" 
+                                        class="small-button"
+                                        title="Chamar no WhatsApp"
+                                        target="_blank"
+                                    >
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M16.75 13.96c-.25-.12-1.47-.72-1.7-.8-.23-.08-.39-.12-.56.12-.16.25-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.16.04-.31-.02-.43-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.66.31-.23.25-.87.85-.87 2.07s.89 2.4 1.01 2.56c.12.16 1.75 2.67 4.24 3.74.59.25 1.05.4 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.29z"/>
+                                            <path d="M12.04 2C6.56 2 2.1 6.45 2.1 11.93c0 1.75.46 3.46 1.33 4.96L2 22l5.25-1.38a9.88 9.88 0 0 0 4.79 1.22h.01c5.48 0 9.94-4.45 9.94-9.93S17.52 2 12.04 2zm0 18.15h-.01a8.2 8.2 0 0 1-4.18-1.14l-.3-.18-3.11.82.83-3.03-.2-.31a8.18 8.18 0 0 1-1.25-4.38c0-4.54 3.69-8.23 8.23-8.23 2.2 0 4.26.86 5.82 2.41a8.17 8.17 0 0 1 2.41 5.82c0 4.53-3.7 8.22-8.24 8.22z"/>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="empty-state">
+                                Nenhum cliente encontrado.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% set pagination_endpoint = 'dashboard' %}
+        {% set pagination_args = {'modal': modal_id} %}
+        {% set pagination_page_param = clientes_data.page_param %}
+        {% set pagination_page = clientes_data.page %}
+        {% set pagination_total_pages = clientes_data.total_pages %}
+        {% set pagination_total_records = clientes_data.total %}
+        {% set pagination_anchor = None %}
+
+        {% include 'partials/pagination.html' %}
+    </div>
+</div>

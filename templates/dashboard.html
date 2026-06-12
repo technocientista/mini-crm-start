@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="app-layout">
+
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content" data-dashboard-modal-aberto="{{ modal_aberto or '' }}">
+            <header class="topbar">
+                <div>
+                    <h1>Dashboard</h1>
+                    <p>Bem-vindo, {{ usuario_nome }}.</p>
+                </div>
+            </header>
+
+            <section class="cards-grid">
+                <div class="card">
+                    <span>Vendas de hoje</span>
+                    <strong>R$ {{ "%.2f"|format(vendas_hoje) }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Faturamento do mês</span>
+                    <strong>R$ {{ "%.2f"|format(faturamento_mes) }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Lucro do mês</span>
+                    <strong>R$ {{ "%.2f"|format(lucro_mes) }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Clientes cadastrados</span>
+                    <strong>{{ total_clientes }}</strong>
+                </div>
+            </section>
+
+            <section class="cards-grid">
+                {% if produtos_baixo_dashboard.total > 0 %}
+                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-produtos-baixo')">
+                        <span>Produtos com estoque baixo</span>
+                        <strong>{{ produtos_baixo_dashboard.total }}</strong>
+                        <small>Precisam de reposição</small>
+                    </button>
+                {% else %}
+                    <div class="card">
+                        <span>Produtos com estoque baixo</span>
+                        <strong>0</strong>
+                    </div>
+                {% endif %}
+
+                {% if produtos_sem_dashboard.total > 0 %}
+                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-produtos-sem')">
+                        <span>Produtos sem estoque</span>
+                        <strong>{{ produtos_sem_dashboard.total }}</strong>
+                        <small>Reposição urgente</small>
+                    </button>
+                {% else %}
+                    <div class="card">
+                        <span>Produtos sem estoque</span>
+                        <strong>0</strong>
+                    </div>
+                {% endif %}
+
+                                {% if clientes_reativar.total > 0 %}
+                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-reativar')">
+                        <span>Clientes para reativar</span>
+                        <strong>{{ clientes_reativar.total }}</strong>
+                        <small>Sem comprar há 30+ dias</small>
+                    </button>
+                {% else %}
+                    <div class="card">
+                        <span>Clientes para reativar</span>
+                        <strong>0</strong>
+                        <small>Sem comprar há 30+ dias</small>
+                    </div>
+                {% endif %}
+
+                {% if clientes_vip_dashboard.total > 0 %}
+                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-vip')">
+                        <span>Clientes VIP</span>
+                        <strong>{{ clientes_vip_dashboard.total }}</strong>
+                        <small>Maiores compradores</small>
+                    </button>
+                {% else %}
+                    <div class="card">
+                        <span>Clientes VIP</span>
+                        <strong>0</strong>
+                        <small>Maiores compradores</small>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="cards-grid margin-top">
+
+
+                {% if clientes_sem_compra_dashboard.total > 0 %}
+                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-sem-compra')">
+                        <span>Clientes sem compra</span>
+                        <strong>{{ clientes_sem_compra_dashboard.total }}</strong>
+                        <small>Cadastrados e ainda sem compra</small>
+                    </button>
+                {% else %}
+                    <div class="card">
+                        <span>Clientes sem compra</span>
+                        <strong>0</strong>
+                        <small>Cadastrados e ainda sem compra</small>
+                    </div>
+                {% endif %}
+
+                {% if clientes_sem_tags_dashboard.total > 0 %}
+                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-sem-tags')">
+                        <span>Clientes sem tags</span>
+                        <strong>{{ clientes_sem_tags_dashboard.total }}</strong>
+                        <small>Cadastro incompleto para campanhas</small>
+                    </button>
+                {% else %}
+                    <div class="card">
+                        <span>Clientes sem tags</span>
+                        <strong>0</strong>
+                        <small>Cadastro incompleto para campanhas</small>
+                    </div>
+                {% endif %}
+
+                {% if clientes_recentes_30_dashboard.total > 0 %}
+                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-recentes-30')">
+                        <span>Compraram nos últimos 30 dias</span>
+                        <strong>{{ clientes_recentes_30_dashboard.total }}</strong>
+                        <small>Pós-venda e fidelização</small>
+                    </button>
+                {% else %}
+                    <div class="card">
+                        <span>Compraram nos últimos 30 dias</span>
+                        <strong>0</strong>
+                        <small>Pós-venda e fidelização</small>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="panel margin-top">
+                <h2>Primeiros passos</h2>
+
+                <div class="quick-actions">
+                    <a href="{{ url_for('clientes') }}" class="action-card">
+                        <strong>Cadastrar cliente</strong>
+                        <span>Adicionar novo cliente ao CRM</span>
+                    </a>
+
+                    <a href="{{ url_for('produtos') }}" class="action-card">
+                        <strong>Cadastrar produto</strong>
+                        <span>Adicionar produto e estoque inicial</span>
+                    </a>
+
+                    <a href="{{ url_for('vendas') }}" class="action-card">
+                        <strong>Registrar venda</strong>
+                        <span>Vender produtos e baixar estoque</span>
+                    </a>
+                </div>
+            </section>
+
+            <section class="panel margin-top" id="ultimas-vendas">
+                <h2>Últimas vendas</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nº</th>
+                                <th>Data</th>
+                                <th>Cliente</th>
+                                <th>Pagamento</th>
+                                <th>Total</th>
+                                <th>Lucro</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for venda in ultimas_vendas %}
+                                <tr>
+                                    <td>#{{ venda.id }}</td>
+                                    <td>{{ venda.data_venda|datetime_br }}</td>
+                                    <td>{{ venda.cliente_nome }}</td>
+                                    <td>{{ venda.forma_pagamento }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.valor_total) }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.lucro_total) }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="empty-state">
+                                        Nenhuma venda registrada ainda.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% set pagination_endpoint = 'dashboard' %}
+                    {% set pagination_args = {
+                        'page_produtos_atencao': page_produtos_atencao,
+                        'modal': modal_aberto
+                    } %}
+                    {% set pagination_page_param = 'page_ultimas_vendas' %}
+                    {% set pagination_page = page_ultimas_vendas %}
+                    {% set pagination_total_pages = total_paginas_ultimas_vendas %}
+                    {% set pagination_total_records = total_ultimas_vendas %}
+                    {% set pagination_anchor = 'ultimas-vendas' %}
+
+                    {% include 'partials/pagination.html' %}
+                </div>
+            </section>
+
+            <section class="panel margin-top" id="produtos-atencao">
+                <h2>Produtos que precisam de atenção</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>SKU</th>
+                                <th>Estoque atual</th>
+                                <th>Estoque mínimo</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for produto in produtos_alerta %}
+                                {% if produto.estoque_atual == 0 %}
+                                    {% set status = 'Sem estoque' %}
+                                    {% set status_class = 'status-danger' %}
+                                {% else %}
+                                    {% set status = 'Baixo estoque' %}
+                                    {% set status_class = 'status-warning' %}
+                                {% endif %}
+
+                                <tr>
+                                    <td>{{ produto.nome }}</td>
+                                    <td>{{ produto.sku }}</td>
+                                    <td>{{ produto.estoque_atual }}</td>
+                                    <td>{{ produto.estoque_minimo }}</td>
+                                    <td>
+                                        <span class="status-pill {{ status_class }}">
+                                            {{ status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="empty-state">
+                                        Nenhum produto em alerta.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% set pagination_endpoint = 'dashboard' %}
+                    {% set pagination_args = {
+                        'page_ultimas_vendas': page_ultimas_vendas,
+                        'modal': modal_aberto
+                    } %}
+                    {% set pagination_page_param = 'page_produtos_atencao' %}
+                    {% set pagination_page = page_produtos_atencao %}
+                    {% set pagination_total_pages = total_paginas_produtos_atencao %}
+                    {% set pagination_total_records = total_produtos_atencao %}
+                    {% set pagination_anchor = 'produtos-atencao' %}
+
+                    {% include 'partials/pagination.html' %}
+                </div>
+            </section>
+        </main>
+
+    </div>
+
+    {% set modal_id = 'modal-reativar' %}
+    {% set modal_title = 'Clientes para reativar' %}
+    {% set modal_description = 'Clientes cuja última compra foi há mais de 30 dias. Ideal para contato pelo WhatsApp.' %}
+    {% set clientes_data = clientes_reativar %}
+    {% set mensagem_tipo = 'reativar' %}
+    {% include 'partials/dashboard_clientes_modal.html' %}
+
+    {% set modal_id = 'modal-vip' %}
+    {% set modal_title = 'Clientes VIP' %}
+    {% set modal_description = 'Clientes com maior valor comprado. Ideais para atendimento personalizado.' %}
+    {% set clientes_data = clientes_vip_dashboard %}
+    {% set mensagem_tipo = 'vip' %}
+    {% include 'partials/dashboard_clientes_modal.html' %}
+
+    {% set modal_id = 'modal-sem-compra' %}
+    {% set modal_title = 'Clientes sem compra' %}
+    {% set modal_description = 'Clientes cadastrados que ainda não realizaram nenhuma compra.' %}
+    {% set clientes_data = clientes_sem_compra_dashboard %}
+    {% set mensagem_tipo = 'sem_compra' %}
+    {% include 'partials/dashboard_clientes_modal.html' %}
+
+    {% set modal_id = 'modal-sem-tags' %}
+    {% set modal_title = 'Clientes sem tags' %}
+    {% set modal_description = 'Clientes sem interesses cadastrados. Complete as tags para melhorar campanhas.' %}
+    {% set clientes_data = clientes_sem_tags_dashboard %}
+    {% set mensagem_tipo = 'sem_tags' %}
+    {% include 'partials/dashboard_clientes_modal.html' %}
+
+    {% set modal_id = 'modal-recentes-30' %}
+    {% set modal_title = 'Compraram nos últimos 30 dias' %}
+    {% set modal_description = 'Clientes recentes. Bom momento para pós-venda e fidelização.' %}
+    {% set clientes_data = clientes_recentes_30_dashboard %}
+    {% set mensagem_tipo = 'recentes_30' %}
+    {% include 'partials/dashboard_clientes_modal.html' %}
+
+    {% set modal_id = 'modal-produtos-baixo' %}
+    {% set modal_title = 'Produtos com estoque baixo' %}
+    {% set modal_description = 'Produtos ativos com estoque atual maior que zero, mas igual ou abaixo do estoque mínimo.' %}
+    {% set produtos_data = produtos_baixo_dashboard %}
+    {% include 'partials/dashboard_produtos_modal.html' %}
+
+    {% set modal_id = 'modal-produtos-sem' %}
+    {% set modal_title = 'Produtos sem estoque' %}
+    {% set modal_description = 'Produtos ativos com estoque zerado. Prioridade para reposição.' %}
+    {% set produtos_data = produtos_sem_dashboard %}
+    {% include 'partials/dashboard_produtos_modal.html' %}
+
+    <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}" defer></script>
+
+</body>
+</html>

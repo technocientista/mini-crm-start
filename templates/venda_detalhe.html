@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Venda #{{ venda.id }} - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="app-layout">
+
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <h1>Venda #{{ venda.id }}</h1>
+                    <p>Detalhes internos da venda.</p>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="success-alert">
+                        {{ messages[0] }}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="panel margin-top">
+                <div class="resumo-venda-header">
+                    <h2>Resumo da venda</h2>
+
+                    <div class="resumo-venda-acoes-inline">
+
+                        <a 
+                            href="{{ url_for('vendas') }}" 
+                            class="icon-action-button secondary"
+                            title="Voltar para vendas"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M15 18l-6-6 6-6"></path>
+                                <path d="M9 12h12"></path>
+                            </svg>
+                            <span>Voltar</span>
+                        </a>
+                        
+                        <a 
+                            href="{{ url_for('venda_recibo', venda_id=venda.id) }}" 
+                            class="icon-action-button" 
+                            target="_blank"
+                            title="Abrir recibo"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M6 2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"></path>
+                                <path d="M14 2v6h6"></path>
+                                <path d="M8 13h8"></path>
+                                <path d="M8 17h8"></path>
+                            </svg>
+                            <span>Recibo</span>
+                        </a>
+
+                        <a 
+                            href="{{ url_for('venda_recibo_termico', venda_id=venda.id) }}" 
+                            class="icon-action-button" 
+                            target="_blank"
+                            title="Cupom térmico"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M6 3h12v18l-2-1.2L14 21l-2-1.2L10 21l-2-1.2L6 21V3z"></path>
+                                <path d="M9 8h6"></path>
+                                <path d="M9 12h6"></path>
+                                <path d="M9 16h4"></path>
+                            </svg>
+                            <span>Cupom fiscal</span>
+                        </a>
+
+                        {% if venda.status != 'CANCELADA' %}
+                            <button 
+                                type="button" 
+                                class="icon-action-button danger" 
+                                onclick="abrirModalCancelamento()"
+                                title="Cancelar venda"
+                            >
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="9"></circle>
+                                    <path d="M8 8l8 8"></path>
+                                    <path d="M16 8l-8 8"></path>
+                                </svg>
+                                <span>Cancelar venda</span>
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="resumo-venda-conteudo">
+                    <p><strong>Data:</strong> {{ venda.data_venda|datetime_br }}</p>
+
+                    <p>
+                        <strong>Cliente:</strong>
+                        {% if venda.cliente_id %}
+                            <a href="{{ url_for('cliente_detalhe', cliente_id=venda.cliente_id) }}" class="table-link">
+                                {{ venda.cliente_nome }}
+                            </a>
+                        {% else %}
+                            {{ venda.cliente_nome }}
+                        {% endif %}
+                    </p>
+
+                    <p><strong>Telefone:</strong> {{ venda.cliente_telefone }}</p>
+                    <p><strong>Endereço:</strong> {{ venda.cliente_endereco }}</p>
+                    <p><strong>Vendedor:</strong> {{ venda.vendedor }}</p>
+                    <p>
+                        <div class="resumo-venda-linha">
+                            <span>Pagamentos</span>
+                            <strong>
+                                {% if pagamentos %}
+                                    {% for pagamento in pagamentos %}
+                                        {{ pagamento.forma_pagamento }}: R$ {{ "%.2f"|format(pagamento.valor or 0) }}{% if not loop.last %}<br>{% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    {{ venda.forma_pagamento }}
+                                {% endif %}
+                            </strong>
+                        </div>
+                    </p>
+                    <p><strong>Observações:</strong> {{ venda.observacoes or '-' }}</p>
+
+                    {% if venda.status == 'CANCELADA' %}
+                        <div class="cancel-info">
+                            <h3>Informações do cancelamento</h3>
+
+                            <p><strong>Cancelado por:</strong> {{ venda.cancelado_por or '-' }}</p>
+                            <p><strong>Data do cancelamento:</strong> {{ venda.data_cancelamento|datetime_br if venda.data_cancelamento else '-' }}</p>
+                            <p><strong>Motivo:</strong> {{ venda.motivo_cancelamento or '-' }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="cards-grid margin-top">
+                <div class="card">
+                    <span>Status</span>
+
+                    {% if venda.status == 'CANCELADA' %}
+                        <strong class="small-card-text">Cancelada</strong>
+                    {% else %}
+                        <strong class="small-card-text">Concluída</strong>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <span>Desconto</span>
+                    <strong>R$ {{ "%.2f"|format(venda.desconto_total) }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Total da venda</span>
+                    <strong>R$ {{ "%.2f"|format(venda.valor_total) }}</strong>
+                </div>
+
+                {% if usuario.perfil == 'ADMIN' %}
+                    <div class="card">
+                        <span>Lucro da venda</span>
+                        <strong>R$ {{ "%.2f"|format(venda.lucro_total) }}</strong>
+                    </div>
+                {% else %}
+                    <div class="card">
+                        <span>Itens vendidos</span>
+                        <strong>{{ itens|length }}</strong>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="panel margin-top">
+                <h2>Itens vendidos</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>SKU</th>
+                                <th>Categoria</th>
+                                <th>Qtd</th>
+                                <th>Unitário</th>
+                                <th>Subtotal</th>
+
+                                {% if usuario.perfil == 'ADMIN' %}
+                                    <th>Custo unit.</th>
+                                    <th>Lucro item</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for item in itens %}
+                                <tr>
+                                    <td>{{ item.produto_nome }}</td>
+                                    <td>{{ item.sku }}</td>
+                                    <td>{{ item.categoria }}</td>
+                                    <td>{{ item.quantidade }}</td>
+                                    <td>R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
+                                    <td>R$ {{ "%.2f"|format(item.subtotal) }}</td>
+
+                                    {% if usuario.perfil == 'ADMIN' %}
+                                        <td>R$ {{ "%.2f"|format(item.preco_custo_unitario) }}</td>
+                                        <td>R$ {{ "%.2f"|format(item.lucro_item) }}</td>
+                                    {% endif %}
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="8" class="empty-state">
+                                        Nenhum item encontrado.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            {% if usuario.perfil == 'ADMIN' %}
+                <section class="panel margin-top">
+                    <h2>Totais internos</h2>
+
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Total vendido</th>
+                                    <th>Custo total</th>
+                                    <th>Lucro total</th>
+                                    <th>Desconto</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                <tr>
+                                    <td>R$ {{ "%.2f"|format(venda.valor_total) }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.custo_total) }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.lucro_total) }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.desconto_total) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="panel margin-top">
+                    <h2>Movimentações de estoque</h2>
+
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Produto</th>
+                                    <th>SKU</th>
+                                    <th>Tipo</th>
+                                    <th>Quantidade</th>
+                                    <th>Estoque anterior</th>
+                                    <th>Estoque atual</th>
+                                    <th>Observações</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for mov in movimentacoes %}
+                                    <tr>
+                                        <td>{{ mov.created_at|datetime_br }}</td>
+                                        <td>{{ mov.produto_nome }}</td>
+                                        <td>{{ mov.produto_sku }}</td>
+                                        <td>{{ mov.tipo }}</td>
+                                        <td>{{ mov.quantidade }}</td>
+                                        <td>{{ mov.estoque_anterior }}</td>
+                                        <td>{{ mov.estoque_atual }}</td>
+                                        <td>{{ mov.observacoes or '-' }}</td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="8" class="empty-state">
+                                            Nenhuma movimentação encontrada para esta venda.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            {% endif %}
+
+        </main>
+
+    </div>
+
+    <div id="modalCancelamentoVenda" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Cancelar venda</h2>
+
+                <button type="button" class="modal-close" onclick="fecharModalCancelamento()">
+                    ×
+                </button>
+            </div>
+
+            <p class="muted-text">
+                Informe o motivo do cancelamento. O estoque dos produtos será devolvido automaticamente.
+            </p>
+
+            <form method="POST" action="{{ url_for('cancelar_venda', venda_id=venda.id) }}">
+                <div class="form-group">
+                    <label for="motivo_cancelamento">Motivo do cancelamento</label>
+                    <textarea 
+                        id="motivo_cancelamento" 
+                        name="motivo_cancelamento" 
+                        rows="4"
+                        required
+                        placeholder="Ex: cliente desistiu da compra, venda lançada incorretamente, troca de produto..."
+                    ></textarea>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="button-secondary" onclick="fecharModalCancelamento()">
+                        Voltar
+                    </button>
+
+                    <button type="submit" class="danger-button">
+                        Confirmar cancelamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
+
+</body>
+</html>

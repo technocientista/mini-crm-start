@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Caixa #{{ caixa.id }} - Start CRM</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="app-layout">
+
+    {% include 'partials/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="topbar">
+            <h1>Caixa #{{ caixa.id }}</h1>
+            <p>Detalhes completos da abertura, movimentações e fechamento.</p>
+        </header>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="success-alert">{{ messages[0] }}</div>
+            {% endif %}
+        {% endwith %}
+
+        <section class="panel">
+            <div class="resumo-venda-header">
+                <h2>Resumo do caixa</h2>
+
+                <div class="resumo-venda-acoes-inline">
+                    <a 
+                        href="{{ url_for('caixa_imprimir', caixa_id=caixa.id) }}" 
+                        class="icon-action-button"
+                        target="_blank"
+                        title="Imprimir fechamento"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M6 9V2h12v7"></path>
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                            <path d="M6 14h12v8H6z"></path>
+                        </svg>
+                        <span>Imprimir</span>
+                    </a>
+                    <a href="{{ url_for('caixa') }}" class="icon-action-button secondary">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M15 18l-6-6 6-6"></path>
+                            <path d="M9 12h12"></path>
+                        </svg>
+                        <span>Voltar</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="cards-grid">
+                <div class="card">
+                    <span>Status</span>
+                    <strong>{{ caixa.status }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Valor inicial</span>
+                    <strong>R$ {{ "%.2f"|format(caixa.valor_inicial or 0) }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Total de vendas</span>
+                    <strong>
+                        {% if caixa.status == 'ABERTO' and resumo_atual %}
+                            R$ {{ "%.2f"|format(resumo_atual.total_vendas or 0) }}
+                        {% else %}
+                            R$ {{ "%.2f"|format(caixa.total_vendas or 0) }}
+                        {% endif %}
+                    </strong>
+                </div>
+
+                <div class="card">
+                    <span>Diferença</span>
+                    <strong>R$ {{ "%.2f"|format(caixa.diferenca or 0) }}</strong>
+                </div>
+            </div>
+
+            <div class="resumo-venda-conteudo margin-top">
+                <p><strong>Aberto por:</strong> {{ caixa.usuario_abertura_nome or '-' }}</p>
+                <p><strong>Data de abertura:</strong> {{ caixa.data_abertura|datetime_br }}</p>
+                <p><strong>Fechado por:</strong> {{ caixa.usuario_fechamento_nome or '-' }}</p>
+                <p><strong>Data de fechamento:</strong> {{ caixa.data_fechamento|datetime_br if caixa.data_fechamento else '-' }}</p>
+                <p><strong>Observação da abertura:</strong> {{ caixa.observacoes_abertura or '-' }}</p>
+                <p><strong>Observação do fechamento:</strong> {{ caixa.observacoes_fechamento or '-' }}</p>
+            </div>
+        </section>
+
+        <section class="panel margin-top">
+            <h2>Valores por forma de pagamento</h2>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Forma</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% if caixa.status == 'ABERTO' and resumo_atual %}
+                            <tr>
+                                <td>Dinheiro</td>
+                                <td>R$ {{ "%.2f"|format(resumo_atual.total_dinheiro or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Pix</td>
+                                <td>R$ {{ "%.2f"|format(resumo_atual.total_pix or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Cartão</td>
+                                <td>R$ {{ "%.2f"|format(resumo_atual.total_cartao or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Outros</td>
+                                <td>R$ {{ "%.2f"|format(resumo_atual.total_outros or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Entradas manuais</td>
+                                <td>R$ {{ "%.2f"|format(resumo_atual.entradas_manuais or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Saídas manuais</td>
+                                <td>R$ {{ "%.2f"|format(resumo_atual.saidas_manuais or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dinheiro esperado</strong></td>
+                                <td><strong>R$ {{ "%.2f"|format(resumo_atual.valor_esperado or 0) }}</strong></td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td>Dinheiro</td>
+                                <td>R$ {{ "%.2f"|format(caixa.total_dinheiro or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Pix</td>
+                                <td>R$ {{ "%.2f"|format(caixa.total_pix or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Cartão</td>
+                                <td>R$ {{ "%.2f"|format(caixa.total_cartao or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Outros</td>
+                                <td>R$ {{ "%.2f"|format(caixa.total_outros or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Entradas manuais</td>
+                                <td>R$ {{ "%.2f"|format(caixa.entradas_manuais or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Saídas manuais</td>
+                                <td>R$ {{ "%.2f"|format(caixa.saidas_manuais or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dinheiro esperado</strong></td>
+                                <td><strong>R$ {{ "%.2f"|format(caixa.valor_esperado or 0) }}</strong></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dinheiro informado</strong></td>
+                                <td><strong>R$ {{ "%.2f"|format(caixa.valor_informado or 0) }}</strong></td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel margin-top">
+            <h2>Vendas vinculadas ao caixa</h2>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Venda</th>
+                            <th>Data</th>
+                            <th>Cliente</th>
+                            <th>Vendedor</th>
+                            <th>Forma</th>
+                            <th>Total</th>
+                            <th>Lucro</th>
+                            <th>Status</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for venda in vendas_caixa %}
+                            <tr>
+                                <td>#{{ venda.id }}</td>
+                                <td>{{ venda.data_venda|datetime_br }}</td>
+                                <td>{{ venda.cliente_nome }}</td>
+                                <td>{{ venda.vendedor }}</td>
+                                <td>{{ venda.forma_pagamento }}</td>
+                                <td>R$ {{ "%.2f"|format(venda.valor_total or 0) }}</td>
+                                <td>R$ {{ "%.2f"|format(venda.lucro_total or 0) }}</td>
+                                <td>
+                                    {% if venda.status == 'CONCLUIDA' %}
+                                        <span class="status-pill status-ok">Concluída</span>
+                                    {% elif venda.status == 'CANCELADA' %}
+                                        <span class="status-pill status-danger">Cancelada</span>
+                                    {% else %}
+                                        <span class="status-pill status-warning">{{ venda.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="table-actions">
+                                        <a 
+                                            href="{{ url_for('venda_detalhe', venda_id=venda.id) }}" 
+                                            class="small-button"
+                                            title="Ver venda"
+                                        >
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-1.8a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"/>
+                                            </svg>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="9" class="empty-state">
+                                    Nenhuma venda vinculada a este caixa.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel margin-top">
+            <h2>Movimentações do caixa</h2>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Tipo</th>
+                            <th>Valor</th>
+                            <th>Descrição</th>
+                            <th>Usuário</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for item in movimentacoes %}
+                            <tr>
+                                <td>{{ item.created_at|datetime_br }}</td>
+                                <td>
+                                    {% if item.tipo == 'ENTRADA' %}
+                                        <span class="status-pill status-ok">Entrada</span>
+                                    {% elif item.tipo == 'SAIDA' %}
+                                        <span class="status-pill status-warning">Saída</span>
+                                    {% elif item.tipo == 'CANCELAMENTO_VENDA' %}
+                                        <span class="status-pill status-danger">Cancelamento</span>
+                                    {% else %}
+                                        <span class="status-pill">{{ item.tipo }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>R$ {{ "%.2f"|format(item.valor or 0) }}</td>
+                                <td>{{ item.descricao or '-' }}</td>
+                                <td>{{ item.usuario_nome or '-' }}</td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="empty-state">
+                                    Nenhuma movimentação manual registrada.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,219 @@
+* {
+            box-sizing: border-box;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 24px;
+            background: #ffffff;
+            color: #000000;
+            font-size: 13px;
+        }
+
+        .print-page {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        h1, h2, h3 {
+            margin: 0;
+        }
+
+        h1 {
+            font-size: 22px;
+            margin-bottom: 4px;
+        }
+
+        h2 {
+            font-size: 17px;
+            margin-top: 24px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 6px;
+        }
+
+        .muted {
+            color: #444;
+            font-size: 12px;
+        }
+
+        .line {
+            border-top: 1px dashed #000;
+            margin: 14px 0;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 24px;
+            margin-top: 14px;
+        }
+
+        .info-grid p {
+            margin: 0;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .card {
+            border: 1px solid #000;
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .card span {
+            display: block;
+            font-size: 11px;
+            color: #444;
+            margin-bottom: 5px;
+        }
+
+        .card strong {
+            font-size: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+
+        th,
+        td {
+            border-bottom: 1px solid #ccc;
+            padding: 7px 6px;
+            text-align: left;
+            font-size: 12px;
+        }
+
+        th {
+            border-bottom: 1px solid #000;
+            font-weight: bold;
+        }
+
+        .total-row td {
+            font-weight: bold;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+        }
+
+        .actions {
+            max-width: 900px;
+            margin: 18px auto;
+            display: flex;
+            gap: 10px;
+        }
+
+        .actions button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #1f7a3f;
+            color: #ffffff;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .actions .secondary {
+            background: #6c757d;
+        }
+
+        .obs {
+            white-space: pre-wrap;
+            line-height: 1.4;
+        }
+
+        @page {
+            size: A4;
+            margin: 8mm;
+        }
+
+        @media print {
+            html,
+            body {
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
+            }
+
+            body {
+                font-size: 11px;
+            }
+
+            .actions {
+                display: none !important;
+            }
+
+            .print-page {
+                max-width: none;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            h1 {
+                font-size: 18px;
+            }
+
+            h2 {
+                font-size: 14px;
+                margin-top: 14px;
+                margin-bottom: 6px;
+                padding-bottom: 4px;
+            }
+
+            .cards {
+                gap: 6px;
+                margin-top: 8px;
+            }
+
+            .card {
+                padding: 6px;
+            }
+
+            .card span {
+                font-size: 10px;
+                margin-bottom: 3px;
+            }
+
+            .card strong {
+                font-size: 12px;
+            }
+
+            .info-grid {
+                gap: 5px 18px;
+                margin-top: 8px;
+            }
+
+            th,
+            td {
+                padding: 4px 5px;
+                font-size: 10px;
+            }
+
+            .line {
+                margin: 8px 0;
+            }
+
+            .final-line {
+                margin-bottom: 0;
+            }
+
+            table,
+            tr,
+            td,
+            th {
+                page-break-inside: avoid;
+            }
+        }

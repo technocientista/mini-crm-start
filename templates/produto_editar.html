@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Editar Produto - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="app-layout">
+
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <h1>Editar produto</h1>
+                    <p>Atualize os dados do produto {{ produto.nome }}.</p>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="success-alert">
+                        {{ messages[0] }}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="panel">
+                <form method="POST" action="{{ url_for('produto_editar', produto_id=produto.id) }}" class="form-grid">
+                    <div class="form-group">
+                        <label for="nome">Nome do produto</label>
+                        <input type="text" id="nome" name="nome" value="{{ produto.nome }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="categoria">Categoria</label>
+                        <select id="categoria" name="categoria" required>
+                            {% set categorias = [
+                                'Capinhas',
+                                'Películas',
+                                'Carregadores',
+                                'Cabos',
+                                'Adaptadores',
+                                'Fones',
+                                'Caixas de som',
+                                'Suportes',
+                                'Acessórios gamer',
+                                'Acessórios de informática',
+                                'Outros'
+                            ] %}
+
+                            {% for categoria in categorias %}
+                                <option value="{{ categoria }}" {% if produto.categoria == categoria %}selected{% endif %}>
+                                    {{ categoria }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="marca">Marca</label>
+                        <input type="text" id="marca" name="marca" value="{{ produto.marca or '' }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sku">SKU / Código</label>
+                        <input type="text" id="sku" name="sku" value="{{ produto.sku }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="preco_custo">Preço de custo</label>
+                        <input 
+                            type="number" 
+                            id="preco_custo" 
+                            name="preco_custo" 
+                            step="0.01" 
+                            min="0" 
+                            value="{{ produto.preco_custo }}"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="preco_venda">Preço de venda</label>
+                        <input 
+                            type="number" 
+                            id="preco_venda" 
+                            name="preco_venda" 
+                            step="0.01" 
+                            min="0" 
+                            value="{{ produto.preco_venda }}"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label>Estoque atual</label>
+                        <input type="number" value="{{ produto.estoque_atual }}" disabled>
+                        <small class="field-help">
+                            Para alterar o estoque, use a tela Estoque.
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="estoque_minimo">Estoque mínimo</label>
+                        <input 
+                            type="number" 
+                            id="estoque_minimo" 
+                            name="estoque_minimo" 
+                            min="0" 
+                            value="{{ produto.estoque_minimo }}"
+                            required
+                        >
+                    </div>
+
+                    <div class="edit-actions-row">
+                        <button type="submit" class="icon-action-button">
+                            Salvar
+                        </button>
+
+                        <a href="{{ url_for('produtos') }}" class="icon-action-button secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </section>
+        </main>
+
+    </div>
+
+</body>
+</html>

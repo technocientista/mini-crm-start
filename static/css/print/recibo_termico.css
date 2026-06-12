@@ -1,0 +1,113 @@
+* {
+            box-sizing: border-box;
+            font-family: "Courier New", monospace;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+            color: #000000;
+        }
+
+        .cupom {
+            width: 80mm;
+            max-width: 80mm;
+            padding: 8px;
+            margin: 0 auto;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .small {
+            font-size: 11px;
+        }
+
+        .line {
+            border-top: 1px dashed #000;
+            margin: 8px 0;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .item {
+            margin-bottom: 8px;
+        }
+
+        .item-name {
+            font-weight: bold;
+            word-break: break-word;
+        }
+
+        .item-details {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .total {
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        .actions {
+            width: 80mm;
+            max-width: 80mm;
+            margin: 12px auto;
+            display: flex;
+            gap: 8px;
+        }
+
+        .actions button,
+        .actions a {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            background: #1f7a3f;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .actions a {
+            background: #6c757d;
+        }
+
+        @media print {
+            @page {
+                size: 80mm auto;
+                margin: 0;
+            }
+
+            body {
+                margin: 0;
+                padding: 0;
+            }
+
+            .cupom {
+                width: 80mm;
+                max-width: 80mm;
+                margin: 0;
+                padding: 6px;
+            }
+
+            .actions {
+                display: none;
+            }
+        }

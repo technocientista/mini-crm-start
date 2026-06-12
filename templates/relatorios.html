@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatórios - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="app-layout">
+
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <h1>Relatórios</h1>
+                    <p>Acompanhe vendas, lucro, produtos e clientes por período.</p>
+                </div>
+            </header>
+
+            <section class="panel">
+                <h2>Filtros</h2>
+
+                <form method="GET" action="{{ url_for('relatorios') }}" class="search-form reports-search-form">
+                    <input type="date" id="data_inicio" name="data_inicio" value="{{ data_inicio }}">
+
+                    <input type="date" id="data_fim" name="data_fim" value="{{ data_fim }}">
+
+                    <select name="vendedor_id">
+                        <option value="">Todos os vendedores</option>
+                        {% for vendedor in vendedores %}
+                            <option value="{{ vendedor.id }}" {% if vendedor_id|string == vendedor.id|string %}selected{% endif %}>
+                                {{ vendedor.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                    <select name="cliente_id">
+                        <option value="">Todos os clientes</option>
+                        {% for cliente in clientes %}
+                            <option value="{{ cliente.id }}" {% if cliente_id|string == cliente.id|string %}selected{% endif %}>
+                                {{ cliente.nome }} - {{ cliente.telefone }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                    <select name="forma_pagamento">
+                        <option value="">Todas as formas</option>
+                        {% for forma in formas_pagamento_opcoes %}
+                            <option value="{{ forma.forma_pagamento }}" {% if forma_pagamento == forma.forma_pagamento %}selected{% endif %}>
+                                {{ forma.forma_pagamento }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                    <button 
+                        type="submit" 
+                        class="small-button action-icon-button"
+                        title="Filtrar"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.45 4.44-1.41 1.41-4.44-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/>
+                        </svg>
+                    </button>
+
+                    <a 
+                        href="{{ url_for('relatorios') }}" 
+                        class="small-button action-icon-button secondary-icon" 
+                        title="Limpar filtros"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 6h18v2H3V6zm3 4h12l-1 10H7L6 10zm3-7h6l1 2H8l1-2z"/>
+                        </svg>
+                    </a>
+
+                    <a 
+                        class="small-button action-icon-button"
+                        title="Exportar Excel"
+                        href="{{ url_for(
+                            'exportar_relatorio',
+                            data_inicio=data_inicio,
+                            data_fim=data_fim,
+                            vendedor_id=vendedor_id,
+                            cliente_id=cliente_id,
+                            forma_pagamento=forma_pagamento
+                        ) }}"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/>
+                        </svg>
+                    </a>
+                </form>
+            </section>
+
+        <section class="cards-grid margin-top">
+            <div class="card">
+                <span>Quantidade de vendas</span>
+                <strong>{{ resumo.quantidade_vendas }}</strong>
+            </div>
+
+            <div class="card">
+                <span>Total vendido</span>
+                <strong>R$ {{ "%.2f"|format(resumo.total_vendido) }}</strong>
+            </div>
+
+            <div class="card">
+                <span>Lucro total</span>
+                <strong>R$ {{ "%.2f"|format(resumo.total_lucro) }}</strong>
+            </div>
+
+            <div class="card">
+                <span>Descontos</span>
+                <strong>R$ {{ "%.2f"|format(resumo.total_desconto) }}</strong>
+            </div>
+        </section>
+
+        <section class="cards-grid margin-top">
+            <div class="card">
+                <span>Custo total</span>
+                <strong>R$ {{ "%.2f"|format(resumo.total_custo) }}</strong>
+            </div>
+
+            <div class="card">
+                <span>Ticket médio</span>
+                <strong>R$ {{ "%.2f"|format(ticket_medio) }}</strong>
+            </div>
+
+            <div class="card">
+                <span>Margem média</span>
+                <strong>{{ "%.2f"|format(margem_media) }}%</strong>
+            </div>
+
+            <div class="card">
+                <span>Registros filtrados</span>
+                <strong>{{ total_registros }}</strong>
+            </div>
+        </section>
+
+        <section class="cards-grid margin-top">
+            <div class="card">
+                <span>Vendas canceladas</span>
+                <strong>{{ resumo_canceladas.quantidade_canceladas or 0 }}</strong>
+            </div>
+
+            <div class="card">
+                <span>Total cancelado</span>
+                <strong>R$ {{ "%.2f"|format(resumo_canceladas.total_cancelado or 0) }}</strong>
+            </div>
+
+            <div class="card">
+                <span>Lucro perdido</span>
+                <strong>R$ {{ "%.2f"|format(resumo_canceladas.lucro_cancelado or 0) }}</strong>
+            </div>
+        </section>
+
+            <section class="panel margin-top" id="lista-relatorio-vendas">
+                <h2>Vendas no período</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nº</th>
+                                <th>Data</th>
+                                <th>Cliente</th>
+                                <th>Vendedor</th>
+                                <th>Pagamento</th>
+                                <th>Desconto</th>
+                                <th>Total</th>
+                                <th>Custo</th>
+                                <th>Lucro</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for venda in vendas %}
+                                <tr>
+                                    <td>#{{ venda.id }}</td>
+                                    <td>{{ venda.data_venda|datetime_br }}</td>
+                                    <td>{{ venda.cliente_nome }}</td>
+                                    <td>{{ venda.vendedor or '-' }}</td>
+                                    <td>{{ venda.forma_pagamento }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.desconto_total) }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.valor_total) }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.custo_total) }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.lucro_total) }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="9" class="empty-state">
+                                        Nenhuma venda encontrada nesse período.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pagination-compact">
+                    {% if page > 1 %}
+                        <a 
+                            href="{{ url_for('relatorios', data_inicio=data_inicio, data_fim=data_fim, vendedor_id=vendedor_id, cliente_id=cliente_id, forma_pagamento=forma_pagamento, page=page-1) }}#lista-relatorio-vendas" 
+                            class="pagination-arrow"
+                            title="Página anterior"
+                        >
+                            ‹
+                        </a>
+                    {% else %}
+                        <span class="pagination-arrow disabled">‹</span>
+                    {% endif %}
+
+                    {% for p in range(1, total_paginas + 1) %}
+                        {% if p <= 10 or p == total_paginas or (p >= page - 1 and p <= page + 1) %}
+                            <a 
+                                href="{{ url_for('relatorios', data_inicio=data_inicio, data_fim=data_fim, vendedor_id=vendedor_id, cliente_id=cliente_id, forma_pagamento=forma_pagamento, page=p) }}#lista-relatorio-vendas" 
+                                class="pagination-number {% if p == page %}active{% endif %}"
+                            >
+                                {{ p }}
+                            </a>
+                        {% elif p == 11 and total_paginas > 11 %}
+                            <span class="pagination-ellipsis">...</span>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page < total_paginas %}
+                        <a 
+                            href="{{ url_for('relatorios', data_inicio=data_inicio, data_fim=data_fim, vendedor_id=vendedor_id, cliente_id=cliente_id, forma_pagamento=forma_pagamento, page=page+1) }}#lista-relatorio-vendas" 
+                            class="pagination-arrow"
+                            title="Próxima página"
+                        >
+                            ›
+                        </a>
+                    {% else %}
+                        <span class="pagination-arrow disabled">›</span>
+                    {% endif %}
+                </div>
+
+                <div class="pagination-summary">
+                    Total de registros: <strong>{{ total_registros }}</strong>
+                </div>
+            </section>
+
+            <section class="panel margin-top">
+                <h2>Vendas por forma de pagamento</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Forma de pagamento</th>
+                                <th>Quantidade</th>
+                                <th>Total vendido</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in formas_pagamento %}
+                                <tr>
+                                    <td>{{ item.forma_pagamento }}</td>
+                                    <td>{{ item.quantidade }}</td>
+                                    <td>R$ {{ "%.2f"|format(item.total) }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="3" class="empty-state">
+                                        Nenhum dado encontrado.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel margin-top">
+                <h2>Produtos mais vendidos</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>SKU</th>
+                                <th>Quantidade vendida</th>
+                                <th>Total vendido</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for produto in produtos_mais_vendidos %}
+                                <tr>
+                                    <td>{{ produto.produto_nome }}</td>
+                                    <td>{{ produto.sku }}</td>
+                                    <td>{{ produto.quantidade_total }}</td>
+                                    <td>R$ {{ "%.2f"|format(produto.total_vendido) }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="4" class="empty-state">
+                                        Nenhum produto vendido nesse período.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel margin-top">
+                <h2>Clientes que mais compraram</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Telefone</th>
+                                <th>Quantidade de compras</th>
+                                <th>Total comprado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cliente in clientes_mais_compraram %}
+                                <tr>
+                                    <td>{{ cliente.cliente_nome }}</td>
+                                    <td>{{ cliente.telefone }}</td>
+                                    <td>{{ cliente.quantidade_compras }}</td>
+                                    <td>R$ {{ "%.2f"|format(cliente.total_comprado) }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="4" class="empty-state">
+                                        Nenhum cliente encontrado nesse período.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel margin-top">
+                <h2>Vendas canceladas no período</h2>
+
+                <p class="muted-text">
+                    Lista das últimas vendas canceladas dentro do período filtrado, com motivo e responsável pelo cancelamento.
+                </p>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Venda</th>
+                                <th>Data da venda</th>
+                                <th>Data do cancelamento</th>
+                                <th>Cliente</th>
+                                <th>Vendedor</th>
+                                <th>Cancelado por</th>
+                                <th>Valor</th>
+                                <th>Motivo</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for venda in vendas_canceladas %}
+                                <tr>
+                                    <td>#{{ venda.id }}</td>
+                                    <td>{{ venda.data_venda|datetime_br }}</td>
+                                    <td>
+                                        {% if venda.data_cancelamento %}
+                                            {{ venda.data_cancelamento|datetime_br }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ venda.cliente_nome }}</td>
+                                    <td>{{ venda.vendedor }}</td>
+                                    <td>{{ venda.cancelado_por or '-' }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.valor_total or 0) }}</td>
+                                    <td class="cancel-reason">
+                                        {{ venda.motivo_cancelamento or '-' }}
+                                    </td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <a 
+                                                href="{{ url_for('venda_detalhe', venda_id=venda.id) }}" 
+                                                class="small-button"
+                                                title="Ver venda"
+                                            >
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-1.8a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"/>
+                                                </svg>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="9" class="empty-state">
+                                        Nenhuma venda cancelada no período.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+
+    </div>
+
+</body>
+</html>

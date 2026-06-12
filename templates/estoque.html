@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Estoque - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="app-layout">
+
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <h1>Estoque</h1>
+                    <p>Acompanhe saldos, estoque baixo e movimentações.</p>
+                </div>
+            </header>
+
+            <div class="page-actions">
+                <button type="button" class="icon-text-button" onclick="abrirModalAjusteEstoque()">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                    </svg>
+                    Ajustar estoque
+                </button>
+            </div>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="success-alert">
+                        {{ messages[0] }}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="cards-grid">
+                <div class="card">
+                    <span>Total de produtos</span>
+                    <strong>{{ resumo_estoque.total_produtos or 0 }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Estoque OK</span>
+                    <strong>{{ resumo_estoque.estoque_ok or 0 }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Baixo estoque</span>
+                    <strong>{{ resumo_estoque.baixo_estoque or 0 }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Sem estoque</span>
+                    <strong>{{ resumo_estoque.sem_estoque or 0 }}</strong>
+                </div>
+            </section>
+
+            <section class="panel margin-top">
+                <h2>Buscar produtos no estoque</h2>
+
+                <form method="GET" action="{{ url_for('estoque') }}" class="search-form stock-search-form">
+                    <input 
+                        type="text" 
+                        name="busca" 
+                        value="{{ busca or '' }}"
+                        placeholder="Buscar por produto, SKU, categoria ou marca..."
+                    >
+
+                    <select name="status">
+                        <option value="todos" {% if status == 'todos' %}selected{% endif %}>Todos</option>
+                        <option value="ok" {% if status == 'ok' %}selected{% endif %}>Estoque OK</option>
+                        <option value="baixo" {% if status == 'baixo' %}selected{% endif %}>Baixo estoque</option>
+                        <option value="sem" {% if status == 'sem' %}selected{% endif %}>Sem estoque</option>
+                    </select>
+
+                    <button 
+                        type="submit" 
+                        class="small-button action-icon-button"
+                        title="Buscar"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.45 4.44-1.41 1.41-4.44-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/>
+                        </svg>
+                    </button>
+
+                    <a 
+                        href="{{ url_for('estoque') }}#lista-estoque" 
+                        class="small-button action-icon-button secondary-icon" 
+                        title="Limpar filtros"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 6h18v2H3V6zm3 4h12l-1 10H7L6 10zm3-7h6l1 2H8l1-2z"/>
+                        </svg>
+                    </a>
+                </form>
+            </section>
+
+            <section class="panel margin-top" id="lista-estoque">
+                <h2>Produtos em estoque</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>Categoria</th>
+                                <th>Marca</th>
+                                <th>SKU</th>
+                                <th>Estoque atual</th>
+                                <th>Estoque mínimo</th>
+                                <th>Status</th>
+                                <th>Valor em estoque</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for produto in produtos %}
+                                {% if produto.estoque_atual == 0 %}
+                                    {% set status = 'Sem estoque' %}
+                                    {% set status_class = 'status-danger' %}
+                                {% elif produto.estoque_atual <= produto.estoque_minimo %}
+                                    {% set status = 'Baixo estoque' %}
+                                    {% set status_class = 'status-warning' %}
+                                {% else %}
+                                    {% set status = 'OK' %}
+                                    {% set status_class = 'status-ok' %}
+                                {% endif %}
+
+                                <tr>
+                                    <td>{{ produto.nome }}</td>
+                                    <td>{{ produto.categoria }}</td>
+                                    <td>{{ produto.marca or '-' }}</td>
+                                    <td>{{ produto.sku }}</td>
+                                    <td>{{ produto.estoque_atual }}</td>
+                                    <td>{{ produto.estoque_minimo }}</td>
+                                    <td>
+                                        <span class="status-pill {{ status_class }}">
+                                            {{ status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        R$ {{ "%.2f"|format(produto.preco_custo * produto.estoque_atual) }}
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="8" class="empty-state">
+                                        Nenhum produto cadastrado.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% set pagination_endpoint = 'estoque' %}
+                {% set pagination_args = {'busca': busca, 'status': status, 'page_movimentacoes': page_movimentacoes} %}
+                {% set pagination_page_param = 'page_produtos' %}
+                {% set pagination_page = page_produtos %}
+                {% set pagination_total_pages = total_paginas_produtos %}
+                {% set pagination_total_records = total_produtos %}
+                {% set pagination_anchor = 'lista-estoque' %}
+
+                {% include 'partials/pagination.html' %}
+            </section>
+
+            <section class="panel margin-top" id="lista-movimentacoes">
+                <h2>Últimas movimentações</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Produto</th>
+                                <th>SKU</th>
+                                <th>Tipo</th>
+                                <th>Quantidade</th>
+                                <th>Anterior</th>
+                                <th>Atual</th>
+                                <th>Observações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mov in movimentacoes %}
+                                <tr>
+                                    <td>{{ mov.created_at|datetime_br }}</td>
+                                    <td>{{ mov.produto_nome }}</td>
+                                    <td>{{ mov.produto_sku }}</td>
+                                    <td>{{ mov.tipo }}</td>
+                                    <td>{{ mov.quantidade }}</td>
+                                    <td>{{ mov.estoque_anterior }}</td>
+                                    <td>{{ mov.estoque_atual }}</td>
+                                    <td>{{ mov.observacoes or '-' }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="8" class="empty-state">
+                                        Nenhuma movimentação registrada.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% set pagination_endpoint = 'estoque' %}
+                {% set pagination_args = {
+                    'busca': busca,
+                    'status': status,
+                    'page_produtos': page_produtos
+                } %}
+                {% set pagination_page_param = 'page_movimentacoes' %}
+                {% set pagination_page = page_movimentacoes %}
+                {% set pagination_total_pages = total_paginas_movimentacoes %}
+                {% set pagination_total_records = total_movimentacoes %}
+                {% set pagination_anchor = 'lista-movimentacoes' %}
+
+                {% include 'partials/pagination.html' %}
+            </section>
+
+        </main>
+
+    </div>
+
+    <div id="modalAjusteEstoque" class="modal-overlay">
+        <div class="modal-card modal-large">
+            <div class="modal-header">
+                <h2>Ajuste manual de estoque</h2>
+
+                <button type="button" class="modal-close" onclick="fecharModalAjusteEstoque()">
+                    ×
+                </button>
+            </div>
+
+            <form method="POST" action="{{ url_for('estoque') }}" class="form-grid compact-form">
+                <div class="form-group">
+                    <label for="produto_id">Produto</label>
+                    <select id="produto_id" name="produto_id" required>
+                        <option value="">Selecione o produto</option>
+                        {% for produto in produtos_ajuste %}
+                            <option value="{{ produto.id }}">
+                                {{ produto.nome }} | SKU: {{ produto.sku }} | Atual: {{ produto.estoque_atual }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="novo_estoque">Novo estoque</label>
+                    <input type="number" id="novo_estoque" name="novo_estoque" min="0" required>
+                </div>
+
+                <div class="form-group full">
+                    <label for="observacoes">Observações</label>
+                    <textarea 
+                        id="observacoes" 
+                        name="observacoes" 
+                        rows="3" 
+                        placeholder="Ex: conferência de estoque, entrada manual, perda, correção..."
+                    ></textarea>
+                </div>
+
+                <div class="modal-actions full">
+                    <button type="button" class="button-secondary" onclick="fecharModalAjusteEstoque()">
+                        Cancelar
+                    </button>
+
+                    <button type="submit">
+                        Ajustar estoque
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
+
+</body>
+</html>

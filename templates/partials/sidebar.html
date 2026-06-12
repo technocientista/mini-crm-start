@@ -1,0 +1,181 @@
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        {% if config_loja and config_loja.logo_path %}
+            <img 
+                src="{{ url_for('static', filename=config_loja.logo_path) }}" 
+                alt="{{ config_loja.nome_loja or 'Start CRM' }}"
+            >
+        {% else %}
+            <h2>{{ config_loja.nome_loja if config_loja else 'Start CRM' }}</h2>
+        {% endif %}
+    </div>
+
+    <nav>
+        {% set endpoint = request.endpoint %}
+        {% set perfil = session.get('usuario_perfil') %}
+
+        {% if perfil == 'ADMIN' %}
+            <a 
+                href="{{ url_for('dashboard') }}"
+                class="{% if endpoint == 'dashboard' %}active{% endif %}"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+                </svg>
+                <span>Início</span>
+            </a>
+        {% endif %}
+
+        <a 
+            href="{{ url_for('clientes') }}"
+            class="{% if endpoint in ['clientes', 'cliente_detalhe', 'cliente_editar'] %}active{% endif %}"
+        >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zM8 11c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+            </svg>
+            <span>Clientes</span>
+        </a>
+
+        {% if perfil == 'ADMIN' %}
+            <a 
+                href="{{ url_for('produtos') }}"
+                class="{% if endpoint in ['produtos', 'produto_editar'] %}active{% endif %}"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M20 8h-3V4H7v4H4l-2 4v8h20v-8l-2-4zM9 6h6v2H9V6zm11 12H4v-5h16v5z"/>
+                </svg>
+                <span>Produtos</span>
+            </a>
+        {% endif %}
+
+            <a 
+                href="{{ url_for('vendas') }}"
+                class="{% if endpoint in ['vendas', 'venda_recibo', 'venda_detalhe'] %}active{% endif %}"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45C4.52 15.37 5.48 17 7 17h12v-2H7l1.1-2h7.45c.75 0 1.41-.41 1.75-1.03L21 5H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2S15.9 22 17 22s2-.9 2-2-.9-2-2-2z"/>
+                </svg>
+                <span>PDV</span>
+            </a>
+
+            <a 
+                href="{{ url_for('caixa') }}"
+                class="{% if request.endpoint == 'caixa' %}active{% endif %}"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 6h18v12H3V6zm2 2v8h14V8H5zm3 2h4v2H8v-2zm0 3h8v2H8v-2z"/>
+                </svg>
+                <span>Caixa</span>
+            </a>
+
+        {% if perfil == 'ADMIN' %}
+            <a 
+                href="{{ url_for('estoque') }}"
+                class="{% if endpoint == 'estoque' %}active{% endif %}"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 16V8l-9-5-9 5v8l9 5 9-5zM12 5.3 18.6 9 12 12.7 5.4 9 12 5.3zM5 10.7l6 3.3v4.7l-6-3.3v-4.7zm8 8V14l6-3.3v4.7l-6 3.3z"/>
+                </svg>
+                <span>Estoque</span>
+            </a>
+
+            <a 
+                href="{{ url_for('relatorios') }}"
+                class="{% if endpoint in ['relatorios', 'exportar_relatorio'] %}active{% endif %}"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 3v18h18v-2H5V3H3zm14 14h2V7h-2v10zm-4 0h2v-6h-2v6zm-4 0h2v-4H9v4z"/>
+                </svg>
+                <span>Relatórios</span>
+            </a>
+
+            <a href="{{ url_for('relatorio_caixas') }}" class="{% if request.endpoint == 'relatorio_caixas' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 6h18v12H3V6zm2 2v8h14V8H5zm3 2h4v2H8v-2zm0 3h8v2H8v-2z"/>
+                </svg>
+                <span>Relatório de caixas</span>
+            </a>
+
+            <a 
+                href="{{ url_for('usuarios') }}"
+                class="{% if endpoint in ['usuarios', 'usuario_editar'] %}active{% endif %}"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+                <span>Usuários</span>
+            </a>
+
+            <a 
+                href="{{ url_for('comissoes') }}"
+                class="{% if endpoint in ['comissoes', 'exportar_comissoes'] %}active{% endif %}"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 2C6.48 2 2 5.13 2 9c0 2.38 1.7 4.47 4.29 5.73L5 20l5.08-3.05c.62.04 1.26.05 1.92.05 5.52 0 10-3.13 10-7S17.52 2 12 2zm1 11h-2v-1c-1.1-.26-2-.95-2-2h2c0 .55.45 1 1 1s1-.45 1-1c0-.6-.4-.83-1.35-1.14C10.54 8.5 9 8 9 6.5c0-1.03.84-1.88 2-2.15V3h2v1.35c1.16.27 2 1.12 2 2.15h-2c0-.55-.45-1-1-1s-1 .45-1 1c0 .6.4.83 1.35 1.14C13.46 8 15 8.5 15 10c0 1.05-.84 1.9-2 2.16V13z"/>
+                </svg>
+                <span>Comissões</span>
+            </a>
+
+            <a 
+                href="{{ url_for('configuracoes') }}"
+                class="{% if endpoint == 'configuracoes' %}active{% endif %}"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65-2-3.46-2.49 1a7.03 7.03 0 0 0-1.69-.98L15 3h-4l-.36 2.93c-.6.23-1.17.56-1.69.98l-2.49-1-2 3.46 2.11 1.65c-.04.32-.07.65-.07.98s.02.66.07.98l-2.11 1.65 2 3.46 2.49-1c.52.42 1.09.75 1.69.98L11 21h4l.36-2.93c.6-.23 1.17-.56 1.69-.98l2.49 1 2-3.46-2.11-1.65zM13 15.5A3.5 3.5 0 1 1 13 8a3.5 3.5 0 0 1 0 7.5z"/>
+                </svg>
+                <span>Configurações</span>
+            </a>
+
+            <a 
+                href="{{ url_for('mensagens_whatsapp') }}"
+                class="{% if endpoint == 'mensagens_whatsapp' %}active{% endif %}"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+                </svg>
+                <span>Mensagens</span>
+            </a>
+
+            <a 
+                href="{{ url_for('logs') }}"
+                class="{% if endpoint == 'logs' %}active{% endif %}"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM13 9V3.5L18.5 9H13zm-5 3h8v2H8v-2zm0 4h8v2H8v-2zm0-8h3v2H8V8z"/>
+                </svg>
+                <span>Logs</span>
+            </a>
+
+            <a 
+                href="{{ url_for('backup') }}"
+                onclick="return confirm('Deseja gerar e baixar um backup do banco agora?');"
+            >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3a9 9 0 0 0-9 9H1l3 3.2L7 12H5a7 7 0 1 1 2.05 4.95l-1.42 1.42A9 9 0 1 0 12 3zm-1 5v5l4.25 2.52.75-1.23-3.5-2.08V8H11z"/>
+                </svg>
+                <span>Backup</span>
+            </a>
+        {% endif %}
+
+        <a href="#" onclick="alternarTema(); return false;">
+            <svg id="theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 14.6A8.5 8.5 0 0 1 9.4 3 9 9 0 1 0 21 14.6z"/>
+            </svg>
+
+            <svg id="theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true" style="display: none;">
+                <path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8 1.42-1.42zM1 13h3v-2H1v2zm10-12h2v3h-2V1zm8.04 2.05-1.79 1.79 1.42 1.42 1.79-1.8-1.42-1.41zM17.24 19.16l1.8 1.79 1.41-1.41-1.79-1.8-1.42 1.42zM20 11v2h3v-2h-3zM4.96 20.95l1.8-1.79-1.42-1.42-1.79 1.8 1.41 1.41zM11 20h2v3h-2v-3zM12 6a6 6 0 1 0 0 12A6 6 0 0 0 12 6z"/>
+            </svg>
+
+            <span id="theme-toggle-text">Modo escuro</span>
+        </a>
+
+        <a href="{{ url_for('logout') }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 17v-3H3v-4h7V7l5 5-5 5zm2-14h8v18h-8v-2h6V5h-6V3z"/>
+            </svg>
+            <span>Sair</span>
+        </a>
+    </nav>
+</aside>
+
+<script src="{{ url_for('static', filename='js/sidebar.js') }}" defer></script>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Logs - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="app-layout">
+
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <h1>Auditoria</h1>
+                    <p>Acompanhe ações importantes realizadas no sistema.</p>
+                </div>
+            </header>
+
+            <section class="panel">
+                <h2>Filtros</h2>
+
+                <form method="GET" action="{{ url_for('logs') }}" class="search-form logs-search-form">
+                    <input 
+                        type="text" 
+                        id="busca" 
+                        name="busca" 
+                        value="{{ busca or '' }}"
+                        placeholder="Buscar por usuário, ação, entidade ou descrição..."
+                    >
+
+                    <input 
+                        type="date" 
+                        id="data_inicio" 
+                        name="data_inicio" 
+                        value="{{ data_inicio or '' }}"
+                        title="Data inicial"
+                    >
+
+                    <input 
+                        type="date" 
+                        id="data_fim" 
+                        name="data_fim" 
+                        value="{{ data_fim or '' }}"
+                        title="Data final"
+                    >
+
+                    <button 
+                        type="submit" 
+                        class="small-button action-icon-button"
+                        title="Buscar"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.45 4.44-1.41 1.41-4.44-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/>
+                        </svg>
+                    </button>
+
+                    <a 
+                        href="{{ url_for('logs') }}#lista-logs" 
+                        class="small-button action-icon-button secondary-icon" 
+                        title="Limpar filtros"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 6h18v2H3V6zm3 4h12l-1 10H7L6 10zm3-7h6l1 2H8l1-2z"/>
+                        </svg>
+                    </a>
+                </form>
+            </section>
+
+            <section class="panel margin-top" id="lista-logs">
+                <h2>Registros de auditoria</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Usuário</th>
+                                <th>Ação</th>
+                                <th>Entidade</th>
+                                <th>ID</th>
+                                <th>Descrição</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for item in logs %}
+                                <tr>
+                                    <td>{{ item.created_at|datetime_br }}</td>
+                                    <td>{{ item.usuario_nome or '-' }}</td>
+                                    <td>{{ item.acao }}</td>
+                                    <td>{{ item.entidade or '-' }}</td>
+                                    <td>{{ item.entidade_id or '-' }}</td>
+                                    <td>{{ item.descricao or '-' }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="empty-state">
+                                        Nenhum log encontrado.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination-compact">
+                    {% if page > 1 %}
+                        <a 
+                            href="{{ url_for('logs', busca=busca, data_inicio=data_inicio, data_fim=data_fim, page=page-1) }}#lista-logs" 
+                            class="pagination-arrow"
+                            title="Página anterior"
+                        >
+                            ‹
+                        </a>
+                    {% else %}
+                        <span class="pagination-arrow disabled">‹</span>
+                    {% endif %}
+
+                    {% for p in range(1, total_paginas + 1) %}
+                        {% if p <= 10 or p == total_paginas or (p >= page - 1 and p <= page + 1) %}
+                            <a 
+                                href="{{ url_for('logs', busca=busca, data_inicio=data_inicio, data_fim=data_fim, page=p) }}#lista-logs" 
+                                class="pagination-number {% if p == page %}active{% endif %}"
+                            >
+                                {{ p }}
+                            </a>
+                        {% elif p == 11 and total_paginas > 11 %}
+                            <span class="pagination-ellipsis">...</span>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page < total_paginas %}
+                        <a 
+                            href="{{ url_for('logs', busca=busca, data_inicio=data_inicio, data_fim=data_fim, page=page+1) }}#lista-logs" 
+                            class="pagination-arrow"
+                            title="Próxima página"
+                        >
+                            ›
+                        </a>
+                    {% else %}
+                        <span class="pagination-arrow disabled">›</span>
+                    {% endif %}
+                </div>
+
+                <div class="pagination-summary">
+                    Total de registros: <strong>{{ total_registros }}</strong>
+                </div>
+            </section>
+        </main>
+
+    </div>
+
+</body>
+</html>

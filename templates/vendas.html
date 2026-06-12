@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Vendas - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="app-layout">
+
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar vendas-topbar">
+                <div>
+                    <h1>PDV - Ponto de Vendas</h1>
+                    <p>Registre vendas com vários produtos e baixa automática de estoque.</p>
+                </div>
+
+                <button 
+                    type="button" 
+                    class="icon-action-button"
+                    onclick="abrirModalVendasCadastradas()"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 4h16v16H4V4zm2 2v3h12V6H6zm0 5v7h12v-7H6zm2 2h8v2H8v-2z"/>
+                    </svg>
+                    <span>Consultar vendas</span>
+                </button>
+            </header>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="success-alert">
+                        {{ messages[0] }}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+
+
+            <section class="panel">
+                <h2>Nova venda</h2>
+
+                <form method="POST" action="{{ url_for('vendas') }}" class="form-grid" id="formVenda" onsubmit="return prepararVenda()">
+
+                    <div class="pdv-path full">
+                        <button type="button" class="pdv-path-step active" data-step-button="produtos" onclick="irParaEtapaPDV('produtos')">
+                            <span>1</span>
+                            Produtos
+                        </button>
+
+                        <button type="button" class="pdv-path-step" data-step-button="cliente" onclick="irParaEtapaPDV('cliente')">
+                            <span>2</span>
+                            Cliente
+                        </button>
+
+                        <button type="button" class="pdv-path-step" data-step-button="pagamento" onclick="irParaEtapaPDV('pagamento')">
+                            <span>3</span>
+                            Pagamento
+                        </button>
+                    </div>
+
+
+
+                    <div class="pdv-step-content full" data-step-content="cliente">
+
+                        <div class="form-group client-search-group">
+                            <label for="cliente_busca">Cliente opcional</label>
+
+                            <div class="inline-search-action">
+                                <input 
+                                    type="text" 
+                                    id="cliente_busca" 
+                                    placeholder="Digite pelo menos 3 caracteres..."
+                                    autocomplete="off"
+                                >
+
+                                <button 
+                                    type="button" 
+                                    class="action-icon-button add-client-button"
+                                    title="Cadastrar novo cliente"
+                                    onclick="abrirModalNovoClienteVenda()"
+                                >
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 5v14"></path>
+                                        <path d="M5 12h14"></path>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <input type="hidden" id="cliente_id" name="cliente_id">
+
+                            <small id="cliente_selecionado_info" class="field-help cliente-field-help">
+                                Nenhum cliente selecionado. A venda será registrada sem identificação.
+                            </small>
+
+                            <div id="cliente_resultados" class="autocomplete-results"></div>
+                        </div>
+
+                        <div class="form-group full">
+                            <label for="observacoes">Observações</label>
+                            <textarea id="observacoes" name="observacoes" rows="3"></textarea>
+                        </div>
+
+                        <div class="pdv-step-actions">
+                            <button type="button" class="icon-action-button secondary" onclick="irParaEtapaPDV('produtos')">
+                                Voltar
+                            </button>
+
+                            <button type="button" class="icon-action-button" onclick="irParaEtapaPDV('pagamento')">
+                                Avançar para Pagamento
+                            </button>
+                        </div>
+                    </div>
+
+                    <input type="hidden" id="itens_json" name="itens_json">
+                    <input type="hidden" id="vendedor_id" name="vendedor_id">
+
+                    <div class="pdv-step-content active full" data-step-content="produtos">
+                        <div class="product-entry-row full">
+                            <div class="form-group product-search-group">
+                                <label for="produto_busca">Produto</label>
+
+                                <div class="inline-search-action">
+                                    <input 
+                                        type="text" 
+                                        id="produto_busca" 
+                                        placeholder="Digite ou leia o código de barras/SKU..."
+                                        autocomplete="off"
+                                    >
+
+                                    <button 
+                                        type="button" 
+                                        class="action-icon-button add-product-button"
+                                        title="Cadastrar novo produto"
+                                        onclick="abrirModalNovoProdutoVenda()"
+                                    >
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M12 5v14"></path>
+                                            <path d="M5 12h14"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <input type="hidden" id="produto_id">
+
+                                <small id="produto_selecionado_info" class="field-help produto-field-help">
+                                    Nenhum produto selecionado.
+                                </small>
+                                <br>
+
+                                <div id="produto_resultados" class="autocomplete-results"></div>
+                            </div>
+
+                            <div class="form-group quantity-product-group">
+                                <label for="quantidade">Quantidade</label>
+                                <input type="number" id="quantidade" min="1" value="1">
+                            </div>
+
+                            <div class="form-group add-product-action-group">
+                                <label>&nbsp;</label>
+                                <button type="button" onclick="adicionarProduto()" class="add-product-sale-button">
+                                    Adicionar produto
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="full">
+                            <label for="desconto_tipo">Itens da venda</label>
+
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Produto</th>
+                                            <th>SKU</th>
+                                            <th>Qtd</th>
+                                            <th>Preço</th>
+                                            <th>Subtotal</th>
+                                            <th>Ação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="itensTabela">
+                                        <tr>
+                                            <td colspan="6" class="empty-state">
+                                                Nenhum produto adicionado.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="sale-preview full">
+                            <strong>Resumo da venda:</strong>
+                            <span id="preview-venda">Total: R$ 0,00</span>
+                        </div>
+
+                        <div class="pdv-step-actions">
+                            <button type="button" class="icon-action-button" onclick="irParaEtapaPDV('cliente')">
+                                Avançar para Cliente
+                            </button>
+                        </div>
+                    </div>
+
+                    
+
+                    <div class="pdv-step-content full" data-step-content="pagamento">
+                        <div class="sale-preview payment-sale-summary">
+                            <strong>Resumo da venda:</strong>
+
+                            <div class="payment-sale-summary-grid">
+                                <span>Subtotal: <b id="pagamento_resumo_subtotal">R$ 0,00</b></span>
+                                <span>Desconto: <b id="pagamento_resumo_desconto">R$ 0,00</b></span>
+                                <span>Total: <b id="pagamento_resumo_total">R$ 0,00</b></span>
+                            </div>
+                        </div>
+
+                        <div class="payment-area full">
+                            <input type="hidden" id="pagamento_dividido" name="pagamento_dividido" value="0">
+                            <input type="hidden" id="forma_pagamento" name="forma_pagamento" value="">
+                            <input type="hidden" id="valor_outros" name="valor_outros" value="0">
+
+                            <label class="payment-main-label">Forma de pagamento</label>
+
+                            <div class="payment-method-options">
+                                <label class="payment-toggle payment-method-option">
+                                    <input 
+                                        type="checkbox" 
+                                        class="payment-method-check"
+                                        id="pagamento_pix_check"
+                                        value="PIX"
+                                        data-payment-method="PIX"
+                                    >
+                                    <span>Pix</span>
+                                </label>
+
+                                <label class="payment-toggle payment-method-option">
+                                    <input 
+                                        type="checkbox" 
+                                        class="payment-method-check"
+                                        id="pagamento_dinheiro_check"
+                                        value="DINHEIRO"
+                                        data-payment-method="DINHEIRO"
+                                    >
+                                    <span>Dinheiro</span>
+                                </label>
+
+                                <label class="payment-toggle payment-method-option">
+                                    <input 
+                                        type="checkbox" 
+                                        class="payment-method-check"
+                                        id="pagamento_cartao_check"
+                                        value="CARTAO"
+                                        data-payment-method="CARTAO"
+                                    >
+                                    <span>Cartão</span>
+                                </label>
+                            </div>
+
+                            <div id="pagamento_dividido_area" class="payment-split-area" style="display: none;">
+                                <p class="payment-split-help">
+                                    Informe quanto será pago em cada forma selecionada.
+                                </p>
+
+                                <div class="payment-split-grid">
+                                    <div class="form-group payment-value-field" data-payment-value="PIX" style="display: none;">
+                                        <label for="valor_pix">Pix</label>
+                                        <input type="text" id="valor_pix" name="valor_pix" placeholder="0,00">
+                                    </div>
+
+                                    <div class="form-group payment-value-field" data-payment-value="DINHEIRO" style="display: none;">
+                                        <label for="valor_dinheiro">Dinheiro</label>
+                                        <input type="text" id="valor_dinheiro" name="valor_dinheiro" placeholder="0,00">
+                                    </div>
+
+                                    <div class="form-group payment-value-field" data-payment-value="CARTAO" style="display: none;">
+                                        <label for="valor_cartao">Cartão</label>
+                                        <input type="text" id="valor_cartao" name="valor_cartao" placeholder="0,00">
+                                    </div>
+                                </div>
+
+                                <div class="payment-split-summary">
+                                    <div>
+                                        <span>Valor final da venda</span>
+                                        <strong id="total_venda_pagamento">R$ 0,00</strong>
+                                    </div>
+
+                                    <div>
+                                        <span>Total informado</span>
+                                        <strong id="total_pagamentos_informado">R$ 0,00</strong>
+                                    </div>
+
+                                    <div>
+                                        <span id="label_pagamento_restante">Falta informar</span>
+                                        <strong id="total_pagamentos_restante">R$ 0,00</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sale-totals-row full">
+                            <div class="form-group">
+                                <label for="desconto_tipo">Tipo de desconto</label>
+                                <select id="desconto_tipo" name="desconto_tipo">
+                                    <option value="percentual">Porcentagem %</option>
+                                    <option value="valor">Valor R$</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="desconto_input">Desconto</label>
+                                <input 
+                                    type="number" 
+                                    id="desconto_input" 
+                                    name="desconto_input" 
+                                    step="0.01" 
+                                    min="0" 
+                                    value="0"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label for="valor_final_input">Valor final</label>
+                                <input 
+                                    type="number" 
+                                    id="valor_final_input" 
+                                    name="valor_final"
+                                    step="0.01" 
+                                    min="0" 
+                                    value="0"
+                                    readonly
+                                    class="readonly-input"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="pdv-step-actions">
+                            <button type="button" class="icon-action-button secondary" onclick="irParaEtapaPDV('cliente')">
+                                Voltar
+                            </button>
+
+                            <button type="submit" class="icon-action-button">
+                                Finalizar venda
+                            </button>
+                        </div>
+                    </div>
+
+                    <input type="hidden" id="desconto_total" name="desconto_total" value="0">
+
+                </form>
+            </section>
+        </main>
+
+    </div>
+
+    <div id="modalVendedor" class="modal-overlay">
+        <div class="modal-card">
+            <h2>Vendedor responsável</h2>
+
+            <p>
+                Esta venda ainda está sem vendedor responsável.
+                Selecione quem realizou a venda para continuar.
+            </p>
+
+            <div class="form-group">
+                <label for="modal_vendedor_id">Vendedor</label>
+                <select id="modal_vendedor_id">
+                    <option value="">Selecione o vendedor</option>
+                    {% for vendedor in vendedores %}
+                        <option value="{{ vendedor.id }}">
+                            {{ vendedor.nome }} - {{ vendedor.email }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="button-secondary" onclick="fecharModalVendedor()">
+                    Cancelar
+                </button>
+
+                <button type="button" onclick="confirmarVendedorEVender()">
+                    Confirmar e finalizar venda
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalNovoClienteVenda" class="modal-overlay">
+        <div class="modal-card modal-large">
+            <div class="modal-header">
+                <h2>Novo cliente</h2>
+
+                <button type="button" class="modal-close" onclick="fecharModalNovoClienteVenda()">
+                    ×
+                </button>
+            </div>
+
+            <p class="muted-text">
+                Cadastre rapidamente um cliente sem sair da venda. Depois de salvar, ele será selecionado automaticamente.
+            </p>
+
+            <form id="formNovoClienteVenda" class="form-grid">
+                <div class="form-group">
+                    <label for="novo_cliente_nome">Nome</label>
+                    <input 
+                        type="text" 
+                        id="novo_cliente_nome" 
+                        name="nome" 
+                        required
+                        placeholder="Nome do cliente"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="novo_cliente_telefone">Telefone/WhatsApp</label>
+                    <input 
+                        type="text" 
+                        id="novo_cliente_telefone" 
+                        name="telefone" 
+                        required
+                        placeholder="Ex: 88999999999"
+                    >
+                </div>
+
+                <div class="form-group full">
+                    <label for="novo_cliente_endereco">Endereço</label>
+                    <input 
+                        type="text" 
+                        id="novo_cliente_endereco" 
+                        name="endereco_completo"
+                        placeholder="Endereço completo"
+                    >
+                </div>
+
+                <div class="form-group full">
+                    <label for="novo_cliente_tags">Tags/interesses</label>
+                    <input 
+                        type="text" 
+                        id="novo_cliente_tags" 
+                        name="tags"
+                        placeholder="Ex: iPhone, Capinhas, Películas"
+                    >
+                </div>
+
+                <div class="form-group full">
+                    <label for="novo_cliente_observacoes">Observações</label>
+                    <textarea 
+                        id="novo_cliente_observacoes" 
+                        name="observacoes" 
+                        rows="3"
+                        placeholder="Observações sobre o cliente"
+                    ></textarea>
+                </div>
+
+                <div class="modal-actions full">
+                    <button type="button" class="button-secondary" onclick="fecharModalNovoClienteVenda()">
+                        Cancelar
+                    </button>
+
+                    <button type="submit">
+                        Salvar cliente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalNovoProdutoVenda" class="modal-overlay">
+        <div class="modal-card modal-large">
+            <div class="modal-header">
+                <h2>Novo produto</h2>
+
+                <button type="button" class="modal-close" onclick="fecharModalNovoProdutoVenda()">
+                    ×
+                </button>
+            </div>
+
+            <p class="muted-text">
+                Cadastre rapidamente um produto sem sair da venda. Depois de salvar, ele será selecionado automaticamente.
+            </p>
+
+            <form id="formNovoProdutoVenda" class="form-grid">
+                <div class="form-group">
+                    <label for="novo_produto_nome">Nome do produto</label>
+                    <input 
+                        type="text" 
+                        id="novo_produto_nome" 
+                        name="nome" 
+                        required
+                        placeholder="Ex: Cabo USB-C 1M"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="novo_produto_categoria">Categoria</label>
+                    <input 
+                        type="text" 
+                        id="novo_produto_categoria" 
+                        name="categoria"
+                        placeholder="Ex: Cabos"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="novo_produto_marca">Marca</label>
+                    <input 
+                        type="text" 
+                        id="novo_produto_marca" 
+                        name="marca"
+                        placeholder="Ex: Start"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="novo_produto_sku">SKU / Código</label>
+                    <input 
+                        type="text" 
+                        id="novo_produto_sku" 
+                        name="sku"
+                        required
+                        placeholder="Ex: CAB-USBC-1M"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="novo_produto_preco_custo">Preço de custo</label>
+                    <input 
+                        type="text" 
+                        id="novo_produto_preco_custo" 
+                        name="preco_custo"
+                        placeholder="Ex: 10,00"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="novo_produto_preco_venda">Preço de venda</label>
+                    <input 
+                        type="text" 
+                        id="novo_produto_preco_venda" 
+                        name="preco_venda"
+                        required
+                        placeholder="Ex: 19,90"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="novo_produto_estoque_atual">Estoque atual</label>
+                    <input 
+                        type="text" 
+                        id="novo_produto_estoque_atual" 
+                        name="estoque_atual"
+                        placeholder="Ex: 5"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="novo_produto_estoque_minimo">Estoque mínimo</label>
+                    <input 
+                        type="text" 
+                        id="novo_produto_estoque_minimo" 
+                        name="estoque_minimo"
+                        placeholder="Ex: 3"
+                    >
+                </div>
+
+                <div class="modal-actions full">
+                    <button type="button" class="button-secondary" onclick="fecharModalNovoProdutoVenda()">
+                        Cancelar
+                    </button>
+
+                    <button type="submit">
+                        Salvar produto
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalVendasCadastradas" class="modal-overlay">
+        <div class="modal-card modal-vendas-cadastradas">
+            <div class="modal-header">
+                <div>
+                    <h2>Vendas cadastradas</h2>
+                    <p class="muted-text">
+                        Consulte vendas, recibos, cupons e cancelamentos sem sair do PDV.
+                    </p>
+                </div>
+
+                <button 
+                    type="button" 
+                    class="modal-close" 
+                    onclick="fecharModalVendasCadastradas()"
+                >
+                    ×
+                </button>
+            </div>
+
+            <section class="panel modal-inner-panel">
+                <h2>Buscar vendas</h2>
+
+                <form method="GET" action="{{ url_for('vendas') }}" class="search-form sales-search-form">
+                    <input 
+                        type="text" 
+                        name="busca" 
+                        value="{{ busca or '' }}"
+                        placeholder="Buscar por nº, cliente, telefone, vendedor ou pagamento..."
+                    >
+
+                    <select name="status">
+                        <option value="todas" {% if status == 'todas' %}selected{% endif %}>Todas</option>
+                        <option value="concluidas" {% if status == 'concluidas' %}selected{% endif %}>Concluídas</option>
+                        <option value="canceladas" {% if status == 'canceladas' %}selected{% endif %}>Canceladas</option>
+                    </select>
+
+                    <input 
+                        type="date" 
+                        name="data_inicio" 
+                        value="{{ data_inicio or '' }}"
+                        title="Data inicial"
+                    >
+
+                    <input 
+                        type="date" 
+                        name="data_fim" 
+                        value="{{ data_fim or '' }}"
+                        title="Data final"
+                    >
+
+                    <button 
+                        type="submit" 
+                        class="small-button action-icon-button"
+                        title="Buscar"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.45 4.44-1.41 1.41-4.44-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/>
+                        </svg>
+                    </button>
+
+                    <a 
+                        href="{{ url_for('vendas') }}#lista-vendas" 
+                        class="small-button action-icon-button secondary-icon" 
+                        title="Limpar filtros"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 6h18v2H3V6zm3 4h12l-1 10H7L6 10zm3-7h6l1 2H8l1-2z"/>
+                        </svg>
+                    </a>
+                </form>
+            </section>
+
+            <section class="panel modal-inner-panel margin-top" id="lista-vendas">
+                <h2>Resultado da consulta</h2>
+
+                <div class="table-wrapper modal-table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nº</th>
+                                <th>Data</th>
+                                <th>Cliente</th>
+                                <th>Vendedor</th>
+                                <th>Pagamento</th>
+                                <th>Total</th>
+                                <th>Custo</th>
+                                <th>Lucro</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for venda in vendas %}
+                                <tr>
+                                    <td>#{{ venda.id }}</td>
+                                    <td>{{ venda.data_venda|datetime_br }}</td>
+                                    <td>{{ venda.cliente_nome }}</td>
+                                    <td>{{ venda.vendedor or '-' }}</td>
+                                    <td>{{ venda.forma_pagamento }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.valor_total) }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.custo_total) }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.lucro_total) }}</td>
+                                    <td>
+                                        {% if venda.status == 'CANCELADA' %}
+                                            <span class="status-pill status-danger">Cancelada</span>
+                                        {% else %}
+                                            <span class="status-pill status-ok">Concluída</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <a 
+                                                href="{{ url_for('venda_detalhe', venda_id=venda.id) }}" 
+                                                class="small-button"
+                                                title="Ver detalhes"
+                                            >
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-1.8a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"/>
+                                                </svg>
+                                            </a>
+
+                                            <a 
+                                                href="{{ url_for('venda_recibo', venda_id=venda.id) }}" 
+                                                class="small-button"
+                                                title="Ver recibo"
+                                                target="_blank"
+                                            >
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2zm2 4v2h8V6H8zm0 4v2h8v-2H8zm0 4v2h5v-2H8z"/>
+                                                </svg>
+                                            </a>
+
+                                            <a 
+                                                href="{{ url_for('venda_recibo_termico', venda_id=venda.id) }}" 
+                                                class="small-button"
+                                                title="Cupom térmico"
+                                                target="_blank"
+                                            >
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="M6 2h12v7h-2V4H8v5H6V2zm13 8H5c-1.1 0-2 .9-2 2v5h4v5h10v-5h4v-5c0-1.1-.9-2-2-2zm-4 10H9v-5h6v5zm3-6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/>
+                                                </svg>
+                                            </a>
+
+                                            {% if usuario.perfil == 'ADMIN' and venda.status != 'CANCELADA' %}
+                                                <form 
+                                                    method="POST" 
+                                                    action="{{ url_for('cancelar_venda', venda_id=venda.id) }}"
+                                                    onsubmit="return confirm('Tem certeza que deseja cancelar esta venda? O estoque será devolvido.');"
+                                                >
+                                                    <button 
+                                                        type="submit" 
+                                                        class="small-danger-button"
+                                                        title="Cancelar venda"
+                                                    >
+                                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                            <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 5.29 14L6 6.71A8 8 0 0 1 12 4zm0 16a8 8 0 0 1-5.29-14L18 17.29A8 8 0 0 1 12 20z"/>
+                                                        </svg>
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="10" class="empty-state">
+                                        Nenhuma venda registrada ainda.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pagination-compact">
+                    {% if page > 1 %}
+                        <a 
+                            href="{{ url_for('vendas', busca=busca, status=status, data_inicio=data_inicio, data_fim=data_fim, page=page-1) }}#lista-vendas" 
+                            class="pagination-arrow"
+                            title="Página anterior"
+                        >
+                            ‹
+                        </a>
+                    {% else %}
+                        <span class="pagination-arrow disabled">‹</span>
+                    {% endif %}
+
+                    {% for p in range(1, total_paginas + 1) %}
+                        {% if p <= 10 or p == total_paginas or (p >= page - 1 and p <= page + 1) %}
+                            <a 
+                                href="{{ url_for('vendas', busca=busca, status=status, data_inicio=data_inicio, data_fim=data_fim, page=p) }}#lista-vendas" 
+                                class="pagination-number {% if p == page %}active{% endif %}"
+                            >
+                                {{ p }}
+                            </a>
+                        {% elif p == 11 and total_paginas > 11 %}
+                            <span class="pagination-ellipsis">...</span>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page < total_paginas %}
+                        <a 
+                            href="{{ url_for('vendas', busca=busca, status=status, data_inicio=data_inicio, data_fim=data_fim, page=page+1) }}#lista-vendas" 
+                            class="pagination-arrow"
+                            title="Próxima página"
+                        >
+                            ›
+                        </a>
+                    {% else %}
+                        <span class="pagination-arrow disabled">›</span>
+                    {% endif %}
+                </div>
+
+                <div class="pagination-summary">
+                    Total de registros: <strong>{{ total_registros }}</strong>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/vendas.js') }}" defer></script>
+
+</body>
+</html>

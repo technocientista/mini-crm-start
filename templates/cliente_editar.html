@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Editar Cliente - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="app-layout">
+
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <h1>Editar cliente</h1>
+                    <p>Atualize os dados de {{ cliente.nome }}.</p>
+                </div>
+            </header>
+
+            <section class="panel">
+                <form method="POST" action="{{ url_for('cliente_editar', cliente_id=cliente.id) }}" class="form-grid">
+                    <div class="form-group">
+                        <label for="nome">Nome</label>
+                        <input type="text" id="nome" name="nome" value="{{ cliente.nome }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="telefone">Telefone / WhatsApp</label>
+                        <input type="text" id="telefone" name="telefone" value="{{ cliente.telefone }}" required>
+                    </div>
+
+                    <div class="form-group full">
+                        <label for="endereco_completo">Endereço completo</label>
+                        <input 
+                            type="text" 
+                            id="endereco_completo" 
+                            name="endereco_completo" 
+                            value="{{ cliente.endereco_completo or '' }}"
+                        >
+                    </div>
+
+                    <div class="form-group full">
+                        <label for="tags">Tags / interesses</label>
+                        <input 
+                            type="text" 
+                            id="tags" 
+                            name="tags" 
+                            value="{{ tags_texto }}"
+                            placeholder="Ex: iPhone, Capinhas, Películas"
+                        >
+                    </div>
+
+                    <div class="form-group full">
+                        <label for="observacoes">Observações</label>
+                        <textarea id="observacoes" name="observacoes" rows="3">{{ cliente.observacoes or '' }}</textarea>
+                    </div>
+
+                    <div class="edit-actions-row">
+                        <button type="submit" class="icon-action-button">
+                            Salvar
+                        </button>
+
+                        <a href="{{ url_for('cliente_detalhe', cliente_id=cliente.id) }}" class="icon-action-button secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </section>
+        </main>
+
+    </div>
+
+</body>
+</html>

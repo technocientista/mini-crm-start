@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Editar mensagem WhatsApp - Start CRM</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="app-layout">
+
+    {% include 'partials/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="topbar">
+            <h1>Editar mensagem WhatsApp</h1>
+            <p>Atualize o modelo de mensagem usado nos contatos com clientes.</p>
+        </header>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="success-alert">
+                    {{ messages[0] }}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <section class="panel">
+            <div class="resumo-venda-header">
+                <h2>Dados do modelo</h2>
+
+                <div class="resumo-venda-acoes-inline">
+                    <a href="{{ url_for('mensagens_whatsapp') }}" class="icon-action-button secondary">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M15 18l-6-6 6-6"></path>
+                            <path d="M9 12h12"></path>
+                        </svg>
+                        <span>Voltar</span>
+                    </a>
+                </div>
+            </div>
+
+            <form method="POST" class="form-grid">
+                <div class="form-group">
+                    <label for="codigo">Código interno</label>
+                    <input 
+                        type="text" 
+                        id="codigo" 
+                        name="codigo" 
+                        value="{{ modelo.codigo or '' }}"
+                        placeholder="Ex: REATIVACAO_CLIENTE"
+                    >
+                    <small class="field-help">
+                        Use apenas se este modelo for usado automaticamente pelo sistema.
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label for="nome">Nome do modelo</label>
+                    <input 
+                        type="text" 
+                        id="nome" 
+                        name="nome" 
+                        value="{{ modelo.nome }}"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="categoria">Categoria</label>
+                    <select id="categoria" name="categoria">
+                        {% set categorias = ['Pós-venda', 'Campanha', 'Produto disponível', 'Cobrança', 'Atendimento', 'Outros'] %}
+
+                        <option value="">Selecione</option>
+
+                        {% for categoria in categorias %}
+                            <option 
+                                value="{{ categoria }}"
+                                {% if modelo.categoria == categoria %}selected{% endif %}
+                            >
+                                {{ categoria }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="ativo">Status</label>
+                    <select id="ativo" name="ativo">
+                        <option value="1" {% if modelo.ativo == 1 %}selected{% endif %}>Ativo</option>
+                        <option value="0" {% if modelo.ativo == 0 %}selected{% endif %}>Inativo</option>
+                    </select>
+                </div>
+
+                <div class="form-group full">
+                    <label for="mensagem">Mensagem</label>
+                    <textarea 
+                        id="mensagem" 
+                        name="mensagem" 
+                        rows="8"
+                        required
+                    >{{ modelo.mensagem }}</textarea>
+
+                    <small class="field-help">
+                        Variáveis disponíveis: {cliente_nome}, {cliente_telefone}, {loja_nome}, {loja_telefone}, {loja_instagram}, {ultima_compra}, {total_comprado}, {tags}
+                    </small>
+                </div>
+
+                <div class="edit-actions-row">
+                    <button type="submit" class="icon-action-button">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Salvar alterações</span>
+                    </button>
+
+                    <a href="{{ url_for('mensagens_whatsapp') }}" class="icon-action-button secondary">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M18 6L6 18"></path>
+                            <path d="M6 6l12 12"></path>
+                        </svg>
+                        <span>Cancelar</span>
+                    </a>
+                </div>
+            </form>
+        </section>
+
+        <section class="panel margin-top">
+            <h2>Exemplo de uso</h2>
+
+            <div class="code-example">{{ modelo.mensagem }}</div>
+        </section>
+    </main>
+
+</div>
+
+</body>
+</html>

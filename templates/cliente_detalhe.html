@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ cliente.nome }} - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="app-layout">
+
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <h1>{{ cliente.nome }}</h1>
+                    <p>Histórico e preferências do cliente.</p>
+                </div>
+            </header>
+
+            <section class="panel margin-top">
+                <div class="resumo-venda-header">
+                    <h2>Dados do cliente</h2>
+
+                    <div class="resumo-venda-acoes-inline">
+
+                        <a 
+                            href="{{ url_for('clientes') }}" 
+                            class="icon-action-button secondary"
+                            title="Voltar para clientes"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M15 18l-6-6 6-6"></path>
+                                <path d="M9 12h12"></path>
+                            </svg>
+                            <span>Voltar</span>
+                        </a>
+
+                        <a 
+                            href="{{ url_for('cliente_editar', cliente_id=cliente.id) }}" 
+                            class="icon-action-button"
+                            title="Editar cliente"
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"></path>
+                                <path d="M14.06 4.94l3.75 3.75"></path>
+                                <path d="M18.37 3.29a1 1 0 0 1 1.41 0l.93.93a1 1 0 0 1 0 1.41l-1.52 1.52-3.75-3.75 1.93-1.11z"></path>
+                            </svg>
+                            <span>Editar</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="resumo-venda-conteudo">
+                    <p><strong>Telefone:</strong> {{ cliente.telefone or '-' }}</p>
+                    <p><strong>Endereço:</strong> {{ cliente.endereco_completo or '-' }}</p>
+                    <p><strong>Cadastro:</strong> {{ cliente.created_at|datetime_br }}</p>
+                    <p><strong>Observações:</strong> {{ cliente.observacoes or '-' }}</p>
+
+                    <p>
+                        <strong>Tags/interesses:</strong>
+
+                        {% if tags %}
+                            {% for tag in tags %}
+                                <span class="tag-pill">{{ tag["tag"] }}</span>
+                            {% endfor %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </p>
+                </div>
+            </section>
+
+            <section class="panel margin-top">
+                <h2>WhatsApp</h2>
+
+                <p class="muted-text">
+                    Escolha um modelo de mensagem para abrir o WhatsApp com o texto pronto.
+                </p>
+
+                <form 
+                    method="POST" 
+                    action="{{ url_for('cliente_whatsapp', cliente_id=cliente.id) }}" 
+                    class="whatsapp-form"
+                    target="_blank"
+                >
+                    <select name="modelo_id" required>
+                        <option value="">Selecione uma mensagem</option>
+
+                        {% for modelo in modelos_whatsapp %}
+                            <option value="{{ modelo.id }}">
+                                {{ modelo.nome }}{% if modelo.categoria %} - {{ modelo.categoria }}{% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                    <button type="submit" class="icon-text-button whatsapp-button">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M16.75 13.96c-.25-.12-1.47-.72-1.7-.8-.23-.08-.39-.12-.56.12-.16.25-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.16.04-.31-.02-.43-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.66.31-.23.25-.87.85-.87 2.07s.89 2.4 1.01 2.56c.12.16 1.75 2.67 4.24 3.74.59.25 1.05.4 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.29z"/>
+                            <path d="M12.04 2C6.56 2 2.1 6.45 2.1 11.93c0 1.75.46 3.46 1.33 4.96L2 22l5.25-1.38a9.88 9.88 0 0 0 4.79 1.22h.01c5.48 0 9.94-4.45 9.94-9.93S17.52 2 12.04 2zm0 18.15h-.01a8.2 8.2 0 0 1-4.18-1.14l-.3-.18-3.11.82.83-3.03-.2-.31a8.18 8.18 0 0 1-1.25-4.38c0-4.54 3.69-8.23 8.23-8.23 2.2 0 4.26.86 5.82 2.41a8.17 8.17 0 0 1 2.41 5.82c0 4.53-3.7 8.22-8.24 8.22z"/>
+                        </svg>
+                        Abrir WhatsApp
+                    </button>
+                </form>
+            </section>
+
+            <section class="cards-grid margin-top">
+                <div class="card">
+                    <span>Total comprado</span>
+                    <strong>R$ {{ "%.2f"|format(resumo.total_comprado) }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Quantidade de compras</span>
+                    <strong>{{ resumo.quantidade_compras }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Lucro gerado</span>
+                    <strong>R$ {{ "%.2f"|format(resumo.lucro_gerado) }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Última compra</span>
+                    <strong class="small-card-text">{{ resumo.ultima_compra or '-' }}</strong>
+                </div>
+            </section>
+
+            <section class="panel margin-top">
+                <h2>Produtos comprados</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>SKU</th>
+                                <th>Categoria</th>
+                                <th>Quantidade</th>
+                                <th>Total gasto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for produto in produtos_comprados %}
+                                <tr>
+                                    <td>{{ produto.produto_nome }}</td>
+                                    <td>{{ produto.sku }}</td>
+                                    <td>{{ produto.categoria }}</td>
+                                    <td>{{ produto.quantidade_total }}</td>
+                                    <td>R$ {{ "%.2f"|format(produto.total_gasto) }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="empty-state">
+                                        Nenhum produto comprado ainda.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel margin-top">
+                <h2>Categorias preferidas</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Categoria</th>
+                                <th>Quantidade comprada</th>
+                                <th>Total gasto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for categoria in categorias_preferidas %}
+                                <tr>
+                                    <td>{{ categoria.categoria }}</td>
+                                    <td>{{ categoria.quantidade_total }}</td>
+                                    <td>R$ {{ "%.2f"|format(categoria.total_gasto) }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="3" class="empty-state">
+                                        Nenhuma categoria encontrada.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel margin-top">
+                <h2>Histórico de vendas</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nº</th>
+                                <th>Data</th>
+                                <th>Vendedor</th>
+                                <th>Pagamento</th>
+                                <th>Desconto</th>
+                                <th>Total</th>
+                                <th>Lucro</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for venda in vendas %}
+                                <tr>
+                                    <td>#{{ venda.id }}</td>
+                                    <td>{{ venda.data_venda|datetime_br }}</td>
+                                    <td>{{ venda.vendedor or '-' }}</td>
+                                    <td>{{ venda.forma_pagamento }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.desconto_total) }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.valor_total) }}</td>
+                                    <td>R$ {{ "%.2f"|format(venda.lucro_total) }}</td>
+                                    <td>{{ venda.status }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="8" class="empty-state">
+                                        Nenhuma venda registrada para este cliente.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+
+    </div>
+
+</body>
+</html>

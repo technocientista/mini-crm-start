@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Configurações - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="app-layout">
+
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <h1>Configurações da loja</h1>
+                    <p>Defina os dados principais da Start.</p>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="success-alert">
+                        {{ messages[0] }}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="panel">
+                <form method="POST" action="{{ url_for('configuracoes') }}" class="form-grid" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="nome_loja">Nome da loja</label>
+                        <input 
+                            type="text" 
+                            id="nome_loja" 
+                            name="nome_loja" 
+                            value="{{ config.nome_loja or '' }}"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group full">
+                        <label for="logo">Logo da loja</label>
+                        <input 
+                            type="file" 
+                            id="logo" 
+                            name="logo" 
+                            accept=".png,.jpg,.jpeg,.webp,.svg"
+                        >
+
+                        {% if config.logo_path %}
+                            <div class="logo-preview">
+                                <span>Logo atual:</span>
+                                <img 
+                                    src="{{ url_for('static', filename=config.logo_path) }}" 
+                                    alt="Logo atual"
+                                >
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group full">
+                        <label for="login_logo">Logo da tela de login</label>
+                        <input 
+                            type="file" 
+                            id="login_logo" 
+                            name="login_logo" 
+                            accept=".png,.jpg,.jpeg,.webp,.svg"
+                        >
+
+                        {% if config.login_logo_path %}
+                            <div class="logo-preview">
+                                <span>Logo atual do login:</span>
+                                <img 
+                                    src="{{ url_for('static', filename=config.login_logo_path) }}" 
+                                    alt="Logo atual do login"
+                                >
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="telefone">Telefone / WhatsApp</label>
+                        <input 
+                            type="text" 
+                            id="telefone" 
+                            name="telefone" 
+                            value="{{ config.telefone or '' }}"
+                        >
+                    </div>
+
+                    <div class="form-group full">
+                        <label for="endereco">Endereço</label>
+                        <input 
+                            type="text" 
+                            id="endereco" 
+                            name="endereco" 
+                            value="{{ config.endereco or '' }}"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cidade">Cidade</label>
+                        <input 
+                            type="text" 
+                            id="cidade" 
+                            name="cidade" 
+                            value="{{ config.cidade or '' }}"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="instagram">Instagram</label>
+                        <input 
+                            type="text" 
+                            id="instagram" 
+                            name="instagram" 
+                            value="{{ config.instagram or '' }}"
+                            placeholder="@start..."
+                        >
+                    </div>
+
+                    <div class="form-group full">
+                        <label for="mensagem_recibo">Mensagem padrão para recibo</label>
+                        <textarea 
+                            id="mensagem_recibo" 
+                            name="mensagem_recibo" 
+                            rows="3"
+                        >{{ config.mensagem_recibo or '' }}</textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit">Salvar configurações</button>
+                    </div>
+                </form>
+            </section>
+        </main>
+
+    </div>
+
+</body>
+</html>

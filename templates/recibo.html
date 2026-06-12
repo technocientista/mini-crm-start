@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Recibo Venda #{{ venda.id }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/print/recibo.css') }}">
+</head>
+<body>
+
+    <div class="receipt">
+        <div class="receipt-header">
+            <h1>{{ config.nome_loja or 'Start CRM' }}</h1>
+
+            {% if config.endereco %}
+                <p>{{ config.endereco }}</p>
+            {% endif %}
+
+            {% if config.cidade %}
+                <p>{{ config.cidade }}</p>
+            {% endif %}
+
+            {% if config.telefone %}
+                <p>Telefone/WhatsApp: {{ config.telefone }}</p>
+            {% endif %}
+
+            {% if config.instagram %}
+                <p>Instagram: {{ config.instagram }}</p>
+            {% endif %}
+        </div>
+
+        <div class="receipt-title">
+            <div>
+                <h2>Recibo de Venda #{{ venda.id }}</h2>
+                <p>Data: {{ venda.data_venda|datetime_br }}</p>
+            </div>
+
+            <div>
+                <p><strong>Status:</strong> {{ venda.status }}</p>
+                <p><strong>Pagamento:</strong> {{ venda.forma_pagamento }}</p>
+            </div>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-box">
+                <h3>Cliente</h3>
+                <p><strong>Nome:</strong> {{ venda.cliente_nome }}</p>
+                <p><strong>Telefone:</strong> {{ venda.cliente_telefone }}</p>
+                <p><strong>Endereço:</strong> {{ venda.cliente_endereco or '-' }}</p>
+            </div>
+
+            <div class="info-box">
+                <h3>Venda</h3>
+                <p><strong>Vendedor:</strong> {{ venda.vendedor or '-' }}</p>
+                <p><strong>Forma de pagamento:</strong> {{ venda.forma_pagamento }}</p>
+                <p><strong>Observações:</strong> {{ venda.observacoes or '-' }}</p>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th>SKU</th>
+                    <th>Qtd</th>
+                    <th>Unitário</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for item in itens %}
+                    <tr>
+                        <td>{{ item.produto_nome }}</td>
+                        <td>{{ item.sku }}</td>
+                        <td>{{ item.quantidade }}</td>
+                        <td>R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
+                        <td>R$ {{ "%.2f"|format(item.subtotal) }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="totals">
+            <div class="total-row">
+                <span>Desconto</span>
+                <strong>R$ {{ "%.2f"|format(venda.desconto_total) }}</strong>
+            </div>
+
+            <div class="total-row">
+                <span>Total</span>
+                <strong>R$ {{ "%.2f"|format(venda.valor_total) }}</strong>
+            </div>
+        </div>
+
+        {% if config.mensagem_recibo %}
+            <div class="message">
+                {{ config.mensagem_recibo }}
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="actions">
+        <button onclick="window.print()">Imprimir recibo</button>
+        <button type="button" class="secondary-action" onclick="window.close()">
+            Fechar
+        </button>
+    </div>
+
+</body>
+</html>

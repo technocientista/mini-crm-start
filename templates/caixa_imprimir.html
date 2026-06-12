@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Fechamento de Caixa #{{ caixa.id }}</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/print/caixa_imprimir.css') }}">
+</head>
+<body>
+
+<div class="print-page">
+
+    <div class="center">
+        <h1>{{ config.nome_loja or 'Start Eletrônicos' }}</h1>
+
+        {% if config.endereco %}
+            <div class="muted">{{ config.endereco }}</div>
+        {% endif %}
+
+        {% if config.cidade %}
+            <div class="muted">{{ config.cidade }}</div>
+        {% endif %}
+
+        {% if config.telefone %}
+            <div class="muted">WhatsApp: {{ config.telefone }}</div>
+        {% endif %}
+
+        {% if config.instagram %}
+            <div class="muted">Instagram: {{ config.instagram }}</div>
+        {% endif %}
+    </div>
+
+    <div class="line"></div>
+
+    <div class="center">
+        <h1>FECHAMENTO DE CAIXA #{{ caixa.id }}</h1>
+        <div class="muted">Documento interno de controle</div>
+    </div>
+
+    <div class="info-grid">
+        <p><strong>Status:</strong> {{ caixa.status }}</p>
+        <p><strong>Aberto por:</strong> {{ caixa.usuario_abertura_nome or '-' }}</p>
+        <p><strong>Abertura:</strong> {{ caixa.data_abertura|datetime_br }}</p>
+        <p><strong>Fechado por:</strong> {{ caixa.usuario_fechamento_nome or '-' }}</p>
+        <p><strong>Fechamento:</strong> {{ caixa.data_fechamento|datetime_br if caixa.data_fechamento else '-' }}</p>
+    </div>
+
+    {% if caixa.status == 'ABERTO' and resumo_atual %}
+        {% set total_vendas = resumo_atual.total_vendas %}
+        {% set total_dinheiro = resumo_atual.total_dinheiro %}
+        {% set total_pix = resumo_atual.total_pix %}
+        {% set total_cartao = resumo_atual.total_cartao %}
+        {% set total_outros = resumo_atual.total_outros %}
+        {% set entradas_manuais = resumo_atual.entradas_manuais %}
+        {% set saidas_manuais = resumo_atual.saidas_manuais %}
+        {% set valor_esperado = resumo_atual.valor_esperado %}
+        {% set valor_informado = caixa.valor_informado %}
+        {% set diferenca = caixa.diferenca %}
+    {% else %}
+        {% set total_vendas = caixa.total_vendas %}
+        {% set total_dinheiro = caixa.total_dinheiro %}
+        {% set total_pix = caixa.total_pix %}
+        {% set total_cartao = caixa.total_cartao %}
+        {% set total_outros = caixa.total_outros %}
+        {% set entradas_manuais = caixa.entradas_manuais %}
+        {% set saidas_manuais = caixa.saidas_manuais %}
+        {% set valor_esperado = caixa.valor_esperado %}
+        {% set valor_informado = caixa.valor_informado %}
+        {% set diferenca = caixa.diferenca %}
+    {% endif %}
+
+    <div class="cards">
+        <div class="card">
+            <span>Valor inicial</span>
+            <strong>R$ {{ "%.2f"|format(caixa.valor_inicial or 0) }}</strong>
+        </div>
+
+        <div class="card">
+            <span>Total vendas</span>
+            <strong>R$ {{ "%.2f"|format(total_vendas or 0) }}</strong>
+        </div>
+
+        <div class="card">
+            <span>Dinheiro esperado</span>
+            <strong>R$ {{ "%.2f"|format(valor_esperado or 0) }}</strong>
+        </div>
+
+        <div class="card">
+            <span>Diferença</span>
+            <strong>R$ {{ "%.2f"|format(diferenca or 0) }}</strong>
+        </div>
+    </div>
+
+    <h2>Resumo financeiro</h2>
+
+    <table>
+        <tbody>
+            <tr>
+                <td>Dinheiro</td>
+                <td>R$ {{ "%.2f"|format(total_dinheiro or 0) }}</td>
+            </tr>
+            <tr>
+                <td>Pix</td>
+                <td>R$ {{ "%.2f"|format(total_pix or 0) }}</td>
+            </tr>
+            <tr>
+                <td>Cartão</td>
+                <td>R$ {{ "%.2f"|format(total_cartao or 0) }}</td>
+            </tr>
+            <tr>
+                <td>Outros</td>
+                <td>R$ {{ "%.2f"|format(total_outros or 0) }}</td>
+            </tr>
+            <tr>
+                <td>Entradas manuais</td>
+                <td>R$ {{ "%.2f"|format(entradas_manuais or 0) }}</td>
+            </tr>
+            <tr>
+                <td>Saídas manuais</td>
+                <td>R$ {{ "%.2f"|format(saidas_manuais or 0) }}</td>
+            </tr>
+            <tr class="total-row">
+                <td>Dinheiro esperado</td>
+                <td>R$ {{ "%.2f"|format(valor_esperado or 0) }}</td>
+            </tr>
+            <tr class="total-row">
+                <td>Dinheiro informado</td>
+                <td>R$ {{ "%.2f"|format(valor_informado or 0) }}</td>
+            </tr>
+            <tr class="total-row">
+                <td>Diferença</td>
+                <td>R$ {{ "%.2f"|format(diferenca or 0) }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>Vendas vinculadas</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Venda</th>
+                <th>Data</th>
+                <th>Cliente</th>
+                <th>Vendedor</th>
+                <th>Forma</th>
+                <th>Total</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for venda in vendas_caixa %}
+                <tr>
+                    <td>#{{ venda.id }}</td>
+                    <td>{{ venda.data_venda|datetime_br }}</td>
+                    <td>{{ venda.cliente_nome }}</td>
+                    <td>{{ venda.vendedor }}</td>
+                    <td>{{ venda.forma_pagamento }}</td>
+                    <td>R$ {{ "%.2f"|format(venda.valor_total or 0) }}</td>
+                    <td>{{ venda.status }}</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="7">Nenhuma venda vinculada.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Movimentações do caixa</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Valor</th>
+                <th>Descrição</th>
+                <th>Usuário</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for item in movimentacoes %}
+                <tr>
+                    <td>{{ item.created_at|datetime_br }}</td>
+                    <td>{{ item.tipo }}</td>
+                    <td>R$ {{ "%.2f"|format(item.valor or 0) }}</td>
+                    <td>{{ item.descricao or '-' }}</td>
+                    <td>{{ item.usuario_nome or '-' }}</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="5">Nenhuma movimentação registrada.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Observações</h2>
+
+    <p class="obs"><strong>Abertura:</strong> {{ caixa.observacoes_abertura or '-' }}</p>
+    <p class="obs"><strong>Fechamento:</strong> {{ caixa.observacoes_fechamento or '-' }}</p>
+
+    <div class="line final-line"></div>
+
+</div>
+
+<div class="actions">
+    <button onclick="window.print()">Imprimir</button>
+    <button class="secondary" onclick="window.close()">Fechar</button>
+</div>
+
+</body>
+</html>

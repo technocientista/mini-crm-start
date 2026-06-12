@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Clientes - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="app-layout">
+
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <h1>Clientes</h1>
+                    <p>Cadastre e consulte os clientes da Start.</p>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="success-alert">
+                        {{ messages[0] }}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="panel margin-top">
+                <h2>Buscar clientes</h2>
+
+                <form method="GET" action="{{ url_for('clientes') }}" class="search-form clients-search-form">
+                    <input 
+                        type="text" 
+                        name="busca" 
+                        value="{{ busca or '' }}"
+                        placeholder="Buscar por nome, telefone, endereço ou tag..."
+                    >
+
+                    <select name="status">
+                        <option value="ativos" {% if status == 'ativos' %}selected{% endif %}>Ativos</option>
+                        <option value="inativos" {% if status == 'inativos' %}selected{% endif %}>Inativos</option>
+                        <option value="todos" {% if status == 'todos' %}selected{% endif %}>Todos</option>
+                    </select>
+
+                    <button 
+                        type="submit" 
+                        class="small-button action-icon-button"
+                        title="Buscar"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.45 4.44-1.41 1.41-4.44-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/>
+                        </svg>
+                    </button>
+
+                    <a 
+                        href="{{ url_for('clientes') }}" 
+                        class="small-button action-icon-button secondary-icon" 
+                        title="Limpar filtros"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 6h18v2H3V6zm3 4h12l-1 10H7L6 10zm3-7h6l1 2H8l1-2z"/>
+                        </svg>
+                    </a>
+
+                    <button 
+                        type="button" 
+                        class="small-button action-icon-button"
+                        onclick="abrirModalCliente()"
+                        title="Novo cliente"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zM6 10V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                    </button>
+
+                    <button 
+                        type="button" 
+                        class="small-button action-icon-button secondary-icon"
+                        onclick="abrirModalImportarClientes()"
+                        title="Importar clientes"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/>
+                        </svg>
+                    </button>
+                </form>
+            </section>
+
+            <section class="panel margin-top" id="lista-clientes">
+                <h2>Clientes cadastrados</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Telefone</th>
+                                <th>Endereço</th>
+                                <th>Tags</th>
+                                <th>Status</th>
+                                <th>Cadastro</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cliente in clientes %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('cliente_detalhe', cliente_id=cliente.id) }}" class="table-link">
+                                            {{ cliente.nome }}
+                                        </a>
+                                    </td>
+                                    <td>{{ cliente.telefone }}</td>
+                                    <td>{{ cliente.endereco_completo or '-' }}</td>
+                                    <td>{{ cliente.tags or '-' }}</td>
+
+                                    <td>
+                                        {% if cliente.ativo == 1 %}
+                                            <span class="status-pill status-ok">Ativo</span>
+                                        {% else %}
+                                            <span class="status-pill status-danger">Inativo</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>{{ cliente.created_at }}</td>
+
+                                    <td>
+                                        <div class="table-actions">
+                                            {% if cliente.ativo == 1 %}
+                                                <a 
+                                                    href="{{ url_for('cliente_detalhe', cliente_id=cliente.id) }}" 
+                                                    class="small-button"
+                                                    title="Ver cliente"
+                                                >
+                                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-1.8a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"/>
+                                                    </svg>
+                                                </a>
+
+                                                <a 
+                                                    href="{{ url_for('cliente_editar', cliente_id=cliente.id) }}" 
+                                                    class="small-button"
+                                                    title="Editar cliente"
+                                                >
+                                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.04a1 1 0 0 0 0-1.41l-2.51-2.51a1 1 0 0 0-1.41 0l-1.96 1.96 3.75 3.75 2.13-1.79z"/>
+                                                    </svg>
+                                                </a>
+
+                                                {% if usuario.perfil == 'ADMIN' %}
+                                                    <form 
+                                                        method="POST" 
+                                                        action="{{ url_for('cliente_inativar', cliente_id=cliente.id) }}"
+                                                        onsubmit="return confirm('Tem certeza que deseja inativar este cliente?');"
+                                                    >
+                                                    <button 
+                                                        type="submit" 
+                                                        class="small-danger-button"
+                                                        title="Inativar"
+                                                    >
+                                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                            <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 5.29 14L6 6.71A8 8 0 0 1 12 4zm0 16a8 8 0 0 1-5.29-14L18 17.29A8 8 0 0 1 12 20z"/>
+                                                        </svg>
+                                                    </button>
+                                                    </form>
+                                                {% endif %}
+                                            {% else %}
+                                                {% if usuario.perfil == 'ADMIN' %}
+                                                    <form 
+                                                        method="POST" 
+                                                        action="{{ url_for('cliente_reativar', cliente_id=cliente.id) }}"
+                                                        onsubmit="return confirm('Deseja reativar este cliente?');"
+                                                    >
+                                                    <button 
+                                                        type="submit" 
+                                                        class="small-button"
+                                                        title="Reativar"
+                                                    >
+                                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                            <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V6a6 6 0 1 1-5.65 8H4.26A8 8 0 1 0 17.65 6.35z"/>
+                                                        </svg>
+                                                    </button>
+                                                    </form>
+                                                {% else %}
+                                                    <span class="muted-text">Sem ações</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="7" class="empty-state">
+                                        Nenhum cliente cadastrado ainda.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            {% set pagination_endpoint = 'clientes' %}
+            {% set pagination_args = {'busca': busca, 'status': status} %}
+            {% set pagination_page_param = 'page' %}
+            {% set pagination_page = page %}
+            {% set pagination_total_pages = total_paginas %}
+            {% set pagination_total_records = total_registros %}
+            {% set pagination_anchor = 'lista-clientes' %}
+
+            {% include 'partials/pagination.html' %}
+        </main>
+
+    </div>
+
+    <div id="modalCliente" class="modal-overlay">
+        <div class="modal-card modal-large">
+            <div class="modal-header">
+                <h2>Novo cliente</h2>
+
+                <button type="button" class="modal-close" onclick="fecharModalCliente()">
+                    ×
+                </button>
+            </div>
+
+            <form method="POST" action="{{ url_for('clientes') }}" class="form-grid compact-form">
+                <div class="form-group">
+                    <label for="nome">Nome</label>
+                    <input type="text" id="nome" name="nome" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="telefone">Telefone / WhatsApp</label>
+                    <input type="text" id="telefone" name="telefone" required>
+                </div>
+
+                <div class="form-group full">
+                    <label for="endereco_completo">Endereço completo</label>
+                    <input type="text" id="endereco_completo" name="endereco_completo">
+                </div>
+
+                <div class="form-group full">
+                    <label for="tags">Tags / interesses</label>
+                    <input 
+                        type="text" 
+                        id="tags" 
+                        name="tags" 
+                        placeholder="Ex: iPhone, Capinhas, Películas"
+                    >
+                </div>
+
+                <div class="form-group full">
+                    <label for="observacoes">Observações</label>
+                    <textarea id="observacoes" name="observacoes" rows="3"></textarea>
+                </div>
+
+                <div class="modal-actions full">
+                    <button type="button" class="button-secondary" onclick="fecharModalCliente()">
+                        Cancelar
+                    </button>
+
+                    <button type="submit">
+                        Salvar cliente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalImportarClientes" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Importar clientes</h2>
+
+                <button type="button" class="modal-close" onclick="fecharModalImportarClientes()">
+                    ×
+                </button>
+            </div>
+
+            <p class="muted-text">
+                Envie um arquivo CSV ou Excel com as colunas:
+                nome, telefone, endereco_completo, tags, observacoes.
+            </p>
+
+            <div class="import-actions">
+                <a href="{{ url_for('baixar_modelo_clientes') }}" class="button-link secondary">
+                    Baixar modelo de clientes
+                </a>
+            </div>
+
+            <form 
+                method="POST" 
+                action="{{ url_for('importar_clientes') }}" 
+                enctype="multipart/form-data" 
+                class="import-form modal-import-form"
+            >
+                <input type="file" name="arquivo" accept=".csv,.xlsx" required>
+
+                <button type="submit">
+                    Importar clientes
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
+
+</body>
+</html>

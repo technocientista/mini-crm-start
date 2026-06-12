@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Comissões - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <div class="app-layout">
+
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <h1>Comissões</h1>
+                    <p>Acompanhe as comissões dos vendedores por período.</p>
+                </div>
+            </header>
+
+            <section class="panel">
+                <h2>Filtros</h2>
+
+                <form method="GET" action="{{ url_for('comissoes') }}" class="form-grid">
+                    <div class="form-group">
+                        <label for="data_inicio">Data inicial</label>
+                        <input type="date" id="data_inicio" name="data_inicio" value="{{ data_inicio }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="data_fim">Data final</label>
+                        <input type="date" id="data_fim" name="data_fim" value="{{ data_fim }}">
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit">Filtrar</button>
+                    </div>
+
+                    <div class="form-actions">
+                        <a 
+                            class="button-link"
+                            href="{{ url_for('exportar_comissoes', data_inicio=data_inicio, data_fim=data_fim) }}"
+                        >
+                            Exportar Excel
+                        </a>
+                    </div>
+                </form>
+            </section>
+
+            <section class="cards-grid margin-top">
+                <div class="card">
+                    <span>Vendas no período</span>
+                    <strong>{{ resumo.quantidade_vendas }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Total vendido</span>
+                    <strong>R$ {{ "%.2f"|format(resumo.total_vendido) }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Lucro gerado</span>
+                    <strong>R$ {{ "%.2f"|format(resumo.lucro_total) }}</strong>
+                </div>
+
+                <div class="card">
+                    <span>Total de comissões</span>
+                    <strong>R$ {{ "%.2f"|format(total_comissoes) }}</strong>
+                </div>
+            </section>
+
+            <section class="panel margin-top">
+                <h2>Comissão por vendedor</h2>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Vendedor</th>
+                                <th>E-mail</th>
+                                <th>Vendas</th>
+                                <th>Total vendido</th>
+                                <th>Lucro gerado</th>
+                                <th>Comissão %</th>
+                                <th>Valor comissão</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in comissoes %}
+                                <tr>
+                                    <td>{{ item.vendedor_nome }}</td>
+                                    <td>{{ item.vendedor_email }}</td>
+                                    <td>{{ item.quantidade_vendas }}</td>
+                                    <td>R$ {{ "%.2f"|format(item.total_vendido) }}</td>
+                                    <td>R$ {{ "%.2f"|format(item.lucro_total) }}</td>
+                                    <td>{{ "%.2f"|format(item.comissao_percentual) }}%</td>
+                                    <td>R$ {{ "%.2f"|format(item.valor_comissao) }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="7" class="empty-state">
+                                        Nenhum vendedor encontrado.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+
+    </div>
+
+</body>
+</html>

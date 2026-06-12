@@ -1,0 +1,183 @@
+* {
+            box-sizing: border-box;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            background: #f4f6f8;
+            color: #222;
+            margin: 0;
+            padding: 24px;
+        }
+
+        .receipt {
+            max-width: 760px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 32px;
+            border-radius: 14px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        }
+
+        .receipt-header {
+            text-align: center;
+            border-bottom: 2px solid #1f7a3f;
+            padding-bottom: 18px;
+            margin-bottom: 24px;
+        }
+
+        .receipt-header h1 {
+            margin: 0;
+            color: #1f7a3f;
+            font-size: 30px;
+        }
+
+        .receipt-header p {
+            margin: 5px 0;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .receipt-title {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 16px;
+        }
+
+        .receipt-title h2 {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-bottom: 24px;
+        }
+
+        .info-box {
+            background: #f8faf9;
+            border: 1px solid #e4e4e4;
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .info-box h3 {
+            margin: 0 0 10px;
+            color: #1f7a3f;
+            font-size: 16px;
+        }
+
+        .info-box p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 24px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e5e5;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f0f3f5;
+        }
+
+        .totals {
+            max-width: 320px;
+            margin-left: auto;
+            border: 1px solid #e4e4e4;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 14px;
+            border-bottom: 1px solid #e4e4e4;
+        }
+
+        .total-row:last-child {
+            border-bottom: none;
+            background: #1f7a3f;
+            color: #ffffff;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .message {
+            margin-top: 28px;
+            text-align: center;
+            color: #555;
+            font-size: 15px;
+        }
+
+        .actions {
+            max-width: 760px;
+            margin: 18px auto 0;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .actions button,
+        .actions a {
+            padding: 12px 18px;
+            border: none;
+            border-radius: 8px;
+            background: #1f7a3f;
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .actions a {
+            background: #6c757d;
+        }
+
+        @media print {
+            body {
+                background: #ffffff;
+                padding: 0;
+            }
+
+            .receipt {
+                box-shadow: none;
+                border-radius: 0;
+                max-width: 100%;
+            }
+
+            .actions {
+                display: none;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .receipt-title,
+            .info-grid {
+                grid-template-columns: 1fr;
+                display: block;
+            }
+
+            .info-box {
+                margin-bottom: 14px;
+            }
+
+            .receipt-title {
+                display: block;
+            }
+        }
