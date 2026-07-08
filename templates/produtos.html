@@ -84,9 +84,20 @@
                         title="Importar produtos"
                     >
                         <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M5 20h14v-2H5v2zm7-18-7 7h4v6h6V9h4l-7-7z"/>
+                        </svg>
+
+                    </button>
+
+                    <a 
+                        href="{{ url_for('exportar_produtos') }}" 
+                        class="small-button action-icon-button secondary-icon"
+                        title="Exportar produtos"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/>
                         </svg>
-                    </button>
+                    </a>
                 </form>
             </section>
 

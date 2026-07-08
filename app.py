@@ -2557,6 +2557,66 @@ def produtos():
         usuario=usuario_logado()
     )
 
+def gerar_planilha_produtos_ignorados(registros_ignorados, importados, atualizados):
+    os.makedirs("exports", exist_ok=True)
+
+    agora = datetime.now().strftime("%Y%m%d_%H%M%S")
+    nome_arquivo = f"produtos_ignorados_{agora}.xlsx"
+    caminho_arquivo = os.path.join("exports", nome_arquivo)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Produtos Ignorados"
+
+    ws.append([
+        "Resumo",
+        f"Novos: {importados}",
+        f"Atualizados: {atualizados}",
+        f"Ignorados: {len(registros_ignorados)}"
+    ])
+    ws.append([])
+
+    ws.append([
+        "Linha",
+        "Nome",
+        "SKU/Código",
+        "Categoria",
+        "Marca",
+        "Preço custo",
+        "Preço venda",
+        "Estoque atual",
+        "Estoque mínimo",
+        "Motivo"
+    ])
+
+    for item in registros_ignorados:
+        ws.append([
+            item.get("linha"),
+            item.get("nome"),
+            item.get("sku"),
+            item.get("categoria"),
+            item.get("marca"),
+            item.get("preco_custo"),
+            item.get("preco_venda"),
+            item.get("estoque_atual"),
+            item.get("estoque_minimo"),
+            item.get("motivo")
+        ])
+
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+
+        for cell in column:
+            value = str(cell.value) if cell.value is not None else ""
+            max_length = max(max_length, len(value))
+
+        ws.column_dimensions[column_letter].width = min(max_length + 4, 60)
+
+    wb.save(caminho_arquivo)
+
+    return caminho_arquivo, nome_arquivo
+
 @app.route("/produtos/importar", methods=["POST"])
 @admin_required
 def importar_produtos():
@@ -2577,9 +2637,23 @@ def importar_produtos():
 
     importados = 0
     atualizados = 0
-    ignorados = 0
+    registros_ignorados = []
 
-    for linha in linhas:
+    def registrar_ignorado(numero_linha, nome, categoria, marca, sku, preco_custo, preco_venda, estoque_atual, estoque_minimo, motivo):
+        registros_ignorados.append({
+            "linha": numero_linha,
+            "nome": nome,
+            "categoria": categoria,
+            "marca": marca,
+            "sku": sku,
+            "preco_custo": preco_custo,
+            "preco_venda": preco_venda,
+            "estoque_atual": estoque_atual,
+            "estoque_minimo": estoque_minimo,
+            "motivo": motivo
+        })
+
+    for numero_linha, linha in enumerate(linhas, start=2):
         nome = get_valor(linha, "nome", "produto")
         categoria = get_valor(linha, "categoria")
         marca = get_valor(linha, "marca")
@@ -2589,54 +2663,121 @@ def importar_produtos():
         estoque_atual = converter_int(get_valor(linha, "estoque_atual", "estoque", "quantidade"))
         estoque_minimo = converter_int(get_valor(linha, "estoque_minimo", "estoque_mínimo", "minimo", "mínimo"))
 
-        if not nome or not categoria or not sku:
-            ignorados += 1
-            continue
+        motivos = []
 
-        produto_existente = cursor.execute("""
-            SELECT id, estoque_atual
-            FROM produtos
-            WHERE sku = ?
-            LIMIT 1
-        """, (sku,)).fetchone()
+        if not nome:
+            motivos.append("Nome do produto não informado")
 
-        if produto_existente:
-            produto_id = produto_existente["id"]
-            estoque_anterior = produto_existente["estoque_atual"]
+        if not sku:
+            motivos.append("SKU/código do produto não informado")
 
-            cursor.execute("""
-                UPDATE produtos
-                SET
-                    nome = ?,
-                    categoria = ?,
-                    marca = ?,
-                    preco_custo = ?,
-                    preco_venda = ?,
-                    estoque_atual = ?,
-                    estoque_minimo = ?,
-                    ativo = 1,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (
+        # Categoria e marca não são obrigatórias na importação.
+        if motivos:
+            registrar_ignorado(
+                numero_linha,
                 nome,
                 categoria,
                 marca,
+                sku,
                 preco_custo,
                 preco_venda,
                 estoque_atual,
                 estoque_minimo,
-                produto_id
-            ))
+                "; ".join(motivos)
+            )
+            continue
 
-            if estoque_anterior != estoque_atual:
-                diferenca = estoque_atual - estoque_anterior
+        try:
+            produto_existente = cursor.execute("""
+                SELECT id, estoque_atual
+                FROM produtos
+                WHERE sku = ?
+                LIMIT 1
+            """, (sku,)).fetchone()
 
-                if diferenca > 0:
-                    tipo = "IMPORTACAO_AJUSTE_ENTRADA"
-                    quantidade = diferenca
-                else:
-                    tipo = "IMPORTACAO_AJUSTE_SAIDA"
-                    quantidade = abs(diferenca)
+            if produto_existente:
+                produto_id = produto_existente["id"]
+                estoque_anterior = produto_existente["estoque_atual"]
+
+                cursor.execute("""
+                    UPDATE produtos
+                    SET
+                        nome = ?,
+                        categoria = ?,
+                        marca = ?,
+                        preco_custo = ?,
+                        preco_venda = ?,
+                        estoque_atual = ?,
+                        estoque_minimo = ?,
+                        ativo = 1,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (
+                    nome,
+                    categoria,
+                    marca,
+                    preco_custo,
+                    preco_venda,
+                    estoque_atual,
+                    estoque_minimo,
+                    produto_id
+                ))
+
+                if estoque_anterior != estoque_atual:
+                    diferenca = estoque_atual - estoque_anterior
+
+                    if diferenca > 0:
+                        tipo = "IMPORTACAO_AJUSTE_ENTRADA"
+                        quantidade = diferenca
+                    else:
+                        tipo = "IMPORTACAO_AJUSTE_SAIDA"
+                        quantidade = abs(diferenca)
+
+                    cursor.execute("""
+                        INSERT INTO movimentacoes_estoque (
+                            produto_id,
+                            tipo,
+                            quantidade,
+                            estoque_anterior,
+                            estoque_atual,
+                            observacoes
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        produto_id,
+                        tipo,
+                        quantidade,
+                        estoque_anterior,
+                        estoque_atual,
+                        "Ajuste por importação de planilha"
+                    ))
+
+                atualizados += 1
+
+            else:
+                cursor.execute("""
+                    INSERT INTO produtos (
+                        nome,
+                        categoria,
+                        marca,
+                        sku,
+                        preco_custo,
+                        preco_venda,
+                        estoque_atual,
+                        estoque_minimo,
+                        ativo
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+                """, (
+                    nome,
+                    categoria,
+                    marca,
+                    sku,
+                    preco_custo,
+                    preco_venda,
+                    estoque_atual,
+                    estoque_minimo
+                ))
+
+                produto_id = cursor.lastrowid
 
                 cursor.execute("""
                     INSERT INTO movimentacoes_estoque (
@@ -2649,29 +2790,18 @@ def importar_produtos():
                     ) VALUES (?, ?, ?, ?, ?, ?)
                 """, (
                     produto_id,
-                    tipo,
-                    quantidade,
-                    estoque_anterior,
+                    "IMPORTACAO_ENTRADA_INICIAL",
                     estoque_atual,
-                    "Ajuste por importação de planilha"
+                    0,
+                    estoque_atual,
+                    "Estoque inicial por importação de planilha"
                 ))
 
-            atualizados += 1
+                importados += 1
 
-        else:
-            cursor.execute("""
-                INSERT INTO produtos (
-                    nome,
-                    categoria,
-                    marca,
-                    sku,
-                    preco_custo,
-                    preco_venda,
-                    estoque_atual,
-                    estoque_minimo,
-                    ativo
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-            """, (
+        except Exception as erro:
+            registrar_ignorado(
+                numero_linha,
                 nome,
                 categoria,
                 marca,
@@ -2679,38 +2809,108 @@ def importar_produtos():
                 preco_custo,
                 preco_venda,
                 estoque_atual,
-                estoque_minimo
-            ))
-
-            produto_id = cursor.lastrowid
-
-            cursor.execute("""
-                INSERT INTO movimentacoes_estoque (
-                    produto_id,
-                    tipo,
-                    quantidade,
-                    estoque_anterior,
-                    estoque_atual,
-                    observacoes
-                ) VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                produto_id,
-                "IMPORTACAO_ENTRADA_INICIAL",
-                estoque_atual,
-                0,
-                estoque_atual,
-                "Estoque inicial por importação de planilha"
-            ))
-
-            importados += 1
+                estoque_minimo,
+                f"Erro ao importar linha: {erro}"
+            )
+            continue
 
     conn.commit()
     conn.close()
 
+    ignorados = len(registros_ignorados)
+
+    if ignorados > 0:
+        caminho_arquivo, nome_arquivo = gerar_planilha_produtos_ignorados(
+            registros_ignorados,
+            importados,
+            atualizados
+        )
+
+        return send_file(
+            caminho_arquivo,
+            as_attachment=True,
+            download_name=nome_arquivo
+        )
+
     flash(f"Importação concluída. Novos: {importados}. Atualizados: {atualizados}. Ignorados: {ignorados}.")
     return redirect(url_for("produtos"))
 
+
+@app.route("/produtos/exportar")
+@admin_required
+def exportar_produtos():
+    conn = get_db_connection()
+
+    produtos = conn.execute("""
+        SELECT
+            nome,
+            categoria,
+            marca,
+            sku,
+            preco_custo,
+            preco_venda,
+            estoque_atual,
+            estoque_minimo
+        FROM produtos
+        WHERE ativo = 1
+        ORDER BY nome ASC
+    """).fetchall()
+
+    conn.close()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Produtos"
+
+    ws.append([
+        "nome",
+        "categoria",
+        "marca",
+        "sku",
+        "preco_custo",
+        "preco_venda",
+        "estoque_atual",
+        "estoque_minimo"
+    ])
+
+    for produto in produtos:
+        ws.append([
+            produto["nome"] or "",
+            produto["categoria"] or "",
+            produto["marca"] or "",
+            produto["sku"] or "",
+            produto["preco_custo"] or 0,
+            produto["preco_venda"] or 0,
+            produto["estoque_atual"] or 0,
+            produto["estoque_minimo"] or 0
+        ])
+
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+
+        for cell in column:
+            value = str(cell.value) if cell.value is not None else ""
+            max_length = max(max_length, len(value))
+
+        ws.column_dimensions[column_letter].width = min(max_length + 4, 45)
+
+    os.makedirs("exports", exist_ok=True)
+
+    agora = datetime.now().strftime("%Y%m%d_%H%M%S")
+    nome_arquivo = f"produtos_exportados_{agora}.xlsx"
+    caminho_arquivo = os.path.join("exports", nome_arquivo)
+
+    wb.save(caminho_arquivo)
+
+    return send_file(
+        caminho_arquivo,
+        as_attachment=True,
+        download_name=nome_arquivo
+    )
+
 @app.route("/produtos/modelo")
+
 @admin_required
 def baixar_modelo_produtos():
     wb = Workbook()
