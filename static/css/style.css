@@ -3538,3 +3538,40 @@ body {
     margin-bottom: 0;
 }
 
+/* Ajuste da barra de busca de produtos */
+.products-search-form {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) 160px 42px 42px 42px 42px 42px;
+    gap: 12px;
+    align-items: center;
+}
+
+.products-search-form input,
+.products-search-form select {
+    height: 42px;
+}
+
+.products-search-form .small-button,
+.products-search-form .action-icon-button {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    max-width: 42px;
+    padding: 0;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.products-search-form svg {
+    width: 18px;
+    height: 18px;
+}
+
+@media (max-width: 900px) {
+    .products-search-form {
+        grid-template-columns: 1fr 150px repeat(5, 42px);
+        overflow-x: auto;
+    }
+}
