@@ -6,6 +6,7 @@
     let produtoBuscaTimer = null;
     let atualizandoResumo = false;
     let vendaProntaParaEnviar = false;
+    let valorFinalEditadoManual = false;
 
     const produtoBuscaInput = document.getElementById("produto_busca");
     const produtoIdInput = document.getElementById("produto_id");
@@ -96,6 +97,76 @@
                 .replace(/\./g, "")
                 .replace(",", ".")
         ) || 0;
+    }
+
+    function formatarCampoMoeda(valor) {
+        if (valor === null || valor === undefined) {
+            return "0,00";
+        }
+
+        let texto = String(valor).trim();
+
+        if (!texto) {
+            return "0,00";
+        }
+
+        texto = texto
+            .replace("R$", "")
+            .replace(/\s/g, "")
+            .replace(/[^\d,.-]/g, "");
+
+        if (!texto) {
+            return "0,00";
+        }
+
+        let numero = 0;
+
+        if (texto.includes(",")) {
+            texto = texto.replace(/\./g, "").replace(",", ".");
+            numero = Number(texto);
+        } else {
+            numero = Number(texto);
+        }
+
+        if (Number.isNaN(numero) || numero < 0) {
+            numero = 0;
+        }
+
+        return numero.toFixed(2).replace(".", ",");
+    }
+
+
+    function converterCampoMoedaParaNumero(valor) {
+        if (valor === null || valor === undefined) {
+            return 0;
+        }
+
+        let texto = String(valor).trim();
+
+        if (!texto) {
+            return 0;
+        }
+
+        texto = texto
+            .replace("R$", "")
+            .replace(/\s/g, "")
+            .replace(/[^\d,.-]/g, "");
+
+        if (!texto) {
+            return 0;
+        }
+
+        if (texto.includes(",")) {
+            texto = texto.replace(/\./g, "").replace(",", ".");
+        }
+
+        const numero = Number(texto);
+
+        if (Number.isNaN(numero) || numero < 0) {
+            return 0;
+        }
+
+        return numero;
     }
 
     function normalizarProduto(produto) {
@@ -239,21 +310,31 @@
         let descontoValor = calcularDescontoEmValor(subtotal);
 
         descontoValor = Math.max(0, Math.min(descontoValor, subtotal));
-        const total = subtotal - descontoValor;
 
-        descontoTotalInput.value = descontoValor.toFixed(2);
-        valorFinalInput.value = total.toFixed(2);
+        let total = subtotal - descontoValor;
 
-        if (descontoValor > 0) {
-            valorFinalInput.removeAttribute("readonly");
-            valorFinalInput.classList.remove("readonly-input");
+        /*
+            Se o usuário editou manualmente o Valor final,
+            o sistema respeita esse valor e calcula o desconto automaticamente.
+        */
+        if (valorFinalEditadoManual) {
+            const valorFinalManual = converterCampoMoedaParaNumero(valorFinalInput.value);
+
+            if (valorFinalManual >= 0 && valorFinalManual <= subtotal) {
+                total = valorFinalManual;
+                descontoValor = subtotal - valorFinalManual;
+            }
         } else {
-            valorFinalInput.setAttribute("readonly", "readonly");
-            valorFinalInput.classList.add("readonly-input");
+            valorFinalInput.value = formatarCampoMoeda(total);
         }
 
-        preview.textContent = `Subtotal: ${formatarMoeda(subtotal)} | Desconto: ${formatarMoeda(descontoValor)} | Total: ${formatarMoeda(total)}`;
+        descontoTotalInput.value = descontoValor.toFixed(2);
 
+        valorFinalInput.removeAttribute("readonly");
+        valorFinalInput.classList.remove("readonly-input");
+
+        preview.textContent = formatarMoeda(total);
+        
         const pagamentoResumoSubtotal = document.getElementById("pagamento_resumo_subtotal");
         const pagamentoResumoDesconto = document.getElementById("pagamento_resumo_desconto");
         const pagamentoResumoTotal = document.getElementById("pagamento_resumo_total");
@@ -719,24 +800,39 @@
     }
 
     function atualizarDescontoPeloValorFinal() {
-        const descontoAtual = Number(descontoTotalInput.value || 0);
-
-        if (descontoAtual <= 0) {
-            valorFinalInput.value = calcularSubtotalVenda().toFixed(2);
-            return;
-        }
-
         if (atualizandoResumo) {
             return;
         }
 
-        atualizandoResumo = true;
+        valorFinalEditadoManual = true;
 
         const subtotal = calcularSubtotalVenda();
-        let valorFinal = Number(valorFinalInput.value || 0);
-        valorFinal = Math.max(0, Math.min(valorFinal, subtotal));
+        const valorFinal = converterCampoMoedaParaNumero(valorFinalInput.value);
+
+        if (subtotal <= 0) {
+            descontoInput.value = 0;
+            descontoTotalInput.value = 0;
+            atualizarResumo();
+            return;
+        }
+
+        if (valorFinal < 0) {
+            valorFinalInput.value = "0.00";
+            return;
+        }
+
+        if (valorFinal > subtotal) {
+            valorFinalInput.value = subtotal.toFixed(2);
+            descontoInput.value = 0;
+            descontoTotalInput.value = 0;
+            valorFinalEditadoManual = false;
+            atualizarResumo();
+            return;
+        }
 
         const descontoValor = subtotal - valorFinal;
+
+        descontoTotalInput.value = descontoValor.toFixed(2);
 
         if (descontoTipoInput.value === "percentual") {
             const percentual = subtotal > 0 ? (descontoValor / subtotal) * 100 : 0;
@@ -745,26 +841,7 @@
             descontoInput.value = descontoValor.toFixed(2);
         }
 
-        descontoTotalInput.value = descontoValor.toFixed(2);
-        preview.textContent = `Subtotal: ${formatarMoeda(subtotal)} | Desconto: ${formatarMoeda(descontoValor)} | Total: ${formatarMoeda(valorFinal)}`;
-        const pagamentoResumoSubtotal = document.getElementById("pagamento_resumo_subtotal");
-        const pagamentoResumoDesconto = document.getElementById("pagamento_resumo_desconto");
-        const pagamentoResumoTotal = document.getElementById("pagamento_resumo_total");
-
-        if (pagamentoResumoSubtotal) {
-            pagamentoResumoSubtotal.textContent = formatarMoeda(subtotal);
-        }
-
-        if (pagamentoResumoDesconto) {
-            pagamentoResumoDesconto.textContent = formatarMoeda(descontoValor);
-        }
-
-        if (pagamentoResumoTotal) {
-            pagamentoResumoTotal.textContent = formatarMoeda(valorFinal);
-        }
-
-        atualizarResumoPagamentos();
-        atualizandoResumo = false;
+        atualizarResumo();
     }
 
     function configurarFormularioNovoProduto() {
@@ -1146,9 +1223,47 @@
             }
         });
 
-        descontoInput.addEventListener("input", atualizarResumo);
-        descontoTipoInput.addEventListener("change", atualizarResumo);
-        valorFinalInput.addEventListener("input", atualizarDescontoPeloValorFinal);
+        if (descontoInput) {
+            descontoInput.addEventListener("input", function () {
+                valorFinalEditadoManual = false;
+                atualizarResumo();
+            });
+        }
+
+        if (descontoTipoInput) {
+            descontoTipoInput.addEventListener("change", function () {
+                valorFinalEditadoManual = false;
+                atualizarResumo();
+            });
+        }
+        if (valorFinalInput) {
+            valorFinalInput.addEventListener("focus", function () {
+                valorFinalInput.select();
+            });
+
+            valorFinalInput.addEventListener("input", function () {
+                valorFinalEditadoManual = true;
+                atualizarDescontoPeloValorFinal();
+            });
+
+            valorFinalInput.addEventListener("blur", function () {
+                const subtotal = calcularSubtotalVenda();
+                let valor = converterCampoMoedaParaNumero(valorFinalInput.value);
+
+                if (valor < 0) {
+                    valor = 0;
+                }
+
+                if (valor > subtotal) {
+                    valor = subtotal;
+                }
+
+                valorFinalInput.value = formatarCampoMoeda(valor);
+
+                valorFinalEditadoManual = true;
+                atualizarDescontoPeloValorFinal();
+            });
+        }
     }
 
     document.addEventListener("DOMContentLoaded", function () {
