@@ -1,6 +1,10 @@
 name: Deploy PC da Loja
 
 on:
+  push:
+    branches:
+      - main
+
   workflow_dispatch:
 
 jobs:
