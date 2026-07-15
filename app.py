@@ -27,7 +27,8 @@ def inject_configuracoes():
             "config_loja": None
         }
 
-DATABASE = "crm_start.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATABASE = os.path.join(BASE_DIR, "crm_start.db")
 
 @app.template_filter("datetime_br")
 def datetime_br(valor):
@@ -813,18 +814,31 @@ def configuracoes():
             login_logo_path = f"uploads/{nome_arquivo}"
 
             conn.execute("""
-                UPDATE configuracoes_loja
-                SET
-                    nome_loja = ?,
-                    telefone = ?,
-                    endereco = ?,
-                    cidade = ?,
-                    instagram = ?,
-                    mensagem_recibo = ?,
-                    logo_path = ?,
-                    login_logo_path = ?,
+                INSERT INTO configuracoes_loja (
+                    id,
+                    nome_loja,
+                    telefone,
+                    endereco,
+                    cidade,
+                    instagram,
+                    mensagem_recibo,
+                    logo_path,
+                    login_logo_path,
+                    updated_at
+                )
+                VALUES (
+                    1, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
+                )
+                ON CONFLICT(id) DO UPDATE SET
+                    nome_loja = excluded.nome_loja,
+                    telefone = excluded.telefone,
+                    endereco = excluded.endereco,
+                    cidade = excluded.cidade,
+                    instagram = excluded.instagram,
+                    mensagem_recibo = excluded.mensagem_recibo,
+                    logo_path = excluded.logo_path,
+                    login_logo_path = excluded.login_logo_path,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = 1
             """, (
                 nome_loja,
                 telefone,
