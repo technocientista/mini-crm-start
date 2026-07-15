@@ -1,0 +1,16 @@
+name: Testar PC da Loja
+
+on:
+  workflow_dispatch:
+
+jobs:
+  teste:
+    runs-on: [self-hosted, Windows, X64]
+
+    steps:
+      - name: Confirmar conexão
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          Write-Host "Runner conectado com sucesso!"
+          Write-Host "Computador: $env:COMPUTERNAME"
+          Write-Host "Runner: $env:RUNNER_NAME"
