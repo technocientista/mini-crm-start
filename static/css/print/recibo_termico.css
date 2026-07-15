@@ -11,8 +11,8 @@
         }
 
         .cupom {
-            width: 80mm;
-            max-width: 80mm;
+            width: 70mm;
+            max-width: 70mm;
             padding: 8px;
             margin: 0 auto;
             font-size: 12px;
@@ -63,8 +63,8 @@
         }
 
         .actions {
-            width: 80mm;
-            max-width: 80mm;
+            width: 70mm;
+            max-width: 70mm;
             margin: 12px auto;
             display: flex;
             gap: 8px;
@@ -101,8 +101,8 @@
             }
 
             .cupom {
-                width: 80mm;
-                max-width: 80mm;
+                width: 70mm;
+                max-width: 70mm;
                 margin: 0;
                 padding: 6px;
             }

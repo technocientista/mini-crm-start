@@ -195,9 +195,13 @@
                             </div>
                         </div>
 
-                        <div class="sale-preview full">
-                            <strong>Resumo da venda:</strong>
-                            <span id="preview-venda">Total: R$ 0,00</span>
+                        <div class="sale-preview product-total-summary full">
+                            <strong>Valor total:</strong>
+
+                            <div class="product-total-summary-grid">
+                                <span>Total:</span>
+                                <strong id="preview-venda">R$ 0,00</strong>
+                            </div>
                         </div>
 
                         <div class="pdv-step-actions">
@@ -210,133 +214,155 @@
                     
 
                     <div class="pdv-step-content full" data-step-content="pagamento">
-                        <div class="sale-preview payment-sale-summary">
-                            <strong>Resumo da venda:</strong>
 
-                            <div class="payment-sale-summary-grid">
-                                <span>Subtotal: <b id="pagamento_resumo_subtotal">R$ 0,00</b></span>
-                                <span>Desconto: <b id="pagamento_resumo_desconto">R$ 0,00</b></span>
-                                <span>Total: <b id="pagamento_resumo_total">R$ 0,00</b></span>
-                            </div>
-                        </div>
 
-                        <div class="payment-area full">
-                            <input type="hidden" id="pagamento_dividido" name="pagamento_dividido" value="0">
-                            <input type="hidden" id="forma_pagamento" name="forma_pagamento" value="">
-                            <input type="hidden" id="valor_outros" name="valor_outros" value="0">
+                        <div class="payment-step-layout full">
 
-                            <label class="payment-main-label">Forma de pagamento</label>
+                            <div class="payment-step-right">
+                                <div class="sale-preview payment-sale-summary">
+                                    <strong>Resumo da venda:</strong>
 
-                            <div class="payment-method-options">
-                                <label class="payment-toggle payment-method-option">
-                                    <input 
-                                        type="checkbox" 
-                                        class="payment-method-check"
-                                        id="pagamento_pix_check"
-                                        value="PIX"
-                                        data-payment-method="PIX"
-                                    >
-                                    <span>Pix</span>
-                                </label>
+                                    <div class="payment-sale-summary-grid">
+                                        <span>
+                                            <b>Subtotal:</b>
+                                            <strong id="pagamento_resumo_subtotal">R$ 0,00</strong>
+                                        </span>
 
-                                <label class="payment-toggle payment-method-option">
-                                    <input 
-                                        type="checkbox" 
-                                        class="payment-method-check"
-                                        id="pagamento_dinheiro_check"
-                                        value="DINHEIRO"
-                                        data-payment-method="DINHEIRO"
-                                    >
-                                    <span>Dinheiro</span>
-                                </label>
+                                        <span>
+                                            <b>Desconto:</b>
+                                            <strong id="pagamento_resumo_desconto">R$ 0,00</strong>
+                                        </span>
 
-                                <label class="payment-toggle payment-method-option">
-                                    <input 
-                                        type="checkbox" 
-                                        class="payment-method-check"
-                                        id="pagamento_cartao_check"
-                                        value="CARTAO"
-                                        data-payment-method="CARTAO"
-                                    >
-                                    <span>Cartão</span>
-                                </label>
-                            </div>
-
-                            <div id="pagamento_dividido_area" class="payment-split-area" style="display: none;">
-                                <p class="payment-split-help">
-                                    Informe quanto será pago em cada forma selecionada.
-                                </p>
-
-                                <div class="payment-split-grid">
-                                    <div class="form-group payment-value-field" data-payment-value="PIX" style="display: none;">
-                                        <label for="valor_pix">Pix</label>
-                                        <input type="text" id="valor_pix" name="valor_pix" placeholder="0,00">
-                                    </div>
-
-                                    <div class="form-group payment-value-field" data-payment-value="DINHEIRO" style="display: none;">
-                                        <label for="valor_dinheiro">Dinheiro</label>
-                                        <input type="text" id="valor_dinheiro" name="valor_dinheiro" placeholder="0,00">
-                                    </div>
-
-                                    <div class="form-group payment-value-field" data-payment-value="CARTAO" style="display: none;">
-                                        <label for="valor_cartao">Cartão</label>
-                                        <input type="text" id="valor_cartao" name="valor_cartao" placeholder="0,00">
+                                        <span>
+                                            <b>Total:</b>
+                                            <strong id="pagamento_resumo_total">R$ 0,00</strong>
+                                        </span>
                                     </div>
                                 </div>
 
-                                <div class="payment-split-summary">
-                                    <div>
-                                        <span>Valor final da venda</span>
-                                        <strong id="total_venda_pagamento">R$ 0,00</strong>
+
+                            </div>
+
+                            <div class="payment-step-left">
+                                <div class="payment-area full">
+                                    <input type="hidden" id="pagamento_dividido" name="pagamento_dividido" value="0">
+                                    <input type="hidden" id="forma_pagamento" name="forma_pagamento" value="">
+                                    <input type="hidden" id="valor_outros" name="valor_outros" value="0">
+
+                                    <label class="payment-main-label">Forma de pagamento</label>
+
+                                    <div class="payment-method-options">
+                                        <label class="payment-toggle payment-method-option">
+                                            <input 
+                                                type="checkbox" 
+                                                class="payment-method-check"
+                                                id="pagamento_pix_check"
+                                                value="PIX"
+                                                data-payment-method="PIX"
+                                            >
+                                            <span>Pix</span>
+                                        </label>
+
+                                        <label class="payment-toggle payment-method-option">
+                                            <input 
+                                                type="checkbox" 
+                                                class="payment-method-check"
+                                                id="pagamento_dinheiro_check"
+                                                value="DINHEIRO"
+                                                data-payment-method="DINHEIRO"
+                                            >
+                                            <span>Dinheiro</span>
+                                        </label>
+
+                                        <label class="payment-toggle payment-method-option">
+                                            <input 
+                                                type="checkbox" 
+                                                class="payment-method-check"
+                                                id="pagamento_cartao_check"
+                                                value="CARTAO"
+                                                data-payment-method="CARTAO"
+                                            >
+                                            <span>Cartão</span>
+                                        </label>
                                     </div>
 
-                                    <div>
-                                        <span>Total informado</span>
-                                        <strong id="total_pagamentos_informado">R$ 0,00</strong>
+                                    <div id="pagamento_dividido_area" class="payment-split-area" style="display: none;">
+                                        <p class="payment-split-help">
+                                            Informe quanto será pago em cada forma selecionada.
+                                        </p>
+
+                                        <div class="payment-split-grid">
+                                            <div class="form-group payment-value-field" data-payment-value="PIX" style="display: none;">
+                                                <label for="valor_pix">Pix</label>
+                                                <input type="text" id="valor_pix" name="valor_pix" placeholder="0,00">
+                                            </div>
+
+                                            <div class="form-group payment-value-field" data-payment-value="DINHEIRO" style="display: none;">
+                                                <label for="valor_dinheiro">Dinheiro</label>
+                                                <input type="text" id="valor_dinheiro" name="valor_dinheiro" placeholder="0,00">
+                                            </div>
+
+                                            <div class="form-group payment-value-field" data-payment-value="CARTAO" style="display: none;">
+                                                <label for="valor_cartao">Cartão</label>
+                                                <input type="text" id="valor_cartao" name="valor_cartao" placeholder="0,00">
+                                            </div>
+                                        </div>
+
+                                        <div class="payment-split-summary">
+                                            <div>
+                                                <span>Valor final da venda</span>
+                                                <strong id="total_venda_pagamento">R$ 0,00</strong>
+                                            </div>
+
+                                            <div>
+                                                <span>Total informado</span>
+                                                <strong id="total_pagamentos_informado">R$ 0,00</strong>
+                                            </div>
+
+                                            <div>
+                                                <span id="label_pagamento_restante">Falta informar</span>
+                                                <strong id="total_pagamentos_restante">R$ 0,00</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="payment-discount-grid">
+                                    <div class="form-group">
+                                        <label for="desconto_tipo">Tipo de desconto</label>
+                                        <select id="desconto_tipo" name="desconto_tipo">
+                                            <option value="percentual" selected>Porcentagem %</option>
+                                            <option value="valor">Valor R$</option>
+                                        </select>
                                     </div>
 
-                                    <div>
-                                        <span id="label_pagamento_restante">Falta informar</span>
-                                        <strong id="total_pagamentos_restante">R$ 0,00</strong>
+                                    <div class="form-group">
+                                        <label for="desconto_input">Desconto</label>
+                                        <input 
+                                            type="number" 
+                                            id="desconto_input" 
+                                            step="0.01" 
+                                            min="0" 
+                                            value="0"
+                                        >
+                                        <input type="hidden" id="desconto_total" name="desconto_total" value="0">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="valor_final_input">Valor final</label>
+                                        <input 
+                                            type="text" 
+                                            id="valor_final_input" 
+                                            name="valor_final"
+                                            inputmode="decimal"
+                                            value="0,00"
+                                        >
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="sale-totals-row full">
-                            <div class="form-group">
-                                <label for="desconto_tipo">Tipo de desconto</label>
-                                <select id="desconto_tipo" name="desconto_tipo">
-                                    <option value="percentual">Porcentagem %</option>
-                                    <option value="valor">Valor R$</option>
-                                </select>
-                            </div>
 
-                            <div class="form-group">
-                                <label for="desconto_input">Desconto</label>
-                                <input 
-                                    type="number" 
-                                    id="desconto_input" 
-                                    name="desconto_input" 
-                                    step="0.01" 
-                                    min="0" 
-                                    value="0"
-                                >
-                            </div>
 
-                            <div class="form-group">
-                                <label for="valor_final_input">Valor final</label>
-                                <input 
-                                    type="number" 
-                                    id="valor_final_input" 
-                                    name="valor_final"
-                                    step="0.01" 
-                                    min="0" 
-                                    value="0"
-                                    readonly
-                                    class="readonly-input"
-                                >
-                            </div>
                         </div>
 
                         <div class="pdv-step-actions">
