@@ -48,3 +48,4 @@ if ($RobocopyExitCode -ge 8) {
 }
 
 Write-Host "Arquivos atualizados com sucesso."
+exit 0
