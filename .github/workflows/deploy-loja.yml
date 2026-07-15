@@ -1,16 +1,18 @@
-name: Testar PC da Loja
+name: Deploy PC da Loja
 
 on:
   workflow_dispatch:
 
 jobs:
-  teste:
+  deploy:
     runs-on: [self-hosted, Windows, X64]
 
     steps:
-      - name: Confirmar conexão
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Executar deploy
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
-          Write-Host "Runner conectado com sucesso!"
-          Write-Host "Computador: $env:COMPUTERNAME"
-          Write-Host "Runner: $env:RUNNER_NAME"
+          & "${{ github.workspace }}\scripts\deploy-loja.ps1" `
+            -SourceDirectory "${{ github.workspace }}"
