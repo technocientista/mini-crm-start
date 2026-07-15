@@ -1,4 +1,4 @@
-$ProjetoPath = "C:\Users\NINJA DEVELOPER\VSCODE\mini-crm-start"
+$ProjetoPath = "C:\Users\saman\Documents\mini-crm-start"
 $Url = "http://127.0.0.1:5000"
 
 Set-Location $ProjetoPath
