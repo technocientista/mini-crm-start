@@ -813,33 +813,9 @@ def configuracoes():
 
             login_logo_path = f"uploads/{nome_arquivo}"
 
-            conn.execute("""
-                INSERT INTO configuracoes_loja (
-                    id,
-                    nome_loja,
-                    telefone,
-                    endereco,
-                    cidade,
-                    instagram,
-                    mensagem_recibo,
-                    logo_path,
-                    login_logo_path,
-                    updated_at
-                )
-                VALUES (
-                    1, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
-                )
-                ON CONFLICT(id) DO UPDATE SET
-                    nome_loja = excluded.nome_loja,
-                    telefone = excluded.telefone,
-                    endereco = excluded.endereco,
-                    cidade = excluded.cidade,
-                    instagram = excluded.instagram,
-                    mensagem_recibo = excluded.mensagem_recibo,
-                    logo_path = excluded.logo_path,
-                    login_logo_path = excluded.login_logo_path,
-                    updated_at = CURRENT_TIMESTAMP
-            """, (
+        conn.execute("""
+            INSERT INTO configuracoes_loja (
+                id,
                 nome_loja,
                 telefone,
                 endereco,
@@ -847,8 +823,32 @@ def configuracoes():
                 instagram,
                 mensagem_recibo,
                 logo_path,
-                login_logo_path
-            ))
+                login_logo_path,
+                updated_at
+            )
+            VALUES (
+                1, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
+            )
+            ON CONFLICT(id) DO UPDATE SET
+                nome_loja = excluded.nome_loja,
+                telefone = excluded.telefone,
+                endereco = excluded.endereco,
+                cidade = excluded.cidade,
+                instagram = excluded.instagram,
+                mensagem_recibo = excluded.mensagem_recibo,
+                logo_path = excluded.logo_path,
+                login_logo_path = excluded.login_logo_path,
+                updated_at = CURRENT_TIMESTAMP
+        """, (
+            nome_loja,
+            telefone,
+            endereco,
+            cidade,
+            instagram,
+            mensagem_recibo,
+            logo_path,
+            login_logo_path
+        ))
 
         conn.commit()
         conn.close()
