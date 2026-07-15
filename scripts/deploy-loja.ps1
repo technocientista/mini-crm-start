@@ -47,5 +47,29 @@ if ($RobocopyExitCode -ge 8) {
     throw "Erro ao copiar os arquivos. Código do Robocopy: $RobocopyExitCode"
 }
 
-Write-Host "Arquivos atualizados com sucesso."
+Write-Host "Reiniciando o servidor Flask..."
+
+$ProjetoPath = "C:\Users\saman\Documents\mini-crm-start"
+
+$ProcessosFlask = Get-CimInstance Win32_Process |
+    Where-Object {
+        ($_.Name -eq "python.exe" -or $_.Name -eq "pythonw.exe") -and
+        $_.CommandLine -like "*$ProjetoPath*app.py*"
+    }
+
+foreach ($Processo in $ProcessosFlask) {
+    Stop-Process -Id $Processo.ProcessId -Force -ErrorAction SilentlyContinue
+}
+
+Start-Sleep -Seconds 2
+
+Start-Process `
+    -FilePath "$ProjetoPath\venv\Scripts\python.exe" `
+    -ArgumentList "app.py" `
+    -WorkingDirectory $ProjetoPath `
+    -WindowStyle Hidden
+
+Start-Sleep -Seconds 3
+
+Write-Host "Arquivos atualizados e servidor reiniciado com sucesso."
 exit 0
