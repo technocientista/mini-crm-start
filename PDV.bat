@@ -1,3 +1,3 @@
 @echo off
-start "" /min powershell -ExecutionPolicy Bypass -File "%~dp0iniciar_crm.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0abrir_crm.ps1"
 exit
