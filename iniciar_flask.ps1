@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$ProjetoPath = "C:\Users\saman\Documents\mini-crm-start"
+$ProjetoPath = $PSScriptRoot
 $PythonPath = Join-Path $ProjetoPath "venv\Scripts\python.exe"
 $AppPath = Join-Path $ProjetoPath "app.py"
 $Url = "http://127.0.0.1:5000"

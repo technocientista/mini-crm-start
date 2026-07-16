@@ -1,4 +1,4 @@
-$ProjetoPath = "C:\Users\saman\Documents\mini-crm-start"
+$ProjetoPath = $PSScriptRoot
 $IniciarFlask = Join-Path $ProjetoPath "iniciar_flask.ps1"
 $LogErro = Join-Path $ProjetoPath "flask_erro.log"
 $Url = "http://127.0.0.1:5000"
