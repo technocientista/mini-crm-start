@@ -7,7 +7,7 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body class="ui-refreshed">
 
     <div class="app-layout">
 
@@ -36,12 +36,12 @@
                     </div>
 
                     <div class="form-actions">
-                        <button type="submit">Filtrar</button>
+                        <button type="submit" class="ui-command-action ui-icon-filter">Filtrar</button>
                     </div>
 
                     <div class="form-actions">
                         <a 
-                            class="button-link"
+                            class="button-link ui-command-action ui-icon-download"
                             href="{{ url_for('exportar_comissoes', data_inicio=data_inicio, data_fim=data_fim) }}"
                         >
                             Exportar Excel

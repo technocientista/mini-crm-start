@@ -374,7 +374,6 @@ select:focus {
     gap: 8px;
     align-items: center;
     flex-wrap: nowrap;
-    min-width: 190px;
 }
 
 .sidebar nav a svg {
@@ -2896,3 +2895,751 @@ body {
         max-width: 260px;
     }
 }
+
+/* =========================================================
+   ROTA /CLIENTES — barra de comandos com ícones outline
+   Escopo intencionalmente limitado à página de clientes.
+   ========================================================= */
+.clients-command-panel {
+    overflow: hidden;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: var(--shadow-soft);
+}
+
+.clients-command-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 64px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.command-separator {
+    width: 1px;
+    height: 28px;
+    margin: 0 4px;
+    background: var(--border-color);
+}
+
+.command-button {
+    width: auto;
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 9px 13px;
+    margin: 0;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: #169176;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.command-button:hover,
+.command-button:focus-visible {
+    background: rgba(22, 124, 145, .08);
+    border-color: rgba(22, 124, 145, .15);
+    color: #0e6577;
+    outline: none;
+}
+
+.command-button svg,
+.table-outline-button svg,
+.clients-search-field > svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.command-button svg {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+}
+
+.clients-filter-bar {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) 160px auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+}
+
+.clients-search-field {
+    min-width: 0;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-input);
+    color: var(--text-muted);
+}
+
+.clients-search-field:focus-within {
+    border-color: #169176;
+    box-shadow: 0 0 0 3px rgba(22, 124, 145, .12);
+}
+
+.clients-search-field > svg {
+    width: 19px;
+    height: 19px;
+    flex: 0 0 19px;
+}
+
+.clients-search-field input {
+    height: 40px;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-main);
+    box-shadow: none;
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.clients-search-field input:focus {
+    border: 0;
+    box-shadow: none;
+}
+
+.clients-filter-bar select {
+    height: 42px;
+    padding: 0 36px 0 12px;
+    margin: 0;
+    color: var(--text-main);
+    background-color: var(--bg-input);
+    border-color: var(--border-color);
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.command-button-compact {
+    min-height: 42px;
+    padding-inline: 12px;
+    border-color: var(--border-color);
+}
+
+.command-button-muted {
+    color: var(--text-muted);
+}
+
+.table-outline-button {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: #169176;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.table-outline-button:hover,
+.table-outline-button:focus-visible {
+    background: rgba(22, 124, 145, .09);
+    border-color: rgba(22, 124, 145, .18);
+    color: #0e6577;
+    outline: none;
+}
+
+.table-outline-button svg {
+    width: 19px;
+    height: 19px;
+}
+
+.table-outline-button-danger {
+    color: #b42318;
+}
+
+.table-outline-button-danger:hover,
+.table-outline-button-danger:focus-visible {
+    color: #8f1b13;
+    background: rgba(180, 35, 24, .08);
+    border-color: rgba(180, 35, 24, .18);
+}
+
+[data-theme="dark"] .command-button {
+    color: #67d46b;
+}
+
+[data-theme="dark"] .command-button:hover,
+[data-theme="dark"] .command-button:focus-visible {
+    color: #8dd9e5;
+    background: rgba(103, 196, 212, .1);
+    border-color: rgba(103, 196, 212, .2);
+}
+
+@media (max-width: 900px) {
+    .clients-filter-bar {
+        grid-template-columns: 1fr 150px;
+    }
+
+    .clients-filter-bar .command-button-compact {
+        width: 100%;
+    }
+}
+
+@media (max-width: 620px) {
+    .clients-command-bar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .clients-command-bar .command-button {
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .command-separator {
+        width: 100%;
+        height: 1px;
+        margin: 2px 0;
+    }
+
+    .clients-filter-bar {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =========================================================
+   ROTA /PRODUTOS — extensão do padrão outline aprovado
+   ========================================================= */
+.products-filter-bar {
+    grid-template-columns: minmax(280px, 1fr) 160px auto auto;
+}
+
+@media (max-width: 900px) {
+    .products-filter-bar {
+        grid-template-columns: 1fr 150px;
+    }
+}
+
+@media (max-width: 620px) {
+    .products-filter-bar {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* =========================================================
+   STATUS MODERNO — CLIENTES E PRODUTOS
+   Ícones outline, cores suaves e leitura consistente.
+   ========================================================= */
+.modern-status {
+    --status-color: var(--text-muted);
+    --status-bg: rgba(148, 163, 184, 0.12);
+    --status-border: rgba(148, 163, 184, 0.28);
+
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 4px 10px;
+    border: 1px solid var(--status-border);
+    border-radius: 999px;
+    background: var(--status-bg);
+    color: var(--status-color);
+    font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.modern-status svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.modern-status--success {
+    --status-color: #168653;
+    --status-bg: rgba(34, 197, 94, 0.10);
+    --status-border: rgba(34, 197, 94, 0.26);
+}
+
+.modern-status--warning {
+    --status-color: #a86400;
+    --status-bg: rgba(245, 158, 11, 0.12);
+    --status-border: rgba(245, 158, 11, 0.30);
+}
+
+.modern-status--danger {
+    --status-color: #c43b3b;
+    --status-bg: rgba(239, 68, 68, 0.10);
+    --status-border: rgba(239, 68, 68, 0.28);
+}
+
+.modern-status--neutral {
+    --status-color: #64748b;
+    --status-bg: rgba(100, 116, 139, 0.10);
+    --status-border: rgba(100, 116, 139, 0.24);
+}
+
+[data-theme="dark"] .modern-status--success {
+    --status-color: #67dfa0;
+    --status-bg: rgba(34, 197, 94, 0.12);
+    --status-border: rgba(74, 222, 128, 0.28);
+}
+
+[data-theme="dark"] .modern-status--warning {
+    --status-color: #f8c45f;
+    --status-bg: rgba(245, 158, 11, 0.13);
+    --status-border: rgba(251, 191, 36, 0.28);
+}
+
+[data-theme="dark"] .modern-status--danger {
+    --status-color: #ff8585;
+    --status-bg: rgba(239, 68, 68, 0.12);
+    --status-border: rgba(248, 113, 113, 0.28);
+}
+
+[data-theme="dark"] .modern-status--neutral {
+    --status-color: #b6c2d1;
+    --status-bg: rgba(148, 163, 184, 0.10);
+    --status-border: rgba(148, 163, 184, 0.22);
+}
+
+/* =========================================================
+   ROTA /ESTOQUE — padrão outline aprovado
+   ========================================================= */
+.stock-filter-bar {
+    grid-template-columns: minmax(300px, 1fr) 170px auto auto;
+}
+
+.stock-command-panel .clients-command-bar {
+    min-height: 58px;
+}
+
+@media (max-width: 900px) {
+    .stock-filter-bar {
+        grid-template-columns: 1fr 170px;
+    }
+
+    .stock-filter-bar .command-button-compact {
+        width: 100%;
+    }
+}
+
+@media (max-width: 620px) {
+    .stock-filter-bar {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =========================================================
+   REDESIGN GLOBAL — TODAS AS ROTAS DO SISTEMA
+   Padrão de command bar com tipografia Segoe UI e ícones outline.
+   ========================================================= */
+.ui-refreshed {
+    font-family: "Segoe UI", Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.ui-refreshed .topbar {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    min-height: 78px;
+    margin-bottom: 20px;
+    padding: 4px 2px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.ui-refreshed .topbar h1 {
+    margin: 0;
+    font-size: clamp(25px, 2.2vw, 34px);
+    font-weight: 650;
+    letter-spacing: -0.025em;
+}
+
+.ui-refreshed .topbar p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.ui-refreshed .panel {
+    border: 1px solid var(--border-color);
+    border-radius: 13px;
+    box-shadow: 0 5px 22px rgba(15, 23, 42, .035);
+}
+
+.ui-refreshed .panel > h2,
+.ui-refreshed .modal-card > h2,
+.ui-refreshed .modal-header h2 {
+    font-size: 18px;
+    font-weight: 650;
+    letter-spacing: -.012em;
+}
+
+.ui-refreshed .card,
+.ui-refreshed .dashboard-insight-card,
+.ui-refreshed .action-card {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 18px rgba(15, 23, 42, .03);
+}
+
+.ui-refreshed input,
+.ui-refreshed select,
+.ui-refreshed textarea {
+    min-height: 42px;
+    border-radius: 8px;
+    border-color: var(--border-color);
+    font-family: inherit;
+    transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+
+.ui-refreshed textarea { min-height: 90px; }
+
+.ui-refreshed input:focus,
+.ui-refreshed select:focus,
+.ui-refreshed textarea:focus {
+    outline: 0;
+    border-color: #16839a;
+    box-shadow: 0 0 0 3px rgba(22, 131, 154, .13);
+}
+
+.ui-refreshed label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary, var(--text-color));
+}
+
+.ui-refreshed table {
+    font-family: inherit;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.ui-refreshed thead th {
+    padding-top: 13px;
+    padding-bottom: 13px;
+    background: color-mix(in srgb, var(--panel-bg) 92%, #16839a 8%);
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: .01em;
+    white-space: nowrap;
+}
+
+.ui-refreshed tbody td {
+    padding-top: 13px;
+    padding-bottom: 13px;
+    vertical-align: middle;
+}
+
+.ui-refreshed tbody tr {
+    transition: background-color .14s ease;
+}
+
+.ui-refreshed tbody tr:hover {
+    background: rgba(22, 131, 154, .045);
+}
+
+/* Botões com texto e ícone no padrão toolbar */
+.ui-refreshed .ui-command-action,
+.ui-refreshed .icon-action-button,
+.ui-refreshed .icon-text-button,
+.ui-refreshed .button-link,
+.ui-refreshed button:not(.modal-close):not(.dashboard-insight-card):not(.pdv-path-step):not(.action-icon-button):not(.small-button):not(.small-danger-button) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    min-height: 40px;
+    padding: 8px 14px;
+    border: 1px solid rgba(22, 124, 145, .16);
+    border-radius: 8px;
+    background: transparent;
+    color: #169176;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: none;
+    transition: background-color .16s ease, border-color .16s ease, color .16s ease, transform .12s ease;
+}
+
+.ui-refreshed .ui-command-action:hover,
+.ui-refreshed .icon-action-button:hover,
+.ui-refreshed .icon-text-button:hover,
+.ui-refreshed .button-link:hover,
+.ui-refreshed button:not(.modal-close):not(.dashboard-insight-card):not(.pdv-path-step):not(.action-icon-button):not(.small-button):not(.small-danger-button):hover {
+    background: rgba(22, 124, 145, .08);
+    border-color: rgba(22, 124, 145, .28);
+    color: #0e6577;
+    transform: translateY(-1px);
+}
+
+.ui-refreshed .danger,
+.ui-refreshed .danger-button,
+.ui-refreshed .small-danger-button {
+    color: #c13b32 !important;
+    border-color: rgba(193, 59, 50, .2) !important;
+}
+
+.ui-refreshed .danger:hover,
+.ui-refreshed .danger-button:hover,
+.ui-refreshed .small-danger-button:hover {
+    background: rgba(193, 59, 50, .08) !important;
+    border-color: rgba(193, 59, 50, .32) !important;
+}
+
+.ui-refreshed .secondary,
+.ui-refreshed .button-secondary,
+.ui-refreshed .secondary-action {
+    color: var(--text-muted) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Outline SVGs consistently across app */
+.ui-refreshed button svg,
+.ui-refreshed a svg,
+.sidebar svg {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    fill: none;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* CSS outline icons for text-only commands */
+.ui-command-action::before {
+    content: "";
+    width: 19px;
+    height: 19px;
+    flex: 0 0 19px;
+    background-color: currentColor;
+    -webkit-mask: var(--ui-icon) center/contain no-repeat;
+    mask: var(--ui-icon) center/contain no-repeat;
+}
+.ui-icon-add { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E"); }
+.ui-icon-save { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round'%3E%3Cpath d='M5 3h12l2 2v16H5zM8 3v6h8V3M8 21v-7h8v7'/%3E%3C/svg%3E"); }
+.ui-icon-search { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-4-4'/%3E%3C/svg%3E"); }
+.ui-icon-filter { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round'%3E%3Cpath d='M3 5h18l-7 8v5l-4 2v-7z'/%3E%3C/svg%3E"); }
+.ui-icon-clear { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='m4 4 16 16M20 4 4 20'/%3E%3C/svg%3E"); }
+.ui-icon-download { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M12 3v13M7 11l5 5 5-5M4 21h16'/%3E%3C/svg%3E"); }
+.ui-icon-upload { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M12 16V3M7 8l5-5 5 5M4 21h16'/%3E%3C/svg%3E"); }
+.ui-icon-print { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round'%3E%3Cpath d='M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z'/%3E%3C/svg%3E"); }
+.ui-icon-back { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E"); }
+.ui-icon-next { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E"); }
+.ui-icon-close { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='m6 6 12 12M18 6 6 18'/%3E%3C/svg%3E"); }
+.ui-icon-edit { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round'%3E%3Cpath d='M12 20H4v-8L15 1l8 8-11 11ZM14 3l8 8M4 20l5-1-4-4-1 5Z'/%3E%3C/svg%3E"); }
+.ui-icon-view { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'%3E%3Cpath d='M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E"); }
+.ui-icon-check { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='m5 12 4 4L19 6'/%3E%3C/svg%3E"); }
+.ui-icon-block { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='m6 6 12 12'/%3E%3C/svg%3E"); }
+.ui-icon-trash { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6'/%3E%3C/svg%3E"); }
+.ui-icon-send { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round'%3E%3Cpath d='m22 2-7 20-4-9-9-4 20-7Z'/%3E%3Cpath d='M22 2 11 13'/%3E%3C/svg%3E"); }
+.ui-icon-wallet { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'%3E%3Crect x='2' y='5' width='20' height='15' rx='2'/%3E%3Cpath d='M16 10h6v5h-6a2.5 2.5 0 0 1 0-5Z'/%3E%3C/svg%3E"); }
+.ui-icon-lock { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'%3E%3Crect x='4' y='10' width='16' height='11' rx='2'/%3E%3Cpath d='M8 10V7a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E"); }
+.ui-icon-adjust { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6'/%3E%3C/svg%3E"); }
+.ui-icon-swap { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M7 7h13l-3-3M17 17H4l3 3'/%3E%3C/svg%3E"); }
+.ui-icon-cart { --ui-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8'%3E%3Ccircle cx='9' cy='20' r='1'/%3E%3Ccircle cx='19' cy='20' r='1'/%3E%3Cpath d='M3 4h2l2.5 11h11l2-7H7'/%3E%3C/svg%3E"); }
+
+/* Status pills globally aligned to the modern visual language */
+.ui-refreshed .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 27px;
+    padding: 4px 10px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background: transparent;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.ui-refreshed .status-pill::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid currentColor;
+    border-radius: 50%;
+}
+
+.ui-refreshed .status-ok { color: #168653; background: rgba(34,197,94,.08); border-color: rgba(34,197,94,.26); }
+.ui-refreshed .status-warning { color: #a86400; background: rgba(245,158,11,.10); border-color: rgba(245,158,11,.28); }
+.ui-refreshed .status-danger { color: #c43b3b; background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.25); }
+
+/* Sidebar outline standard */
+.sidebar nav a {
+    min-height: 43px;
+    border-radius: 8px;
+    font-family: "Segoe UI", system-ui, sans-serif;
+}
+.sidebar nav a svg {
+    width: 20px;
+    height: 20px;
+}
+.sidebar nav a.active {
+    position: relative;
+}
+.sidebar nav a.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 9px;
+    bottom: 9px;
+    width: 3px;
+    border-radius: 3px;
+    background: currentColor;
+}
+
+/* Modal refinement */
+.ui-refreshed .modal-card,
+.ui-refreshed .modal-content {
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, .22);
+}
+
+/* Compact table action buttons remain icon-only */
+.ui-refreshed .small-button,
+.ui-refreshed .small-danger-button,
+.ui-refreshed .action-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 7px;
+    background: transparent;
+    box-shadow: none;
+}
+
+[data-theme="dark"] .ui-refreshed .ui-command-action,
+[data-theme="dark"] .ui-refreshed .icon-action-button,
+[data-theme="dark"] .ui-refreshed .icon-text-button,
+[data-theme="dark"] .ui-refreshed .button-link,
+[data-theme="dark"] .ui-refreshed button:not(.modal-close):not(.dashboard-insight-card):not(.pdv-path-step):not(.action-icon-button):not(.small-button):not(.small-danger-button) {
+    color: #67d46b;
+    border-color: rgba(103,196,212,.18);
+}
+
+[data-theme="dark"] .ui-refreshed .panel,
+[data-theme="dark"] .ui-refreshed .card,
+[data-theme="dark"] .ui-refreshed .dashboard-insight-card,
+[data-theme="dark"] .ui-refreshed .action-card {
+    box-shadow: 0 8px 30px rgba(0,0,0,.12);
+}
+
+@media (max-width: 760px) {
+    .ui-refreshed .topbar { min-height: 64px; }
+    .ui-refreshed .edit-actions-row,
+    .ui-refreshed .form-actions,
+    .ui-refreshed .modal-actions { flex-wrap: wrap; }
+    .ui-refreshed .ui-command-action,
+    .ui-refreshed .icon-action-button,
+    .ui-refreshed .icon-text-button { min-height: 42px; }
+}
+
+
+/* Produtos: mantém a coluna de ações compacta, sem espaço vazio excessivo */
+.ui-refreshed .products-table th:last-child,
+.ui-refreshed .products-table td:last-child {
+    width: 1%;
+    min-width: 84px;
+    padding-left: 8px;
+    padding-right: 8px;
+    white-space: nowrap;
+}
+
+.ui-refreshed .products-table .table-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    width: auto;
+}
+
+/* =========================================================
+   PRODUTOS — normalização dos botões da barra de comandos
+   Garante que <button> e <a> com .command-button tenham
+   exatamente a mesma aparência.
+   ========================================================= */
+.ui-refreshed .products-command-panel .clients-command-bar > .command-button {
+    appearance: none;
+    -webkit-appearance: none;
+    width: auto;
+    min-width: 0;
+    min-height: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 9px 13px;
+    margin: 0;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: #169176;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: none;
+    transform: none;
+}
+
+.ui-refreshed .products-command-panel .clients-command-bar > .command-button:hover,
+.ui-refreshed .products-command-panel .clients-command-bar > .command-button:focus-visible {
+    background: rgba(22, 124, 145, .08);
+    border-color: rgba(22, 124, 145, .15);
+    color: #0e6577;
+    outline: none;
+    transform: none;
+}
+
+.ui-refreshed .products-command-panel .clients-command-bar > .command-button svg {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+

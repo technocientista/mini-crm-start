@@ -7,7 +7,7 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body class="ui-refreshed">
 
     <div class="app-layout">
 
@@ -102,11 +102,11 @@
                     </div>
 
                     <div class="form-actions">
-                        <button type="submit">Salvar alterações</button>
+                        <button type="submit" class="ui-command-action ui-icon-save">Salvar alterações</button>
                     </div>
 
                     <div class="form-actions">
-                        <a href="{{ url_for('usuarios') }}" class="button-link secondary">
+                        <a href="{{ url_for('usuarios') }}" class="button-link secondary ui-command-action ui-icon-close">
                             Cancelar
                         </a>
                     </div>

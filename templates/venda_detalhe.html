@@ -7,7 +7,7 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body class="ui-refreshed">
 
     <div class="app-layout">
 
@@ -323,11 +323,11 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" class="button-secondary" onclick="fecharModalCancelamento()">
+                    <button type="button" class="button-secondary ui-command-action ui-icon-back" onclick="fecharModalCancelamento()">
                         Voltar
                     </button>
 
-                    <button type="submit" class="danger-button">
+                    <button type="submit" class="danger-button ui-command-action ui-icon-check">
                         Confirmar cancelamento
                     </button>
                 </div>

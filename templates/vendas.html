@@ -7,7 +7,7 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body class="ui-refreshed">
 
     <div class="app-layout">
 
@@ -107,7 +107,7 @@
                         </div>
 
                         <div class="pdv-step-actions">
-                            <button type="button" class="icon-action-button secondary" onclick="irParaEtapaPDV('produtos')">
+                            <button type="button" class="icon-action-button secondary ui-command-action ui-icon-back" onclick="irParaEtapaPDV('produtos')">
                                 Voltar
                             </button>
 
@@ -163,7 +163,7 @@
 
                             <div class="form-group add-product-action-group">
                                 <label>&nbsp;</label>
-                                <button type="button" onclick="adicionarProduto()" class="add-product-sale-button">
+                                <button type="button" onclick="adicionarProduto()" class="add-product-sale-button ui-command-action ui-icon-add">
                                     Adicionar produto
                                 </button>
                             </div>
@@ -366,11 +366,11 @@
                         </div>
 
                         <div class="pdv-step-actions">
-                            <button type="button" class="icon-action-button secondary" onclick="irParaEtapaPDV('cliente')">
+                            <button type="button" class="icon-action-button secondary ui-command-action ui-icon-back" onclick="irParaEtapaPDV('cliente')">
                                 Voltar
                             </button>
 
-                            <button type="submit" class="icon-action-button">
+                            <button type="submit" class="icon-action-button ui-command-action ui-icon-check">
                                 Finalizar venda
                             </button>
                         </div>
@@ -406,11 +406,11 @@
             </div>
 
             <div class="modal-actions">
-                <button type="button" class="button-secondary" onclick="fecharModalVendedor()">
+                <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalVendedor()">
                     Cancelar
                 </button>
 
-                <button type="button" onclick="confirmarVendedorEVender()">
+                <button type="button" onclick="confirmarVendedorEVender()" class="ui-command-action ui-icon-check">
                     Confirmar e finalizar venda
                 </button>
             </div>
@@ -485,11 +485,11 @@
                 </div>
 
                 <div class="modal-actions full">
-                    <button type="button" class="button-secondary" onclick="fecharModalNovoClienteVenda()">
+                    <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalNovoClienteVenda()">
                         Cancelar
                     </button>
 
-                    <button type="submit">
+                    <button type="submit" class="ui-command-action ui-icon-save">
                         Salvar cliente
                     </button>
                 </div>
@@ -596,11 +596,11 @@
                 </div>
 
                 <div class="modal-actions full">
-                    <button type="button" class="button-secondary" onclick="fecharModalNovoProdutoVenda()">
+                    <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalNovoProdutoVenda()">
                         Cancelar
                     </button>
 
-                    <button type="submit">
+                    <button type="submit" class="ui-command-action ui-icon-save">
                         Salvar produto
                     </button>
                 </div>

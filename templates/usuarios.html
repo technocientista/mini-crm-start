@@ -7,7 +7,7 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body class="ui-refreshed">
 
     <div class="app-layout">
 
@@ -69,7 +69,7 @@
                     </div>
 
                     <div class="form-actions">
-                        <button type="submit">Salvar usuário</button>
+                        <button type="submit" class="ui-command-action ui-icon-save">Salvar usuário</button>
                     </div>
                 </form>
             </section>
@@ -106,9 +106,19 @@
                                     </td>
                                     <td>{{ item.created_at|datetime_br }}</td>
                                     <td>
-                                        <a href="{{ url_for('usuario_editar', usuario_id=item.id) }}" class="small-button">
-                                            Editar
-                                        </a>
+                                        <div class="table-actions">
+                                            <a
+                                                href="{{ url_for('usuario_editar', usuario_id=item.id) }}"
+                                                class="table-outline-button"
+                                                title="Editar usuário"
+                                                aria-label="Editar usuário"
+                                            >
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="m14.25 5.25 4.5 4.5"/>
+                                                    <path d="M5.5 18.5 6.4 14l9.95-9.95a1.8 1.8 0 0 1 2.55 0l1.05 1.05a1.8 1.8 0 0 1 0 2.55L10 17.6l-4.5.9Z"/>
+                                                </svg>
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                             {% else %}
