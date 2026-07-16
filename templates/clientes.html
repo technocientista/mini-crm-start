@@ -7,7 +7,7 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body class="ui-refreshed">
 
     <div class="app-layout">
 
@@ -29,64 +29,87 @@
                 {% endif %}
             {% endwith %}
 
-            <section class="panel margin-top">
-                <h2>Buscar clientes</h2>
-
-                <form method="GET" action="{{ url_for('clientes') }}" class="search-form clients-search-form">
-                    <input 
-                        type="text" 
-                        name="busca" 
-                        value="{{ busca or '' }}"
-                        placeholder="Buscar por nome, telefone, endereço ou tag..."
+            <section class="clients-command-panel margin-top" aria-label="Ações de clientes">
+                <div class="clients-command-bar">
+                    <button
+                        type="button"
+                        class="command-button"
+                        onclick="abrirModalCliente()"
                     >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M15.5 12.25a4.25 4.25 0 1 0 0-8.5 4.25 4.25 0 0 0 0 8.5Z"/>
+                            <path d="M8.5 20.25v-1.1c0-2.55 2.87-4.65 7-4.65 1.2 0 2.3.18 3.24.5"/>
+                            <path d="M5 8.25v6M2 11.25h6"/>
+                            <path d="M19.5 17v5M17 19.5h5"/>
+                        </svg>
+                        <span>Novo cliente</span>
+                    </button>
 
-                    <select name="status">
+                    <span class="command-separator" aria-hidden="true"></span>
+
+                    <button
+                        type="button"
+                        class="command-button"
+                        onclick="abrirModalImportarClientes()"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 3.75v10.5"/>
+                            <path d="m8.25 10.5 3.75 3.75 3.75-3.75"/>
+                            <path d="M4.75 16.75v1.5a2 2 0 0 0 2 2h10.5a2 2 0 0 0 2-2v-1.5"/>
+                        </svg>
+                        <span>Importar clientes</span>
+                    </button>
+
+                    <a href="{{ url_for('baixar_modelo_clientes') }}" class="command-button">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M7.75 3.75h6.5l4 4v12.5H7.75a2 2 0 0 1-2-2V5.75a2 2 0 0 1 2-2Z"/>
+                            <path d="M14.25 3.75v4h4"/>
+                            <path d="M12 10.75v6"/>
+                            <path d="m9.5 14.25 2.5 2.5 2.5-2.5"/>
+                        </svg>
+                        <span>Baixar modelo</span>
+                    </a>
+                </div>
+
+                <form method="GET" action="{{ url_for('clientes') }}" class="clients-filter-bar">
+                    <div class="clients-search-field">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="10.75" cy="10.75" r="6.5"/>
+                            <path d="m15.5 15.5 4.25 4.25"/>
+                        </svg>
+                        <input
+                            type="text"
+                            name="busca"
+                            value="{{ busca or '' }}"
+                            placeholder="Buscar por nome, telefone, endereço ou tag..."
+                            aria-label="Buscar clientes"
+                        >
+                    </div>
+
+                    <select name="status" aria-label="Filtrar clientes por status">
                         <option value="ativos" {% if status == 'ativos' %}selected{% endif %}>Ativos</option>
                         <option value="inativos" {% if status == 'inativos' %}selected{% endif %}>Inativos</option>
                         <option value="todos" {% if status == 'todos' %}selected{% endif %}>Todos</option>
                     </select>
 
-                    <button 
-                        type="submit" 
-                        class="small-button action-icon-button"
-                        title="Buscar"
-                    >
+                    <button type="submit" class="command-button command-button-compact">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.45 4.44-1.41 1.41-4.44-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/>
+                            <circle cx="10.75" cy="10.75" r="6.5"/>
+                            <path d="m15.5 15.5 4.25 4.25"/>
                         </svg>
+                        <span>Buscar</span>
                     </button>
 
-                    <a 
-                        href="{{ url_for('clientes') }}" 
-                        class="small-button action-icon-button secondary-icon" 
-                        title="Limpar filtros"
-                    >
+                    <a href="{{ url_for('clientes') }}" class="command-button command-button-compact command-button-muted">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M3 6h18v2H3V6zm3 4h12l-1 10H7L6 10zm3-7h6l1 2H8l1-2z"/>
+                            <path d="M4 5.75h16"/>
+                            <path d="M7 11.75h10"/>
+                            <path d="M10 17.75h4"/>
+                            <path d="m18.5 14.5 3 3"/>
+                            <path d="m21.5 14.5-3 3"/>
                         </svg>
+                        <span>Limpar</span>
                     </a>
-
-                    <button 
-                        type="button" 
-                        class="small-button action-icon-button"
-                        onclick="abrirModalCliente()"
-                        title="Novo cliente"
-                    >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zM6 10V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                        </svg>
-                    </button>
-
-                    <button 
-                        type="button" 
-                        class="small-button action-icon-button secondary-icon"
-                        onclick="abrirModalImportarClientes()"
-                        title="Importar clientes"
-                    >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/>
-                        </svg>
-                    </button>
                 </form>
             </section>
 
@@ -120,9 +143,21 @@
 
                                     <td>
                                         {% if cliente.ativo == 1 %}
-                                            <span class="status-pill status-ok">Ativo</span>
+                                            <span class="modern-status modern-status--success">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <circle cx="12" cy="12" r="8.25"/>
+                                                    <path d="m8.4 12.1 2.25 2.25 4.95-5.05"/>
+                                                </svg>
+                                                <span>Ativo</span>
+                                            </span>
                                         {% else %}
-                                            <span class="status-pill status-danger">Inativo</span>
+                                            <span class="modern-status modern-status--neutral">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <circle cx="12" cy="12" r="8.25"/>
+                                                    <path d="M8.5 12h7"/>
+                                                </svg>
+                                                <span>Inativo</span>
+                                            </span>
                                         {% endif %}
                                     </td>
 
@@ -133,21 +168,23 @@
                                             {% if cliente.ativo == 1 %}
                                                 <a 
                                                     href="{{ url_for('cliente_detalhe', cliente_id=cliente.id) }}" 
-                                                    class="small-button"
+                                                    class="table-outline-button"
                                                     title="Ver cliente"
                                                 >
                                                     <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                        <path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-1.8a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"/>
+                                                        <path d="M2.75 12s3.25-6 9.25-6 9.25 6 9.25 6-3.25 6-9.25 6-9.25-6-9.25-6Z"/>
+                                                        <circle cx="12" cy="12" r="2.75"/>
                                                     </svg>
                                                 </a>
 
                                                 <a 
                                                     href="{{ url_for('cliente_editar', cliente_id=cliente.id) }}" 
-                                                    class="small-button"
+                                                    class="table-outline-button"
                                                     title="Editar cliente"
                                                 >
                                                     <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.04a1 1 0 0 0 0-1.41l-2.51-2.51a1 1 0 0 0-1.41 0l-1.96 1.96 3.75 3.75 2.13-1.79z"/>
+                                                        <path d="m14.25 5.25 4.5 4.5"/>
+                                                        <path d="M5.5 18.5 6.4 14l9.95-9.95a1.8 1.8 0 0 1 2.55 0l1.05 1.05a1.8 1.8 0 0 1 0 2.55L10 17.6l-4.5.9Z"/>
                                                     </svg>
                                                 </a>
 
@@ -159,11 +196,12 @@
                                                     >
                                                     <button 
                                                         type="submit" 
-                                                        class="small-danger-button"
+                                                        class="table-outline-button table-outline-button-danger"
                                                         title="Inativar"
                                                     >
                                                         <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                            <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 5.29 14L6 6.71A8 8 0 0 1 12 4zm0 16a8 8 0 0 1-5.29-14L18 17.29A8 8 0 0 1 12 20z"/>
+                                                            <circle cx="12" cy="12" r="8.5"/>
+                                                            <path d="m6 6 12 12"/>
                                                         </svg>
                                                     </button>
                                                     </form>
@@ -177,11 +215,12 @@
                                                     >
                                                     <button 
                                                         type="submit" 
-                                                        class="small-button"
+                                                        class="table-outline-button"
                                                         title="Reativar"
                                                     >
                                                         <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                            <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V6a6 6 0 1 1-5.65 8H4.26A8 8 0 1 0 17.65 6.35z"/>
+                                                            <path d="M19 7.5V3.75h-3.75"/>
+                                                            <path d="M18.25 5.25A8 8 0 1 0 20 14"/>
                                                         </svg>
                                                     </button>
                                                     </form>
@@ -259,11 +298,11 @@
                 </div>
 
                 <div class="modal-actions full">
-                    <button type="button" class="button-secondary" onclick="fecharModalCliente()">
+                    <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalCliente()">
                         Cancelar
                     </button>
 
-                    <button type="submit">
+                    <button type="submit" class="ui-command-action ui-icon-save">
                         Salvar cliente
                     </button>
                 </div>
@@ -287,7 +326,7 @@
             </p>
 
             <div class="import-actions">
-                <a href="{{ url_for('baixar_modelo_clientes') }}" class="button-link secondary">
+                <a href="{{ url_for('baixar_modelo_clientes') }}" class="button-link secondary ui-command-action ui-icon-download">
                     Baixar modelo de clientes
                 </a>
             </div>
@@ -300,7 +339,7 @@
             >
                 <input type="file" name="arquivo" accept=".csv,.xlsx" required>
 
-                <button type="submit">
+                <button type="submit" class="ui-command-action ui-icon-upload">
                     Importar clientes
                 </button>
             </form>
