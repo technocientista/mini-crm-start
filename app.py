@@ -1271,64 +1271,25 @@ def dashboard():
         per_page_dashboard
     )
 
-    page_ultimas_vendas = normalizar_pagina(request.args.get("page_ultimas_vendas"))
-    page_produtos_atencao = normalizar_pagina(request.args.get("page_produtos_atencao"))
-
-    offset_ultimas_vendas = (page_ultimas_vendas - 1) * per_page_dashboard
-    offset_produtos_atencao = (page_produtos_atencao - 1) * per_page_dashboard
-
     vendas_hoje = conn.execute("""
-        SELECT COALESCE(SUM(valor_total), 0) AS total
+        SELECT
+            COUNT(*) AS quantidade,
+            COALESCE(SUM(valor_total), 0) AS total,
+            COALESCE(SUM(lucro_total), 0) AS lucro
         FROM vendas
         WHERE date(data_venda) = date('now', 'localtime')
           AND status = 'CONCLUIDA'
     """).fetchone()
 
     faturamento_mes = conn.execute("""
-        SELECT COALESCE(SUM(valor_total), 0) AS total
+        SELECT
+            COUNT(*) AS quantidade,
+            COALESCE(SUM(valor_total), 0) AS total,
+            COALESCE(SUM(lucro_total), 0) AS lucro
         FROM vendas
         WHERE strftime('%Y-%m', data_venda) = strftime('%Y-%m', 'now', 'localtime')
           AND status = 'CONCLUIDA'
     """).fetchone()
-
-    lucro_mes = conn.execute("""
-        SELECT COALESCE(SUM(lucro_total), 0) AS total
-        FROM vendas
-        WHERE strftime('%Y-%m', data_venda) = strftime('%Y-%m', 'now', 'localtime')
-          AND status = 'CONCLUIDA'
-    """).fetchone()
-
-    estoque_baixo = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM produtos
-        WHERE ativo = 1
-          AND estoque_atual > 0
-          AND estoque_atual <= estoque_minimo
-    """).fetchone()
-
-    sem_estoque = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM produtos
-        WHERE ativo = 1
-          AND estoque_atual = 0
-    """).fetchone()
-
-    total_clientes = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM clientes
-        WHERE ativo = 1
-    """).fetchone()
-
-    total_ultimas_vendas = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM vendas
-    """).fetchone()["total"]
-
-    page_ultimas_vendas, total_paginas_ultimas_vendas, offset_ultimas_vendas = calcular_paginacao(
-        total_ultimas_vendas,
-        page_ultimas_vendas,
-        per_page_dashboard
-    )
 
     ultimas_vendas = conn.execute("""
         SELECT
@@ -1339,28 +1300,17 @@ def dashboard():
             v.forma_pagamento,
             v.valor_total,
             v.lucro_total,
-            v.status
+            v.status,
+            (
+                SELECT GROUP_CONCAT(pagamento.forma_pagamento, ' + ')
+                FROM venda_pagamentos pagamento
+                WHERE pagamento.venda_id = v.id
+            ) AS pagamentos_descricao
         FROM vendas v
         LEFT JOIN clientes c ON c.id = v.cliente_id
         ORDER BY v.id DESC
-        LIMIT ? OFFSET ?
-    """, (
-        per_page_dashboard,
-        offset_ultimas_vendas
-    )).fetchall()
-
-    total_produtos_atencao = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM produtos
-        WHERE ativo = 1
-        AND estoque_atual <= estoque_minimo
-    """).fetchone()["total"]
-
-    page_produtos_atencao, total_paginas_produtos_atencao, offset_produtos_atencao = calcular_paginacao(
-        total_produtos_atencao,
-        page_produtos_atencao,
-        per_page_dashboard
-    )
+        LIMIT 5
+    """).fetchall()
 
     produtos_alerta = conn.execute("""
         SELECT
@@ -1375,144 +1325,7 @@ def dashboard():
         WHERE ativo = 1
         AND estoque_atual <= estoque_minimo
         ORDER BY estoque_atual ASC, nome ASC
-        LIMIT ? OFFSET ?
-    """, (
-        per_page_dashboard,
-        offset_produtos_atencao
-    )).fetchall()
-
-    clientes_resumo = conn.execute("""
-        SELECT
-            COUNT(*) AS total_clientes,
-            SUM(CASE WHEN ativo = 1 THEN 1 ELSE 0 END) AS clientes_ativos,
-            SUM(CASE WHEN ativo = 0 THEN 1 ELSE 0 END) AS clientes_inativos
-        FROM clientes
-    """).fetchone()
-
-    clientes_sem_comprar_30 = conn.execute("""
-        SELECT
-            c.id,
-            c.nome,
-            c.telefone,
-            MAX(v.data_venda) AS ultima_compra,
-            COUNT(v.id) AS quantidade_compras,
-            COALESCE(SUM(v.valor_total), 0) AS total_comprado
-        FROM clientes c
-        INNER JOIN vendas v ON v.cliente_id = c.id
-        WHERE c.ativo = 1
-          AND v.status = 'CONCLUIDA'
-        GROUP BY c.id
-        HAVING date(MAX(v.data_venda)) <= date('now', '-30 days')
-        ORDER BY MAX(v.data_venda) ASC
-        LIMIT 10
-    """).fetchall()
-
-    total_clientes_sem_comprar_30 = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM (
-            SELECT
-                c.id,
-                MAX(v.data_venda) AS ultima_compra
-            FROM clientes c
-            INNER JOIN vendas v ON v.cliente_id = c.id
-            WHERE c.ativo = 1
-              AND v.status = 'CONCLUIDA'
-            GROUP BY c.id
-            HAVING date(MAX(v.data_venda)) <= date('now', '-30 days')
-        )
-    """).fetchone()["total"]
-
-    clientes_vip = conn.execute("""
-        SELECT
-            c.id,
-            c.nome,
-            c.telefone,
-            COUNT(v.id) AS quantidade_compras,
-            COALESCE(SUM(v.valor_total), 0) AS total_comprado,
-            MAX(v.data_venda) AS ultima_compra
-        FROM clientes c
-        INNER JOIN vendas v ON v.cliente_id = c.id
-        WHERE c.ativo = 1
-          AND v.status = 'CONCLUIDA'
-        GROUP BY c.id
-        ORDER BY total_comprado DESC
-        LIMIT 10
-    """).fetchall()
-
-    clientes_novos_sem_compra = conn.execute("""
-        SELECT
-            c.id,
-            c.nome,
-            c.telefone,
-            c.created_at
-        FROM clientes c
-        LEFT JOIN vendas v 
-            ON v.cliente_id = c.id
-            AND v.status = 'CONCLUIDA'
-        WHERE c.ativo = 1
-        GROUP BY c.id
-        HAVING COUNT(v.id) = 0
-        ORDER BY c.created_at DESC
-        LIMIT 10
-    """).fetchall()
-
-    total_clientes_novos_sem_compra = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM (
-            SELECT c.id
-            FROM clientes c
-            LEFT JOIN vendas v 
-                ON v.cliente_id = c.id
-                AND v.status = 'CONCLUIDA'
-            WHERE c.ativo = 1
-            GROUP BY c.id
-            HAVING COUNT(v.id) = 0
-        )
-    """).fetchone()["total"]
-
-    clientes_sem_tags = conn.execute("""
-        SELECT
-            c.id,
-            c.nome,
-            c.telefone,
-            c.created_at
-        FROM clientes c
-        LEFT JOIN cliente_tags ct ON ct.cliente_id = c.id
-        WHERE c.ativo = 1
-        GROUP BY c.id
-        HAVING COUNT(ct.id) = 0
-        ORDER BY c.created_at DESC
-        LIMIT 10
-    """).fetchall()
-
-    total_clientes_sem_tags = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM (
-            SELECT c.id
-            FROM clientes c
-            LEFT JOIN cliente_tags ct ON ct.cliente_id = c.id
-            WHERE c.ativo = 1
-            GROUP BY c.id
-            HAVING COUNT(ct.id) = 0
-        )
-    """).fetchone()["total"]
-
-    clientes_recentes = conn.execute("""
-        SELECT
-            c.id,
-            c.nome,
-            c.telefone,
-            MAX(v.data_venda) AS ultima_compra,
-            COUNT(v.id) AS quantidade_compras,
-            COALESCE(SUM(v.valor_total), 0) AS total_comprado
-        FROM clientes c
-        INNER JOIN vendas v ON v.cliente_id = c.id
-        WHERE c.ativo = 1
-          AND v.status = 'CONCLUIDA'
-          AND date(v.data_venda) >= date('now', '-7 days')
-        GROUP BY c.id
-        ORDER BY MAX(v.data_venda) DESC
-        LIMIT 10
+        LIMIT 5
     """).fetchall()
 
     clientes_reativar = buscar_clientes_dashboard(
@@ -1550,6 +1363,173 @@ def dashboard():
         per_page_dashboard
     )
 
+    hoje_obj = date.today()
+    ontem_obj = hoje_obj - timedelta(days=1)
+    inicio_mes_obj = hoje_obj.replace(day=1)
+    fim_mes_anterior_obj = inicio_mes_obj - timedelta(days=1)
+    inicio_mes_anterior_obj = fim_mes_anterior_obj.replace(day=1)
+    dias_comparacao_mes = min(hoje_obj.day, fim_mes_anterior_obj.day)
+    fim_comparacao_mes_anterior_obj = (
+        inicio_mes_anterior_obj + timedelta(days=dias_comparacao_mes - 1)
+    )
+
+    resumo_ontem = conn.execute("""
+        SELECT
+            COUNT(*) AS quantidade,
+            COALESCE(SUM(valor_total), 0) AS total,
+            COALESCE(SUM(lucro_total), 0) AS lucro
+        FROM vendas
+        WHERE date(data_venda) = date(?)
+          AND status = 'CONCLUIDA'
+    """, (ontem_obj.isoformat(),)).fetchone()
+
+    resumo_mes_anterior = conn.execute("""
+        SELECT
+            COUNT(*) AS quantidade,
+            COALESCE(SUM(valor_total), 0) AS total,
+            COALESCE(SUM(lucro_total), 0) AS lucro
+        FROM vendas
+        WHERE date(data_venda) BETWEEN date(?) AND date(?)
+          AND status = 'CONCLUIDA'
+    """, (
+        inicio_mes_anterior_obj.isoformat(),
+        fim_comparacao_mes_anterior_obj.isoformat(),
+    )).fetchone()
+
+    inicio_serie_obj = hoje_obj - timedelta(days=13)
+    serie_dashboard_rows = conn.execute("""
+        SELECT
+            date(data_venda) AS dia,
+            COALESCE(SUM(valor_total), 0) AS total,
+            COALESCE(SUM(lucro_total), 0) AS lucro
+        FROM vendas
+        WHERE date(data_venda) BETWEEN date(?) AND date(?)
+          AND status = 'CONCLUIDA'
+        GROUP BY date(data_venda)
+        ORDER BY date(data_venda)
+    """, (
+        inicio_serie_obj.isoformat(),
+        hoje_obj.isoformat(),
+    )).fetchall()
+
+    pagamentos_hoje_rows = conn.execute("""
+        SELECT
+            vp.forma_pagamento,
+            COUNT(DISTINCT vp.venda_id) AS quantidade,
+            COALESCE(SUM(vp.valor), 0) AS total
+        FROM venda_pagamentos vp
+        INNER JOIN vendas v ON v.id = vp.venda_id
+        WHERE date(v.data_venda) = date('now', 'localtime')
+          AND v.status = 'CONCLUIDA'
+        GROUP BY vp.forma_pagamento
+        ORDER BY total DESC
+    """).fetchall()
+
+    caixa_aberto_dashboard = obter_caixa_aberto(conn)
+    resumo_caixa_dashboard = (
+        calcular_resumo_caixa(conn, caixa_aberto_dashboard["id"])
+        if caixa_aberto_dashboard
+        else None
+    )
+
+    def calcular_variacao_dashboard(valor_atual, valor_anterior):
+        valor_atual = float(valor_atual or 0)
+        valor_anterior = float(valor_anterior or 0)
+
+        if abs(valor_anterior) <= 0.009:
+            return None if abs(valor_atual) <= 0.009 else 100.0
+
+        return round(((valor_atual - valor_anterior) / abs(valor_anterior)) * 100, 1)
+
+    ticket_medio_hoje = (
+        float(vendas_hoje["total"] or 0) / int(vendas_hoje["quantidade"] or 0)
+        if int(vendas_hoje["quantidade"] or 0) > 0
+        else 0
+    )
+    margem_mes = (
+        float(faturamento_mes["lucro"] or 0)
+        / float(faturamento_mes["total"] or 0)
+        * 100
+        if float(faturamento_mes["total"] or 0) > 0
+        else 0
+    )
+    variacoes_dashboard = {
+        "vendas_hoje": calcular_variacao_dashboard(
+            vendas_hoje["quantidade"],
+            resumo_ontem["quantidade"],
+        ),
+        "faturamento_hoje": calcular_variacao_dashboard(
+            vendas_hoje["total"],
+            resumo_ontem["total"],
+        ),
+        "faturamento_mes": calcular_variacao_dashboard(
+            faturamento_mes["total"],
+            resumo_mes_anterior["total"],
+        ),
+        "lucro_mes": calcular_variacao_dashboard(
+            faturamento_mes["lucro"],
+            resumo_mes_anterior["lucro"],
+        ),
+    }
+
+    serie_por_dia = {
+        row["dia"]: {
+            "total": float(row["total"] or 0),
+            "lucro": float(row["lucro"] or 0),
+        }
+        for row in serie_dashboard_rows
+    }
+    serie_dashboard = []
+
+    for deslocamento in range(14):
+        dia_obj = inicio_serie_obj + timedelta(days=deslocamento)
+        valores = serie_por_dia.get(dia_obj.isoformat(), {})
+        serie_dashboard.append({
+            "label": dia_obj.strftime("%d/%m"),
+            "total": valores.get("total", 0),
+            "lucro": valores.get("lucro", 0),
+        })
+
+    maior_valor_dashboard = max(
+        [
+            max(item["total"], item["lucro"], 0)
+            for item in serie_dashboard
+        ]
+        or [0]
+    )
+
+    for item in serie_dashboard:
+        if maior_valor_dashboard > 0:
+            item["altura_total"] = (
+                max(4, round(item["total"] / maior_valor_dashboard * 100, 2))
+                if item["total"] > 0
+                else 0
+            )
+            item["altura_lucro"] = (
+                max(4, round(max(item["lucro"], 0) / maior_valor_dashboard * 100, 2))
+                if item["lucro"] > 0
+                else 0
+            )
+        else:
+            item["altura_total"] = 0
+            item["altura_lucro"] = 0
+
+    total_pagamentos_hoje = sum(
+        float(item["total"] or 0)
+        for item in pagamentos_hoje_rows
+    )
+    pagamentos_hoje = [
+        {
+            **dict(item),
+            "percentual": (
+                round(float(item["total"] or 0) / total_pagamentos_hoje * 100, 1)
+                if total_pagamentos_hoje > 0
+                else 0
+            ),
+        }
+        for item in pagamentos_hoje_rows
+    ]
+
     modal_aberto = request.args.get("modal", "")
 
     conn.close()
@@ -1558,36 +1538,26 @@ def dashboard():
         "dashboard.html",
         usuario_nome=session.get("usuario_nome"),
         vendas_hoje=vendas_hoje["total"],
+        quantidade_vendas_hoje=vendas_hoje["quantidade"],
+        ticket_medio_hoje=ticket_medio_hoje,
         faturamento_mes=faturamento_mes["total"],
-        lucro_mes=lucro_mes["total"],
-        estoque_baixo=estoque_baixo["total"],
-        sem_estoque=sem_estoque["total"],
-        total_clientes=total_clientes["total"],
+        lucro_mes=faturamento_mes["lucro"],
+        margem_mes=margem_mes,
+        variacoes_dashboard=variacoes_dashboard,
+        serie_dashboard=serie_dashboard,
+        pagamentos_hoje=pagamentos_hoje,
+        caixa_aberto_dashboard=caixa_aberto_dashboard,
+        resumo_caixa_dashboard=resumo_caixa_dashboard,
         ultimas_vendas=ultimas_vendas,
         produtos_alerta=produtos_alerta,
-        clientes_resumo=clientes_resumo,
-        clientes_sem_comprar_30=clientes_sem_comprar_30,
-        total_clientes_sem_comprar_30=total_clientes_sem_comprar_30,
-        clientes_vip=clientes_vip,
-        clientes_novos_sem_compra=clientes_novos_sem_compra,
-        total_clientes_novos_sem_compra=total_clientes_novos_sem_compra,
-        clientes_sem_tags=clientes_sem_tags,
-        total_clientes_sem_tags=total_clientes_sem_tags,
-        clientes_recentes=clientes_recentes,
         clientes_reativar=clientes_reativar,
         clientes_vip_dashboard=clientes_vip_dashboard,
         clientes_sem_compra_dashboard=clientes_sem_compra_dashboard,
         clientes_sem_tags_dashboard=clientes_sem_tags_dashboard,
         clientes_recentes_30_dashboard=clientes_recentes_30_dashboard,
         modal_aberto=modal_aberto,
-        page_ultimas_vendas=page_ultimas_vendas,
-        total_paginas_ultimas_vendas=total_paginas_ultimas_vendas,
-        total_ultimas_vendas=total_ultimas_vendas,
-        page_produtos_atencao=page_produtos_atencao,
-        total_paginas_produtos_atencao=total_paginas_produtos_atencao,
         produtos_baixo_dashboard=produtos_baixo_dashboard,
-        produtos_sem_dashboard=produtos_sem_dashboard,  
-        total_produtos_atencao=total_produtos_atencao
+        produtos_sem_dashboard=produtos_sem_dashboard
     )
 
 @app.route("/clientes", methods=["GET", "POST"])
