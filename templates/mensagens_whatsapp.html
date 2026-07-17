@@ -4,217 +4,70 @@
     <meta charset="UTF-8">
     <title>Mensagens WhatsApp - Start CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
-
+{% set stats = namespace(ativos=0, inativos=0) %}
+{% for item in mensagens %}
+    {% if item.ativo == 1 %}{% set stats.ativos = stats.ativos + 1 %}{% else %}{% set stats.inativos = stats.inativos + 1 %}{% endif %}
+{% endfor %}
+<body class="ui-refreshed management-page whatsapp-page">
     <div class="app-layout">
-
         {% include 'partials/sidebar.html' %}
 
         <main class="main-content">
-            <header class="topbar">
+            <header class="topbar management-topbar">
                 <div>
                     <h1>Mensagens WhatsApp</h1>
-                    <p>Cadastre modelos de mensagens para enviar aos clientes.</p>
+                    <p>Organize modelos reutilizáveis para relacionamento e campanhas.</p>
+                </div>
+                <div class="management-topbar-actions">
+                    <button type="button" class="ui-command-action ui-icon-add" onclick="abrirModalPorId('modalMensagemWhatsApp')">Novo modelo</button>
                 </div>
             </header>
 
             {% with messages = get_flashed_messages() %}
-                {% if messages %}
-                    <div class="success-alert">
-                        {{ messages[0] }}
-                    </div>
-                {% endif %}
+                {% if messages %}<div class="success-alert">{{ messages[0] }}</div>{% endif %}
             {% endwith %}
 
-            <section class="panel">
-                <h2>Novo modelo</h2>
-
-                <form method="POST" action="{{ url_for('mensagens_whatsapp') }}" class="form-grid">
-                    <div class="form-group">
-                        <label for="nome">Nome do modelo</label>
-                        <input 
-                            type="text" 
-                            id="nome" 
-                            name="nome" 
-                            placeholder="Ex: Agradecimento pós-venda"
-                            required
-                        >
-                    </div>
-
-                    <div class="form-group">
-                        <label for="categoria">Categoria</label>
-                        <select id="categoria" name="categoria">
-                            <option value="">Selecione</option>
-                            <option value="Pós-venda">Pós-venda</option>
-                            <option value="Campanha">Campanha</option>
-                            <option value="Produto disponível">Produto disponível</option>
-                            <option value="Cobrança">Cobrança</option>
-                            <option value="Atendimento">Atendimento</option>
-                            <option value="Outros">Outros</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group full">
-                        <label for="mensagem">Mensagem</label>
-                        <textarea 
-                            id="mensagem" 
-                            name="mensagem" 
-                            rows="6"
-                            placeholder="Olá, {cliente_nome}! Aqui é da {loja_nome}. Obrigado pela preferência."
-                            required
-                        ></textarea>
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="ui-command-action ui-icon-save">Salvar modelo</button>
-                    </div>
-                </form>
+            <section class="management-overview-grid" aria-label="Resumo dos modelos">
+                <article class="management-overview-card featured"><span>Modelos cadastrados</span><strong>{{ mensagens|length }}</strong><small>Biblioteca de mensagens</small></article>
+                <article class="management-overview-card success"><span>Modelos ativos</span><strong>{{ stats.ativos }}</strong><small>Disponíveis para utilização</small></article>
+                <article class="management-overview-card neutral"><span>Modelos inativos</span><strong>{{ stats.inativos }}</strong><small>Fora da seleção de envio</small></article>
+                <article class="management-overview-card info"><span>Variáveis disponíveis</span><strong>8</strong><small>Campos substituídos automaticamente</small></article>
             </section>
 
-            <section class="panel margin-top">
-                <h2>Instruções de variáveis</h2>
-
-                <p class="muted-text">
-                    Você pode usar variáveis dentro da mensagem. Na hora do envio, o sistema troca automaticamente pelos dados do cliente, da loja ou da venda.
-                </p>
-
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Variável</th>
-                                <th>O que será substituído</th>
-                                <th>Exemplo</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>{cliente_nome}</strong></td>
-                                <td>Nome do cliente</td>
-                                <td>Maria Silva</td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>{cliente_telefone}</strong></td>
-                                <td>Telefone do cliente</td>
-                                <td>88999999999</td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>{loja_nome}</strong></td>
-                                <td>Nome da loja configurado no sistema</td>
-                                <td>Start Eletrônicos</td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>{loja_telefone}</strong></td>
-                                <td>Telefone/WhatsApp da loja</td>
-                                <td>(88) 99999-9999</td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>{loja_instagram}</strong></td>
-                                <td>Instagram da loja</td>
-                                <td>@starteletronicos</td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>{ultima_compra}</strong></td>
-                                <td>Data da última compra do cliente</td>
-                                <td>08/06/2026</td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>{total_comprado}</strong></td>
-                                <td>Total comprado pelo cliente</td>
-                                <td>R$ 250,00</td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>{tags}</strong></td>
-                                <td>Interesses/tags do cliente</td>
-                                <td>iPhone, Capinhas</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <p class="muted-text margin-top">
-                    Exemplo de mensagem:
-                </p>
-
-                <div class="code-example">
-Olá, {cliente_nome}! Tudo bem? Aqui é da {loja_nome}. 
-Temos novidades que combinam com seus interesses: {tags}. 
-Qualquer dúvida, chama a gente no WhatsApp: {loja_telefone}.
-                </div>
-            </section>
-
-            <section class="panel margin-top">
-                <h2>Modelos cadastrados</h2>
-
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Código</th>
-                                <th>Nome</th>
-                                <th>Categoria</th>
-                                <th>Mensagem</th>
-                                <th>Status</th>
-                                <th>Cadastro</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-
+            <section class="panel management-directory-panel whatsapp-directory-panel">
+                <header class="management-panel-heading">
+                    <div><span class="management-eyebrow">Biblioteca</span><h2>Modelos cadastrados</h2><p>Consulte conteúdo, categoria e disponibilidade de cada mensagem.</p></div>
+                    <span class="management-results-badge">{{ mensagens|length }} modelo{% if mensagens|length != 1 %}s{% endif %}</span>
+                </header>
+                <div class="table-wrapper management-table-wrapper">
+                    <table class="management-table whatsapp-models-table">
+                        <thead><tr><th>Modelo</th><th>Categoria</th><th>Prévia da mensagem</th><th>Status</th><th>Cadastro</th><th class="management-actions-column">Ações</th></tr></thead>
                         <tbody>
                             {% for item in mensagens %}
                                 <tr>
-                                    <td>{{ item.codigo or '-' }}</td>
-                                    <td>{{ item.nome }}</td>
-                                    <td>{{ item.categoria or '-' }}</td>
-                                    <td>{{ item.mensagem }}</td>
                                     <td>
-                                        {% if item.ativo == 1 %}
-                                            <span class="status-pill status-ok">Ativo</span>
-                                        {% else %}
-                                            <span class="status-pill status-danger">Inativo</span>
-                                        {% endif %}
+                                        <div class="management-identity">
+                                            <span class="management-avatar management-avatar--whatsapp" aria-hidden="true"></span>
+                                            <span><strong>{{ item.nome }}</strong><small>Código: {{ item.codigo or "Não definido" }}</small></span>
+                                        </div>
                                     </td>
+                                    <td><span class="whatsapp-category">{{ item.categoria or "Sem categoria" }}</span></td>
+                                    <td><p class="whatsapp-message-preview" title="{{ item.mensagem }}">{{ item.mensagem }}</p></td>
+                                    <td>{% if item.ativo == 1 %}<span class="status-pill status-ok">Ativo</span>{% else %}<span class="status-pill status-danger">Inativo</span>{% endif %}</td>
                                     <td>{{ item.created_at|datetime_br }}</td>
                                     <td>
-                                        <div class="table-actions">
-                                            <a 
-                                                href="{{ url_for('mensagem_whatsapp_editar', mensagem_id=item.id) }}" 
-                                                class="small-button"
-                                                title="Editar modelo"
-                                            >
-                                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.04a1 1 0 0 0 0-1.41l-2.51-2.51a1 1 0 0 0-1.41 0l-1.96 1.96 3.75 3.75 2.13-1.79z"/>
-                                                </svg>
+                                        <div class="table-actions management-row-actions">
+                                            <a href="{{ url_for('mensagem_whatsapp_editar', mensagem_id=item.id) }}" class="table-outline-button" title="Editar modelo" aria-label="Editar modelo {{ item.nome }}">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.25 5.25 4.5 4.5"/><path d="M5.5 18.5 6.4 14l9.95-9.95a1.8 1.8 0 0 1 2.55 0l1.05 1.05a1.8 1.8 0 0 1 0 2.55L10 17.6l-4.5.9Z"/></svg>
                                             </a>
-
-                                            <form 
-                                                method="POST" 
-                                                action="{{ url_for('mensagem_whatsapp_alternar_status', mensagem_id=item.id) }}"
-                                                onsubmit="return confirm('Deseja alterar o status deste modelo?')"
-                                            >
-                                                <button 
-                                                    type="submit" 
-                                                    class="small-button"
-                                                    title="{% if item.ativo == 1 %}Inativar modelo{% else %}Reativar modelo{% endif %}"
-                                                >
+                                            <form method="POST" action="{{ url_for('mensagem_whatsapp_alternar_status', mensagem_id=item.id) }}" onsubmit="return confirm('Deseja alterar o status deste modelo?');">
+                                                <button type="submit" class="table-outline-button {% if item.ativo == 1 %}management-danger-action{% endif %}" title="{% if item.ativo == 1 %}Inativar modelo{% else %}Reativar modelo{% endif %}" aria-label="{% if item.ativo == 1 %}Inativar{% else %}Reativar{% endif %} modelo {{ item.nome }}">
                                                     {% if item.ativo == 1 %}
-                                                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                            <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 5.29 14L6 6.71A8 8 0 0 1 12 4zm0 16a8 8 0 0 1-5.29-14L18 17.29A8 8 0 0 1 12 20z"/>
-                                                        </svg>
+                                                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m6 6 12 12"/></svg>
                                                     {% else %}
-                                                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                            <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V6a6 6 0 1 1-5.65 8H4.26A8 8 0 1 0 17.65 6.35z"/>
-                                                        </svg>
+                                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7.5V3.75h-3.75"/><path d="M18.25 5.25A8 8 0 1 0 20 14"/></svg>
                                                     {% endif %}
                                                 </button>
                                             </form>
@@ -222,20 +75,66 @@ Qualquer dúvida, chama a gente no WhatsApp: {loja_telefone}.
                                     </td>
                                 </tr>
                             {% else %}
-                                <tr>
-                                    <td colspan="6" class="empty-state">
-                                        Nenhum modelo cadastrado.
-                                    </td>
-                                </tr>
+                                <tr><td colspan="6"><div class="management-empty-state"><span class="management-empty-icon management-empty-icon--message" aria-hidden="true"></span><strong>Nenhum modelo cadastrado</strong><p>Crie mensagens reutilizáveis para agilizar o relacionamento.</p><button type="button" class="ui-command-action ui-icon-add" onclick="abrirModalPorId('modalMensagemWhatsApp')">Criar modelo</button></div></td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </section>
 
-        </main>
+            <section class="whatsapp-guide-grid">
+                <article class="panel whatsapp-variables-panel">
+                    <header class="management-panel-heading">
+                        <div><span class="management-eyebrow">Personalização</span><h2>Variáveis disponíveis</h2><p>Use os códigos abaixo para preencher os dados automaticamente.</p></div>
+                    </header>
+                    <div class="whatsapp-variables-grid">
+                        <div><code>{cliente_nome}</code><span>Nome do cliente</span></div>
+                        <div><code>{cliente_telefone}</code><span>Telefone do cliente</span></div>
+                        <div><code>{loja_nome}</code><span>Nome da loja</span></div>
+                        <div><code>{loja_telefone}</code><span>WhatsApp da loja</span></div>
+                        <div><code>{loja_instagram}</code><span>Instagram da loja</span></div>
+                        <div><code>{ultima_compra}</code><span>Data da última compra</span></div>
+                        <div><code>{total_comprado}</code><span>Total comprado</span></div>
+                        <div><code>{tags}</code><span>Interesses do cliente</span></div>
+                    </div>
+                </article>
 
+                <article class="panel whatsapp-example-panel">
+                    <header class="management-panel-heading">
+                        <div><span class="management-eyebrow">Exemplo prático</span><h2>Mensagem personalizada</h2><p>As variáveis são substituídas apenas no momento do envio.</p></div>
+                    </header>
+                    <div class="whatsapp-chat-preview">
+                        <span class="whatsapp-chat-label">Prévia do modelo</span>
+                        <p>Olá, <b>{cliente_nome}</b>! Aqui é da <b>{loja_nome}</b>. Temos novidades que combinam com seus interesses: <b>{tags}</b>. Qualquer dúvida, fale com a gente pelo <b>{loja_telefone}</b>.</p>
+                        <small>Mensagem de exemplo · não enviada</small>
+                    </div>
+                </article>
+            </section>
+        </main>
     </div>
 
+    <div id="modalMensagemWhatsApp" class="modal-overlay">
+        <div class="modal-card modal-large management-form-modal whatsapp-form-modal">
+            <div class="modal-header">
+                <div><h2>Novo modelo de WhatsApp</h2><p>Crie uma mensagem reutilizável e personalize com variáveis.</p></div>
+                <button type="button" class="modal-close" onclick="fecharModalPorId('modalMensagemWhatsApp')" aria-label="Fechar modal">×</button>
+            </div>
+            <form method="POST" action="{{ url_for('mensagens_whatsapp') }}" class="form-grid compact-form management-modal-form">
+                <div class="form-group"><label for="nome">Nome do modelo</label><input type="text" id="nome" name="nome" placeholder="Ex.: agradecimento pós-venda" required></div>
+                <div class="form-group">
+                    <label for="categoria">Categoria</label>
+                    <select id="categoria" name="categoria">
+                        <option value="">Selecione</option><option value="Pós-venda">Pós-venda</option><option value="Campanha">Campanha</option><option value="Produto disponível">Produto disponível</option><option value="Cobrança">Cobrança</option><option value="Atendimento">Atendimento</option><option value="Outros">Outros</option>
+                    </select>
+                </div>
+                <div class="form-group full"><label for="mensagem">Mensagem</label><textarea id="mensagem" name="mensagem" rows="7" placeholder="Olá, {cliente_nome}! Aqui é da {loja_nome}..." required></textarea><small>Você pode utilizar qualquer variável apresentada na tela.</small></div>
+                <div class="modal-actions full">
+                    <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalPorId('modalMensagemWhatsApp')">Cancelar</button>
+                    <button type="submit" class="ui-command-action ui-icon-save">Salvar modelo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
 </body>
 </html>

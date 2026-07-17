@@ -4,116 +4,78 @@
     <meta charset="UTF-8">
     <title>Comissões - Start CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
-
+<body class="ui-refreshed management-page commissions-page">
     <div class="app-layout">
-
         {% include 'partials/sidebar.html' %}
 
         <main class="main-content">
-            <header class="topbar">
+            <header class="topbar management-topbar">
                 <div>
                     <h1>Comissões</h1>
-                    <p>Acompanhe as comissões dos vendedores por período.</p>
+                    <p>Acompanhe desempenho comercial e valores de comissão por período.</p>
+                </div>
+                <div class="management-topbar-actions">
+                    <a href="{{ url_for('usuarios') }}" class="ui-command-action ui-icon-user-plus">Gerenciar equipe</a>
+                    <a href="{{ url_for('exportar_comissoes', data_inicio=data_inicio, data_fim=data_fim) }}" class="ui-command-action ui-icon-download">Exportar Excel</a>
                 </div>
             </header>
 
-            <section class="panel">
-                <h2>Filtros</h2>
-
-                <form method="GET" action="{{ url_for('comissoes') }}" class="form-grid">
-                    <div class="form-group">
-                        <label for="data_inicio">Data inicial</label>
-                        <input type="date" id="data_inicio" name="data_inicio" value="{{ data_inicio }}">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="data_fim">Data final</label>
-                        <input type="date" id="data_fim" name="data_fim" value="{{ data_fim }}">
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="ui-command-action ui-icon-filter">Filtrar</button>
-                    </div>
-
-                    <div class="form-actions">
-                        <a 
-                            class="button-link ui-command-action ui-icon-download"
-                            href="{{ url_for('exportar_comissoes', data_inicio=data_inicio, data_fim=data_fim) }}"
-                        >
-                            Exportar Excel
-                        </a>
-                    </div>
+            <section class="panel commissions-filter-panel">
+                <header class="management-panel-heading">
+                    <div><span class="management-eyebrow">Período de apuração</span><h2>Filtros do relatório</h2><p>Defina o intervalo usado para calcular vendas e comissões.</p></div>
+                    <span class="management-results-badge">{{ data_inicio[8:10] }}/{{ data_inicio[5:7] }}/{{ data_inicio[0:4] }} a {{ data_fim[8:10] }}/{{ data_fim[5:7] }}/{{ data_fim[0:4] }}</span>
+                </header>
+                <form method="GET" action="{{ url_for('comissoes') }}" class="commissions-filter-form">
+                    <label><span>Data inicial</span><input type="date" name="data_inicio" value="{{ data_inicio }}"></label>
+                    <label><span>Data final</span><input type="date" name="data_fim" value="{{ data_fim }}"></label>
+                    <button type="submit" class="ui-command-action ui-icon-filter">Aplicar período</button>
                 </form>
             </section>
 
-            <section class="cards-grid margin-top">
-                <div class="card">
-                    <span>Vendas no período</span>
-                    <strong>{{ resumo.quantidade_vendas }}</strong>
-                </div>
-
-                <div class="card">
-                    <span>Total vendido</span>
-                    <strong>R$ {{ "%.2f"|format(resumo.total_vendido) }}</strong>
-                </div>
-
-                <div class="card">
-                    <span>Lucro gerado</span>
-                    <strong>R$ {{ "%.2f"|format(resumo.lucro_total) }}</strong>
-                </div>
-
-                <div class="card">
-                    <span>Total de comissões</span>
-                    <strong>R$ {{ "%.2f"|format(total_comissoes) }}</strong>
-                </div>
+            <section class="management-overview-grid commissions-overview" aria-label="Resumo das comissões">
+                <article class="management-overview-card featured"><span>Vendas atribuídas</span><strong>{{ resumo.quantidade_vendas or 0 }}</strong><small>Vendas concluídas no período</small></article>
+                <article class="management-overview-card success"><span>Total vendido</span><strong>{{ resumo.total_vendido|moeda_br }}</strong><small>Faturamento da equipe</small></article>
+                <article class="management-overview-card info"><span>Lucro gerado</span><strong>{{ resumo.lucro_total|moeda_br }}</strong><small>{% if (resumo.total_vendido or 0) > 0 %}Margem de {{ (((resumo.lucro_total or 0) / resumo.total_vendido) * 100)|numero_br }}%{% else %}Sem vendas no período{% endif %}</small></article>
+                <article class="management-overview-card warning"><span>Comissões previstas</span><strong>{{ total_comissoes|moeda_br }}</strong><small>Valor calculado para pagamento</small></article>
             </section>
 
-            <section class="panel margin-top">
-                <h2>Comissão por vendedor</h2>
-
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Vendedor</th>
-                                <th>E-mail</th>
-                                <th>Vendas</th>
-                                <th>Total vendido</th>
-                                <th>Lucro gerado</th>
-                                <th>Comissão %</th>
-                                <th>Valor comissão</th>
-                            </tr>
-                        </thead>
+            <section class="panel management-directory-panel commissions-directory-panel">
+                <header class="management-panel-heading">
+                    <div><span class="management-eyebrow">Desempenho comercial</span><h2>Comissão por vendedor</h2><p>Compare vendas, lucro e comissão prevista de cada profissional.</p></div>
+                    <span class="management-results-badge">{{ comissoes|length }} vendedor{% if comissoes|length != 1 %}es{% endif %}</span>
+                </header>
+                <div class="table-wrapper management-table-wrapper">
+                    <table class="management-table commissions-table">
+                        <thead><tr><th>Vendedor</th><th>Vendas</th><th>Total vendido</th><th>Lucro gerado</th><th>Regra</th><th>Comissão prevista</th></tr></thead>
                         <tbody>
                             {% for item in comissoes %}
                                 <tr>
-                                    <td>{{ item.vendedor_nome }}</td>
-                                    <td>{{ item.vendedor_email }}</td>
-                                    <td>{{ item.quantidade_vendas }}</td>
-                                    <td>R$ {{ "%.2f"|format(item.total_vendido) }}</td>
-                                    <td>R$ {{ "%.2f"|format(item.lucro_total) }}</td>
-                                    <td>{{ "%.2f"|format(item.comissao_percentual) }}%</td>
-                                    <td>R$ {{ "%.2f"|format(item.valor_comissao) }}</td>
+                                    <td>
+                                        <div class="management-identity">
+                                            <span class="management-avatar management-avatar--seller">{{ item.vendedor_nome[0]|upper }}</span>
+                                            <span><strong>{{ item.vendedor_nome }}</strong><small>{{ item.vendedor_email }}</small></span>
+                                        </div>
+                                    </td>
+                                    <td><span class="commissions-sales-count">{{ item.quantidade_vendas }}</span></td>
+                                    <td><div class="management-value"><strong>{{ item.total_vendido|moeda_br }}</strong><small>Faturamento atribuído</small></div></td>
+                                    <td><div class="management-value"><strong>{{ item.lucro_total|moeda_br }}</strong><small>{% if (item.total_vendido or 0) > 0 %}{{ (((item.lucro_total or 0) / item.total_vendido) * 100)|numero_br }}% de margem{% else %}Sem vendas{% endif %}</small></div></td>
+                                    <td><span class="management-role management-role--commission">{{ item.comissao_percentual|numero_br(2) }}%</span></td>
+                                    <td><strong class="commissions-earned">{{ item.valor_comissao|moeda_br }}</strong></td>
                                 </tr>
                             {% else %}
-                                <tr>
-                                    <td colspan="7" class="empty-state">
-                                        Nenhum vendedor encontrado.
-                                    </td>
-                                </tr>
+                                <tr><td colspan="6"><div class="management-empty-state"><span class="management-empty-icon management-empty-icon--commission" aria-hidden="true"></span><strong>Nenhum vendedor ativo encontrado</strong><p>Cadastre vendedores ativos para calcular as comissões.</p><a href="{{ url_for('usuarios') }}" class="ui-command-action ui-icon-user-plus">Gerenciar equipe</a></div></td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                <footer class="commissions-total-footer">
+                    <div><span>Total previsto para pagamento</span><small>Considerando as regras individuais do período</small></div>
+                    <strong>{{ total_comissoes|moeda_br }}</strong>
+                </footer>
             </section>
-
         </main>
-
     </div>
-
 </body>
 </html>

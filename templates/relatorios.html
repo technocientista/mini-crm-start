@@ -1,84 +1,51 @@
+{% macro variacao(valor, sufixo="%") %}
+    {% if valor is none %}
+        <span class="report-kpi-comparison neutral">Sem base no período anterior</span>
+    {% elif valor > 0 %}
+        <span class="report-kpi-comparison positive">
+            <span aria-hidden="true">↑</span> {{ valor|abs|numero_br }}{{ sufixo }}
+            <small>vs. período anterior</small>
+        </span>
+    {% elif valor < 0 %}
+        <span class="report-kpi-comparison negative">
+            <span aria-hidden="true">↓</span> {{ valor|abs|numero_br }}{{ sufixo }}
+            <small>vs. período anterior</small>
+        </span>
+    {% else %}
+        <span class="report-kpi-comparison neutral">
+            Sem alteração <small>vs. período anterior</small>
+        </span>
+    {% endif %}
+{% endmacro %}
+
 <!DOCTYPE html>
 <html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
 <head>
     <meta charset="UTF-8">
     <title>Relatórios - Start CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
-
+<body class="ui-refreshed reports-page">
     <div class="app-layout">
-
         {% include 'partials/sidebar.html' %}
 
         <main class="main-content">
-            <header class="topbar">
+            <header class="topbar reports-topbar">
                 <div>
-                    <h1>Relatórios</h1>
-                    <p>Acompanhe vendas, lucro, produtos e clientes por período.</p>
+                    <h1>Relatórios de vendas</h1>
+                    <p>Visão consolidada de faturamento, lucro, produtos e clientes.</p>
                 </div>
-            </header>
 
-            <section class="panel">
-                <h2>Filtros</h2>
-
-                <form method="GET" action="{{ url_for('relatorios') }}" class="search-form reports-search-form">
-                    <input type="date" id="data_inicio" name="data_inicio" value="{{ data_inicio }}">
-
-                    <input type="date" id="data_fim" name="data_fim" value="{{ data_fim }}">
-
-                    <select name="vendedor_id">
-                        <option value="">Todos os vendedores</option>
-                        {% for vendedor in vendedores %}
-                            <option value="{{ vendedor.id }}" {% if vendedor_id|string == vendedor.id|string %}selected{% endif %}>
-                                {{ vendedor.nome }}
-                            </option>
-                        {% endfor %}
-                    </select>
-
-                    <select name="cliente_id">
-                        <option value="">Todos os clientes</option>
-                        {% for cliente in clientes %}
-                            <option value="{{ cliente.id }}" {% if cliente_id|string == cliente.id|string %}selected{% endif %}>
-                                {{ cliente.nome }} - {{ cliente.telefone }}
-                            </option>
-                        {% endfor %}
-                    </select>
-
-                    <select name="forma_pagamento">
-                        <option value="">Todas as formas</option>
-                        {% for forma in formas_pagamento_opcoes %}
-                            <option value="{{ forma.forma_pagamento }}" {% if forma_pagamento == forma.forma_pagamento %}selected{% endif %}>
-                                {{ forma.forma_pagamento }}
-                            </option>
-                        {% endfor %}
-                    </select>
-
-                    <button 
-                        type="submit" 
-                        class="small-button action-icon-button"
-                        title="Filtrar"
+                <div class="reports-topbar-actions">
+                    <a
+                        href="{{ url_for('relatorio_caixas') }}"
+                        class="ui-command-action ui-icon-wallet secondary-action"
                     >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.45 4.44-1.41 1.41-4.44-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/>
-                        </svg>
-                    </button>
-
-                    <a 
-                        href="{{ url_for('relatorios') }}" 
-                        class="small-button action-icon-button secondary-icon" 
-                        title="Limpar filtros"
-                    >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M3 6h18v2H3V6zm3 4h12l-1 10H7L6 10zm3-7h6l1 2H8l1-2z"/>
-                        </svg>
+                        Relatório de caixas
                     </a>
 
-                    <a 
-                        class="small-button action-icon-button"
-                        title="Exportar Excel"
+                    <a
                         href="{{ url_for(
                             'exportar_relatorio',
                             data_inicio=data_inicio,
@@ -87,329 +54,455 @@
                             cliente_id=cliente_id,
                             forma_pagamento=forma_pagamento
                         ) }}"
+                        class="command-button reports-export-action"
                     >
                         <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/>
+                            <path d="M12 3.75v10.5"/>
+                            <path d="m8.25 10.5 3.75 3.75 3.75-3.75"/>
+                            <path d="M4.75 16.75v1.5a2 2 0 0 0 2 2h10.5a2 2 0 0 0 2-2v-1.5"/>
                         </svg>
+                        <span>Exportar Excel</span>
                     </a>
+                </div>
+            </header>
+
+            <section class="panel reports-filter-panel">
+                <div class="reports-section-heading">
+                    <div>
+                        <h2>Período e filtros</h2>
+                        <p>
+                            Exibindo <strong>{{ periodo_label }}</strong>
+                            {% if filtros_ativos %}
+                                com {{ filtros_ativos }} {{ "filtro adicional" if filtros_ativos == 1 else "filtros adicionais" }}
+                            {% endif %}
+                        </p>
+                    </div>
+                    <span class="reports-period-reference" title="{{ periodo_anterior_label }}">
+                        Comparação: período anterior
+                    </span>
+                </div>
+
+                <nav class="reports-period-shortcuts" aria-label="Atalhos de período">
+                    {% for atalho in atalhos_periodo %}
+                        <a
+                            href="{{ url_for(
+                                'relatorios',
+                                data_inicio=atalho.inicio,
+                                data_fim=atalho.fim,
+                                vendedor_id=vendedor_id,
+                                cliente_id=cliente_id,
+                                forma_pagamento=forma_pagamento
+                            ) }}"
+                            class="{% if data_inicio == atalho.inicio and data_fim == atalho.fim %}active{% endif %}"
+                        >
+                            {{ atalho.label }}
+                        </a>
+                    {% endfor %}
+                </nav>
+
+                <form method="GET" action="{{ url_for('relatorios') }}" class="reports-filter-form">
+                    <div class="form-group">
+                        <label for="data_inicio">Data inicial</label>
+                        <input type="date" id="data_inicio" name="data_inicio" value="{{ data_inicio }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="data_fim">Data final</label>
+                        <input type="date" id="data_fim" name="data_fim" value="{{ data_fim }}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="vendedor_id">Vendedor</label>
+                        <select id="vendedor_id" name="vendedor_id">
+                            <option value="">Todos os vendedores</option>
+                            {% for vendedor in vendedores %}
+                                <option value="{{ vendedor.id }}" {% if vendedor_id|string == vendedor.id|string %}selected{% endif %}>
+                                    {{ vendedor.nome }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group reports-client-filter">
+                        <label for="cliente_id">Cliente</label>
+                        <select id="cliente_id" name="cliente_id">
+                            <option value="">Todos os clientes</option>
+                            {% for cliente in clientes %}
+                                <option value="{{ cliente.id }}" {% if cliente_id|string == cliente.id|string %}selected{% endif %}>
+                                    {{ cliente.nome }}{% if cliente.telefone %} — {{ cliente.telefone }}{% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="forma_pagamento">Pagamento</label>
+                        <select id="forma_pagamento" name="forma_pagamento">
+                            <option value="">Todas as formas</option>
+                            {% for forma in formas_pagamento_opcoes %}
+                                <option value="{{ forma.forma_pagamento }}" {% if forma_pagamento == forma.forma_pagamento %}selected{% endif %}>
+                                    {{ forma.forma_pagamento|title }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="reports-filter-actions">
+                        <button type="submit" class="ui-command-action ui-icon-filter reports-apply-filter">
+                            Aplicar filtros
+                        </button>
+                        <a href="{{ url_for('relatorios') }}" class="ui-command-action ui-icon-clear secondary-action">
+                            Limpar
+                        </a>
+                    </div>
                 </form>
             </section>
 
-        <section class="cards-grid margin-top">
-            <div class="card">
-                <span>Quantidade de vendas</span>
-                <strong>{{ resumo.quantidade_vendas }}</strong>
-            </div>
+            <section class="reports-kpi-grid" aria-label="Indicadores principais">
+                <article class="report-kpi-card featured">
+                    <span class="report-kpi-label">Faturamento</span>
+                    <strong>{{ resumo.total_vendido|moeda_br }}</strong>
+                    {{ variacao(variacoes.total_vendido) }}
+                </article>
 
-            <div class="card">
-                <span>Total vendido</span>
-                <strong>R$ {{ "%.2f"|format(resumo.total_vendido) }}</strong>
-            </div>
+                <article class="report-kpi-card">
+                    <span class="report-kpi-label">Lucro bruto</span>
+                    <strong>{{ resumo.total_lucro|moeda_br }}</strong>
+                    {{ variacao(variacoes.total_lucro) }}
+                </article>
 
-            <div class="card">
-                <span>Lucro total</span>
-                <strong>R$ {{ "%.2f"|format(resumo.total_lucro) }}</strong>
-            </div>
+                <article class="report-kpi-card">
+                    <span class="report-kpi-label">Margem média</span>
+                    <strong>{{ margem_media|numero_br }}%</strong>
+                    {{ variacao(variacoes.margem_media, " pp") }}
+                </article>
 
-            <div class="card">
-                <span>Descontos</span>
-                <strong>R$ {{ "%.2f"|format(resumo.total_desconto) }}</strong>
-            </div>
-        </section>
-
-        <section class="cards-grid margin-top">
-            <div class="card">
-                <span>Custo total</span>
-                <strong>R$ {{ "%.2f"|format(resumo.total_custo) }}</strong>
-            </div>
-
-            <div class="card">
-                <span>Ticket médio</span>
-                <strong>R$ {{ "%.2f"|format(ticket_medio) }}</strong>
-            </div>
-
-            <div class="card">
-                <span>Margem média</span>
-                <strong>{{ "%.2f"|format(margem_media) }}%</strong>
-            </div>
-
-            <div class="card">
-                <span>Registros filtrados</span>
-                <strong>{{ total_registros }}</strong>
-            </div>
-        </section>
-
-        <section class="cards-grid margin-top">
-            <div class="card">
-                <span>Vendas canceladas</span>
-                <strong>{{ resumo_canceladas.quantidade_canceladas or 0 }}</strong>
-            </div>
-
-            <div class="card">
-                <span>Total cancelado</span>
-                <strong>R$ {{ "%.2f"|format(resumo_canceladas.total_cancelado or 0) }}</strong>
-            </div>
-
-            <div class="card">
-                <span>Lucro perdido</span>
-                <strong>R$ {{ "%.2f"|format(resumo_canceladas.lucro_cancelado or 0) }}</strong>
-            </div>
-        </section>
-
-            <section class="panel margin-top" id="lista-relatorio-vendas">
-                <h2>Vendas no período</h2>
-
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Nº</th>
-                                <th>Data</th>
-                                <th>Cliente</th>
-                                <th>Vendedor</th>
-                                <th>Pagamento</th>
-                                <th>Desconto</th>
-                                <th>Total</th>
-                                <th>Custo</th>
-                                <th>Lucro</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for venda in vendas %}
-                                <tr>
-                                    <td>#{{ venda.id }}</td>
-                                    <td>{{ venda.data_venda|datetime_br }}</td>
-                                    <td>{{ venda.cliente_nome }}</td>
-                                    <td>{{ venda.vendedor or '-' }}</td>
-                                    <td>{{ venda.forma_pagamento }}</td>
-                                    <td>R$ {{ "%.2f"|format(venda.desconto_total) }}</td>
-                                    <td>R$ {{ "%.2f"|format(venda.valor_total) }}</td>
-                                    <td>R$ {{ "%.2f"|format(venda.custo_total) }}</td>
-                                    <td>R$ {{ "%.2f"|format(venda.lucro_total) }}</td>
-                                </tr>
-                            {% else %}
-                                <tr>
-                                    <td colspan="9" class="empty-state">
-                                        Nenhuma venda encontrada nesse período.
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="pagination-compact">
-                    {% if page > 1 %}
-                        <a 
-                            href="{{ url_for('relatorios', data_inicio=data_inicio, data_fim=data_fim, vendedor_id=vendedor_id, cliente_id=cliente_id, forma_pagamento=forma_pagamento, page=page-1) }}#lista-relatorio-vendas" 
-                            class="pagination-arrow"
-                            title="Página anterior"
-                        >
-                            ‹
-                        </a>
-                    {% else %}
-                        <span class="pagination-arrow disabled">‹</span>
-                    {% endif %}
-
-                    {% for p in range(1, total_paginas + 1) %}
-                        {% if p <= 10 or p == total_paginas or (p >= page - 1 and p <= page + 1) %}
-                            <a 
-                                href="{{ url_for('relatorios', data_inicio=data_inicio, data_fim=data_fim, vendedor_id=vendedor_id, cliente_id=cliente_id, forma_pagamento=forma_pagamento, page=p) }}#lista-relatorio-vendas" 
-                                class="pagination-number {% if p == page %}active{% endif %}"
-                            >
-                                {{ p }}
-                            </a>
-                        {% elif p == 11 and total_paginas > 11 %}
-                            <span class="pagination-ellipsis">...</span>
-                        {% endif %}
-                    {% endfor %}
-
-                    {% if page < total_paginas %}
-                        <a 
-                            href="{{ url_for('relatorios', data_inicio=data_inicio, data_fim=data_fim, vendedor_id=vendedor_id, cliente_id=cliente_id, forma_pagamento=forma_pagamento, page=page+1) }}#lista-relatorio-vendas" 
-                            class="pagination-arrow"
-                            title="Próxima página"
-                        >
-                            ›
-                        </a>
-                    {% else %}
-                        <span class="pagination-arrow disabled">›</span>
-                    {% endif %}
-                </div>
-
-                <div class="pagination-summary">
-                    Total de registros: <strong>{{ total_registros }}</strong>
-                </div>
+                <article class="report-kpi-card">
+                    <span class="report-kpi-label">Ticket médio</span>
+                    <strong>{{ ticket_medio|moeda_br }}</strong>
+                    {{ variacao(variacoes.ticket_medio) }}
+                </article>
             </section>
 
-            <section class="panel margin-top">
-                <h2>Vendas por forma de pagamento</h2>
+            <section class="reports-secondary-metrics" aria-label="Indicadores complementares">
+                <article>
+                    <span>Vendas concluídas</span>
+                    <strong>{{ resumo.quantidade_vendas }}</strong>
+                </article>
+                <article>
+                    <span>Custo total</span>
+                    <strong>{{ resumo.total_custo|moeda_br }}</strong>
+                </article>
+                <article>
+                    <span>Descontos concedidos</span>
+                    <strong>{{ resumo.total_desconto|moeda_br }}</strong>
+                </article>
+                <article class="danger">
+                    <span>Vendas canceladas</span>
+                    <strong>{{ resumo_canceladas.quantidade_canceladas or 0 }}</strong>
+                    <small>{{ (resumo_canceladas.total_cancelado or 0)|moeda_br }}</small>
+                </article>
+            </section>
 
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Forma de pagamento</th>
-                                <th>Quantidade</th>
-                                <th>Total vendido</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+            <section class="reports-analytics-grid">
+                <article class="panel report-chart-card">
+                    <div class="reports-section-heading compact">
+                        <div>
+                            <h2>Evolução do período</h2>
+                            <p>Faturamento e lucro agrupados em até 16 intervalos.</p>
+                        </div>
+                        <div class="report-chart-legend" aria-label="Legenda">
+                            <span><i class="revenue"></i> Faturamento</span>
+                            <span><i class="profit"></i> Lucro</span>
+                        </div>
+                    </div>
+
+                    {% if resumo.quantidade_vendas %}
+                        <div class="report-bar-chart" role="img" aria-label="Gráfico de faturamento e lucro no período">
+                            {% for ponto in serie_temporal %}
+                                <div
+                                    class="report-chart-column"
+                                    title="{{ ponto.label }} — Faturamento: {{ ponto.total_vendido|moeda_br }}; Lucro: {{ ponto.total_lucro|moeda_br }}"
+                                >
+                                    <div class="report-chart-bars">
+                                        <span class="revenue" style="height: {{ ponto.altura_total }}%"></span>
+                                        <span class="profit" style="height: {{ ponto.altura_lucro }}%"></span>
+                                    </div>
+                                    <small>{{ ponto.label }}</small>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="reports-empty-visual">
+                            <strong>Sem vendas no período</strong>
+                            <span>Altere os filtros para visualizar a evolução.</span>
+                        </div>
+                    {% endif %}
+                </article>
+
+                <article class="panel report-payment-card">
+                    <div class="reports-section-heading compact">
+                        <div>
+                            <h2>Formas de pagamento</h2>
+                            <p>Participação sobre o valor efetivamente pago.</p>
+                        </div>
+                    </div>
+
+                    {% if formas_pagamento %}
+                        <div class="report-progress-list">
                             {% for item in formas_pagamento %}
-                                <tr>
-                                    <td>{{ item.forma_pagamento }}</td>
-                                    <td>{{ item.quantidade }}</td>
-                                    <td>R$ {{ "%.2f"|format(item.total) }}</td>
-                                </tr>
-                            {% else %}
-                                <tr>
-                                    <td colspan="3" class="empty-state">
-                                        Nenhum dado encontrado.
-                                    </td>
-                                </tr>
+                                <div class="report-progress-item">
+                                    <div>
+                                        <strong>{{ item.forma_pagamento|title }}</strong>
+                                        <span>{{ item.total|moeda_br }}</span>
+                                    </div>
+                                    <div class="report-progress-track" aria-label="{{ item.percentual|numero_br }}%">
+                                        <span style="width: {{ item.percentual }}%"></span>
+                                    </div>
+                                    <small>{{ item.percentual|numero_br }}% · {{ item.quantidade }} {{ "venda" if item.quantidade == 1 else "vendas" }}</small>
+                                </div>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                        </div>
+                    {% else %}
+                        <div class="reports-empty-visual compact">
+                            <strong>Sem pagamentos</strong>
+                            <span>Nenhum pagamento encontrado no período.</span>
+                        </div>
+                    {% endif %}
+                </article>
             </section>
 
-            <section class="panel margin-top">
-                <h2>Produtos mais vendidos</h2>
+            <section class="reports-ranking-grid">
+                <article class="panel report-ranking-card">
+                    <div class="reports-section-heading compact">
+                        <div>
+                            <h2>Produtos mais vendidos</h2>
+                            <p>Ranking por valor vendido.</p>
+                        </div>
+                    </div>
 
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Produto</th>
-                                <th>SKU</th>
-                                <th>Quantidade vendida</th>
-                                <th>Total vendido</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for produto in produtos_mais_vendidos %}
-                                <tr>
-                                    <td>{{ produto.produto_nome }}</td>
-                                    <td>{{ produto.sku }}</td>
-                                    <td>{{ produto.quantidade_total }}</td>
-                                    <td>R$ {{ "%.2f"|format(produto.total_vendido) }}</td>
-                                </tr>
-                            {% else %}
-                                <tr>
-                                    <td colspan="4" class="empty-state">
-                                        Nenhum produto vendido nesse período.
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <section class="panel margin-top">
-                <h2>Clientes que mais compraram</h2>
-
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Cliente</th>
-                                <th>Telefone</th>
-                                <th>Quantidade de compras</th>
-                                <th>Total comprado</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for cliente in clientes_mais_compraram %}
-                                <tr>
-                                    <td>{{ cliente.cliente_nome }}</td>
-                                    <td>{{ cliente.telefone }}</td>
-                                    <td>{{ cliente.quantidade_compras }}</td>
-                                    <td>R$ {{ "%.2f"|format(cliente.total_comprado) }}</td>
-                                </tr>
-                            {% else %}
-                                <tr>
-                                    <td colspan="4" class="empty-state">
-                                        Nenhum cliente encontrado nesse período.
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <section class="panel margin-top">
-                <h2>Vendas canceladas no período</h2>
-
-                <p class="muted-text">
-                    Lista das últimas vendas canceladas dentro do período filtrado, com motivo e responsável pelo cancelamento.
-                </p>
-
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Venda</th>
-                                <th>Data da venda</th>
-                                <th>Data do cancelamento</th>
-                                <th>Cliente</th>
-                                <th>Vendedor</th>
-                                <th>Cancelado por</th>
-                                <th>Valor</th>
-                                <th>Motivo</th>
-                                <th>Ação</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {% for venda in vendas_canceladas %}
-                                <tr>
-                                    <td>#{{ venda.id }}</td>
-                                    <td>{{ venda.data_venda|datetime_br }}</td>
-                                    <td>
-                                        {% if venda.data_cancelamento %}
-                                            {{ venda.data_cancelamento|datetime_br }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ venda.cliente_nome }}</td>
-                                    <td>{{ venda.vendedor }}</td>
-                                    <td>{{ venda.cancelado_por or '-' }}</td>
-                                    <td>R$ {{ "%.2f"|format(venda.valor_total or 0) }}</td>
-                                    <td class="cancel-reason">
-                                        {{ venda.motivo_cancelamento or '-' }}
-                                    </td>
-                                    <td>
-                                        <div class="table-actions">
-                                            <a 
-                                                href="{{ url_for('venda_detalhe', venda_id=venda.id) }}" 
-                                                class="small-button"
-                                                title="Ver venda"
-                                            >
-                                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                    <path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-1.8a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"/>
-                                                </svg>
-                                            </a>
+                    {% if produtos_ranking %}
+                        <ol class="report-ranking-list">
+                            {% for produto in produtos_ranking[:5] %}
+                                <li>
+                                    <span class="report-ranking-position">{{ loop.index }}</span>
+                                    <div class="report-ranking-content">
+                                        <div>
+                                            <strong>{{ produto.produto_nome }}</strong>
+                                            <span>{{ produto.total_vendido|moeda_br }}</span>
                                         </div>
-                                    </td>
-                                </tr>
-                            {% else %}
-                                <tr>
-                                    <td colspan="9" class="empty-state">
-                                        Nenhuma venda cancelada no período.
-                                    </td>
-                                </tr>
+                                        <small>SKU {{ produto.sku or "-" }} · {{ produto.quantidade_total }} unidades</small>
+                                        <div class="report-progress-track">
+                                            <span style="width: {{ produto.percentual }}%"></span>
+                                        </div>
+                                    </div>
+                                </li>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                        </ol>
+                    {% else %}
+                        <div class="reports-empty-visual compact">
+                            <strong>Sem produtos vendidos</strong>
+                            <span>O ranking aparecerá quando houver vendas.</span>
+                        </div>
+                    {% endif %}
+                </article>
+
+                <article class="panel report-ranking-card">
+                    <div class="reports-section-heading compact">
+                        <div>
+                            <h2>Clientes em destaque</h2>
+                            <p>Ranking por valor total comprado.</p>
+                        </div>
+                    </div>
+
+                    {% if clientes_ranking %}
+                        <ol class="report-ranking-list">
+                            {% for cliente in clientes_ranking[:5] %}
+                                <li>
+                                    <span class="report-ranking-position">{{ loop.index }}</span>
+                                    <div class="report-ranking-content">
+                                        <div>
+                                            <strong>{{ cliente.cliente_nome }}</strong>
+                                            <span>{{ cliente.total_comprado|moeda_br }}</span>
+                                        </div>
+                                        <small>{{ cliente.telefone or "Sem telefone" }} · {{ cliente.quantidade_compras }} compras</small>
+                                        <div class="report-progress-track">
+                                            <span style="width: {{ cliente.percentual }}%"></span>
+                                        </div>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ol>
+                    {% else %}
+                        <div class="reports-empty-visual compact">
+                            <strong>Sem clientes identificados</strong>
+                            <span>O ranking considera apenas vendas vinculadas a clientes.</span>
+                        </div>
+                    {% endif %}
+                </article>
             </section>
 
-        </main>
+            <section class="panel reports-details-panel" id="detalhamento">
+                <div class="reports-details-header">
+                    <div>
+                        <h2>Detalhamento</h2>
+                        <p>Consulte as vendas do período e acesse cada registro.</p>
+                    </div>
 
+                    <div class="reports-tabs" role="tablist" aria-label="Tipo de venda">
+                        <button
+                            type="button"
+                            class="active"
+                            data-report-tab="concluidas"
+                            role="tab"
+                            aria-selected="true"
+                        >
+                            Concluídas
+                            <span>{{ total_registros }}</span>
+                        </button>
+                        <button
+                            type="button"
+                            data-report-tab="canceladas"
+                            role="tab"
+                            aria-selected="false"
+                        >
+                            Canceladas
+                            <span>{{ resumo_canceladas.quantidade_canceladas or 0 }}</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="reports-tab-panel active" data-report-panel="concluidas" role="tabpanel">
+                    <div class="table-wrapper">
+                        <table class="reports-table">
+                            <thead>
+                                <tr>
+                                    <th>Venda</th>
+                                    <th>Data</th>
+                                    <th>Cliente</th>
+                                    <th>Vendedor</th>
+                                    <th>Pagamento</th>
+                                    <th class="numeric">Desconto</th>
+                                    <th class="numeric">Total</th>
+                                    <th class="numeric">Custo</th>
+                                    <th class="numeric">Lucro</th>
+                                    <th aria-label="Ações"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for venda in vendas %}
+                                    <tr>
+                                        <td><strong>#{{ venda.id }}</strong></td>
+                                        <td>{{ venda.data_venda|datetime_br }}</td>
+                                        <td>{{ venda.cliente_nome }}</td>
+                                        <td>{{ venda.vendedor or "-" }}</td>
+                                        <td>
+                                            <span class="report-payment-pill">
+                                                {{ (venda.pagamentos_descricao or venda.forma_pagamento)|title }}
+                                            </span>
+                                        </td>
+                                        <td class="numeric">{{ venda.desconto_total|moeda_br }}</td>
+                                        <td class="numeric"><strong>{{ venda.valor_total|moeda_br }}</strong></td>
+                                        <td class="numeric">{{ venda.custo_total|moeda_br }}</td>
+                                        <td class="numeric report-profit-value">{{ venda.lucro_total|moeda_br }}</td>
+                                        <td>
+                                            <a
+                                                href="{{ url_for('venda_detalhe', venda_id=venda.id) }}"
+                                                class="small-button ui-icon-view report-view-action"
+                                                title="Ver detalhes da venda"
+                                                aria-label="Ver detalhes da venda #{{ venda.id }}"
+                                            ></a>
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="10" class="empty-state">Nenhuma venda concluída no período.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="reports-table-footer">
+                        <span>Total de registros: <strong>{{ total_registros }}</strong></span>
+                        <nav class="pagination-compact" aria-label="Paginação das vendas">
+                            {% if page > 1 %}
+                                <a href="{{ url_for('relatorios', data_inicio=data_inicio, data_fim=data_fim, vendedor_id=vendedor_id, cliente_id=cliente_id, forma_pagamento=forma_pagamento, page=page-1) }}#detalhamento" class="pagination-arrow" title="Página anterior">‹</a>
+                            {% else %}
+                                <span class="pagination-arrow disabled">‹</span>
+                            {% endif %}
+
+                            {% for p in range(1, total_paginas + 1) %}
+                                {% if p <= 10 or p == total_paginas or (p >= page - 1 and p <= page + 1) %}
+                                    <a href="{{ url_for('relatorios', data_inicio=data_inicio, data_fim=data_fim, vendedor_id=vendedor_id, cliente_id=cliente_id, forma_pagamento=forma_pagamento, page=p) }}#detalhamento" class="pagination-number {% if p == page %}active{% endif %}">{{ p }}</a>
+                                {% elif p == 11 and total_paginas > 11 %}
+                                    <span class="pagination-ellipsis">…</span>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page < total_paginas %}
+                                <a href="{{ url_for('relatorios', data_inicio=data_inicio, data_fim=data_fim, vendedor_id=vendedor_id, cliente_id=cliente_id, forma_pagamento=forma_pagamento, page=page+1) }}#detalhamento" class="pagination-arrow" title="Próxima página">›</a>
+                            {% else %}
+                                <span class="pagination-arrow disabled">›</span>
+                            {% endif %}
+                        </nav>
+                    </div>
+                </div>
+
+                <div class="reports-tab-panel" data-report-panel="canceladas" role="tabpanel" hidden>
+                    <div class="reports-cancelled-summary">
+                        <span>Valor cancelado <strong>{{ (resumo_canceladas.total_cancelado or 0)|moeda_br }}</strong></span>
+                        <span>Lucro perdido <strong>{{ (resumo_canceladas.lucro_cancelado or 0)|moeda_br }}</strong></span>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="reports-table reports-cancelled-table">
+                            <thead>
+                                <tr>
+                                    <th>Venda</th>
+                                    <th>Data da venda</th>
+                                    <th>Cancelamento</th>
+                                    <th>Cliente</th>
+                                    <th>Vendedor</th>
+                                    <th>Cancelado por</th>
+                                    <th class="numeric">Valor</th>
+                                    <th>Motivo</th>
+                                    <th aria-label="Ações"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for venda in vendas_canceladas %}
+                                    <tr>
+                                        <td><strong>#{{ venda.id }}</strong></td>
+                                        <td>{{ venda.data_venda|datetime_br }}</td>
+                                        <td>{{ venda.data_cancelamento|datetime_br if venda.data_cancelamento else "-" }}</td>
+                                        <td>{{ venda.cliente_nome }}</td>
+                                        <td>{{ venda.vendedor or "-" }}</td>
+                                        <td>{{ venda.cancelado_por or "-" }}</td>
+                                        <td class="numeric report-cancelled-value">{{ (venda.valor_total or 0)|moeda_br }}</td>
+                                        <td class="cancel-reason">{{ venda.motivo_cancelamento or "-" }}</td>
+                                        <td>
+                                            <a
+                                                href="{{ url_for('venda_detalhe', venda_id=venda.id) }}"
+                                                class="small-button ui-icon-view report-view-action"
+                                                title="Ver detalhes da venda"
+                                                aria-label="Ver detalhes da venda #{{ venda.id }}"
+                                            ></a>
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="9" class="empty-state">Nenhuma venda cancelada no período.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
+    <script src="{{ url_for('static', filename='js/relatorios.js') }}"></script>
 </body>
 </html>

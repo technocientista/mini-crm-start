@@ -1,280 +1,368 @@
+{% macro variacao(valor, referencia) %}
+    {% if valor is none %}
+        <span class="dashboard-kpi-comparison neutral">Sem base em {{ referencia }}</span>
+    {% elif valor > 0 %}
+        <span class="dashboard-kpi-comparison positive">
+            <span aria-hidden="true">↑</span> {{ valor|abs|numero_br }}%
+            <small>vs. {{ referencia }}</small>
+        </span>
+    {% elif valor < 0 %}
+        <span class="dashboard-kpi-comparison negative">
+            <span aria-hidden="true">↓</span> {{ valor|abs|numero_br }}%
+            <small>vs. {{ referencia }}</small>
+        </span>
+    {% else %}
+        <span class="dashboard-kpi-comparison neutral">
+            Sem alteração <small>vs. {{ referencia }}</small>
+        </span>
+    {% endif %}
+{% endmacro %}
+
 <!DOCTYPE html>
 <html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
 <head>
     <meta charset="UTF-8">
     <title>Dashboard - Start CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
-
+<body class="ui-refreshed dashboard-page">
     <div class="app-layout">
-
         {% include 'partials/sidebar.html' %}
 
-        <main class="main-content" data-dashboard-modal-aberto="{{ modal_aberto or '' }}">
-            <header class="topbar">
+        <main
+            class="main-content"
+            data-dashboard-modal-aberto="{{ modal_aberto or '' }}"
+        >
+            <header class="topbar dashboard-topbar">
                 <div>
                     <h1>Dashboard</h1>
-                    <p>Bem-vindo, {{ usuario_nome }}.</p>
+                    <p>Visão geral da operação de hoje. Bem-vindo, {{ usuario_nome }}.</p>
+                </div>
+
+                <div class="dashboard-topbar-actions">
+                    <a
+                        href="{{ url_for('relatorios') }}"
+                        class="ui-command-action ui-icon-chart secondary-action"
+                    >
+                        Ver relatórios
+                    </a>
+                    <a
+                        href="{{ url_for('vendas') }}"
+                        class="ui-command-action ui-icon-cart"
+                    >
+                        Abrir PDV
+                    </a>
                 </div>
             </header>
 
-            <section class="cards-grid">
-                <div class="card">
-                    <span>Vendas de hoje</span>
-                    <strong>R$ {{ "%.2f"|format(vendas_hoje) }}</strong>
+            <section class="dashboard-kpi-grid" aria-label="Indicadores principais">
+                <article class="dashboard-kpi-card featured">
+                    <span>Faturamento hoje</span>
+                    <strong>{{ vendas_hoje|moeda_br }}</strong>
+                    {{ variacao(variacoes_dashboard.faturamento_hoje, "ontem") }}
+                </article>
+
+                <article class="dashboard-kpi-card">
+                    <span>Vendas hoje</span>
+                    <strong>{{ quantidade_vendas_hoje }}</strong>
+                    <small>Ticket médio: {{ ticket_medio_hoje|moeda_br }}</small>
+                    {{ variacao(variacoes_dashboard.vendas_hoje, "ontem") }}
+                </article>
+
+                <article class="dashboard-kpi-card">
+                    <span>Faturamento mensal</span>
+                    <strong>{{ faturamento_mes|moeda_br }}</strong>
+                    {{ variacao(variacoes_dashboard.faturamento_mes, "mesmo período anterior") }}
+                </article>
+
+                <article class="dashboard-kpi-card">
+                    <span>Lucro mensal</span>
+                    <strong>{{ lucro_mes|moeda_br }}</strong>
+                    <small>Margem: {{ margem_mes|numero_br }}%</small>
+                    {{ variacao(variacoes_dashboard.lucro_mes, "mesmo período anterior") }}
+                </article>
+            </section>
+
+            <section class="dashboard-main-grid">
+                <article class="panel dashboard-performance-card">
+                    <div class="dashboard-section-heading">
+                        <div>
+                            <h2>Desempenho dos últimos 14 dias</h2>
+                            <p>Faturamento e lucro das vendas concluídas.</p>
+                        </div>
+                        <div class="report-chart-legend" aria-label="Legenda">
+                            <span><i class="revenue"></i> Faturamento</span>
+                            <span><i class="profit"></i> Lucro</span>
+                        </div>
+                    </div>
+
+                    {% if serie_dashboard|selectattr("total", "gt", 0)|list %}
+                        <div class="report-bar-chart dashboard-bar-chart" role="img" aria-label="Gráfico de faturamento e lucro dos últimos 14 dias">
+                            {% for ponto in serie_dashboard %}
+                                <div
+                                    class="report-chart-column"
+                                    title="{{ ponto.label }} — Faturamento: {{ ponto.total|moeda_br }}; Lucro: {{ ponto.lucro|moeda_br }}"
+                                >
+                                    <div class="report-chart-bars">
+                                        <span class="revenue" style="height: {{ ponto.altura_total }}%"></span>
+                                        <span class="profit" style="height: {{ ponto.altura_lucro }}%"></span>
+                                    </div>
+                                    <small>{{ ponto.label }}</small>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="dashboard-empty-visual">
+                            <strong>Sem vendas nos últimos 14 dias</strong>
+                            <span>O gráfico será preenchido conforme novas vendas forem registradas.</span>
+                        </div>
+                    {% endif %}
+                </article>
+
+                <article class="panel dashboard-operation-card">
+                    <div class="dashboard-section-heading">
+                        <div>
+                            <h2>Operação de hoje</h2>
+                            <p>Caixa e recebimentos do dia.</p>
+                        </div>
+                        {% if caixa_aberto_dashboard %}
+                            <span class="dashboard-operation-status success">Caixa aberto</span>
+                        {% else %}
+                            <span class="dashboard-operation-status danger">Caixa fechado</span>
+                        {% endif %}
+                    </div>
+
+                    {% if caixa_aberto_dashboard %}
+                        <div class="dashboard-cash-summary">
+                            <span>
+                                <small>Aberto por</small>
+                                <strong>{{ caixa_aberto_dashboard.usuario_abertura_nome or "-" }}</strong>
+                            </span>
+                            <span>
+                                <small>Vendas no caixa</small>
+                                <strong>{{ resumo_caixa_dashboard.total_vendas|moeda_br }}</strong>
+                            </span>
+                            <span>
+                                <small>Dinheiro esperado</small>
+                                <strong>{{ resumo_caixa_dashboard.valor_esperado|moeda_br }}</strong>
+                            </span>
+                        </div>
+                    {% else %}
+                        <div class="dashboard-cash-closed">
+                            <p>Abra o caixa para iniciar as vendas do dia.</p>
+                            <a href="{{ url_for('vendas') }}" class="ui-command-action ui-icon-wallet">
+                                Abrir caixa no PDV
+                            </a>
+                        </div>
+                    {% endif %}
+
+                    <div class="dashboard-payment-summary">
+                        <strong>Recebimentos de hoje</strong>
+
+                        {% if pagamentos_hoje %}
+                            {% for item in pagamentos_hoje %}
+                                <div class="dashboard-payment-row">
+                                    <div>
+                                        <span>{{ item.forma_pagamento|title }}</span>
+                                        <strong>{{ item.total|moeda_br }}</strong>
+                                    </div>
+                                    <div class="report-progress-track">
+                                        <span style="width: {{ item.percentual }}%"></span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <small class="dashboard-no-payments">Nenhum recebimento registrado hoje.</small>
+                        {% endif %}
+                    </div>
+                </article>
+            </section>
+
+            <section class="dashboard-alert-section">
+                <div class="dashboard-section-heading">
+                    <div>
+                        <h2>Alertas que precisam de ação</h2>
+                        <p>Prioridades operacionais e oportunidades imediatas.</p>
+                    </div>
                 </div>
 
-                <div class="card">
-                    <span>Faturamento do mês</span>
-                    <strong>R$ {{ "%.2f"|format(faturamento_mes) }}</strong>
-                </div>
+                <div class="dashboard-alert-grid">
+                    <button
+                        type="button"
+                        class="dashboard-alert-card danger"
+                        onclick="abrirModalDashboard('modal-produtos-sem')"
+                    >
+                        <span class="dashboard-alert-icon" aria-hidden="true">!</span>
+                        <span>
+                            <small>Reposição urgente</small>
+                            <strong>{{ produtos_sem_dashboard.total }} sem estoque</strong>
+                            <em>Ver produtos</em>
+                        </span>
+                    </button>
 
-                <div class="card">
-                    <span>Lucro do mês</span>
-                    <strong>R$ {{ "%.2f"|format(lucro_mes) }}</strong>
-                </div>
+                    <button
+                        type="button"
+                        class="dashboard-alert-card warning"
+                        onclick="abrirModalDashboard('modal-produtos-baixo')"
+                    >
+                        <span class="dashboard-alert-icon" aria-hidden="true">↓</span>
+                        <span>
+                            <small>Estoque abaixo do mínimo</small>
+                            <strong>{{ produtos_baixo_dashboard.total }} produtos</strong>
+                            <em>Ver produtos</em>
+                        </span>
+                    </button>
 
-                <div class="card">
-                    <span>Clientes cadastrados</span>
-                    <strong>{{ total_clientes }}</strong>
+                    <button
+                        type="button"
+                        class="dashboard-alert-card opportunity"
+                        onclick="abrirModalDashboard('modal-reativar')"
+                    >
+                        <span class="dashboard-alert-icon" aria-hidden="true">↻</span>
+                        <span>
+                            <small>Sem comprar há 30+ dias</small>
+                            <strong>{{ clientes_reativar.total }} clientes</strong>
+                            <em>Iniciar contato</em>
+                        </span>
+                    </button>
                 </div>
             </section>
 
-            <section class="cards-grid">
-                {% if produtos_baixo_dashboard.total > 0 %}
-                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-produtos-baixo')">
-                        <span>Produtos com estoque baixo</span>
-                        <strong>{{ produtos_baixo_dashboard.total }}</strong>
-                        <small>Precisam de reposição</small>
-                    </button>
-                {% else %}
-                    <div class="card">
-                        <span>Produtos com estoque baixo</span>
-                        <strong>0</strong>
+            <section class="dashboard-tables-grid">
+                <article class="panel dashboard-table-card">
+                    <div class="dashboard-section-heading">
+                        <div>
+                            <h2>Últimas vendas</h2>
+                            <p>Os cinco registros mais recentes.</p>
+                        </div>
+                        <a href="{{ url_for('vendas') }}#lista-vendas" class="dashboard-section-link">
+                            Ver todas
+                        </a>
                     </div>
-                {% endif %}
 
-                {% if produtos_sem_dashboard.total > 0 %}
-                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-produtos-sem')">
-                        <span>Produtos sem estoque</span>
-                        <strong>{{ produtos_sem_dashboard.total }}</strong>
-                        <small>Reposição urgente</small>
-                    </button>
-                {% else %}
-                    <div class="card">
-                        <span>Produtos sem estoque</span>
-                        <strong>0</strong>
+                    <div class="table-wrapper">
+                        <table class="dashboard-compact-table">
+                            <thead>
+                                <tr>
+                                    <th>Venda</th>
+                                    <th>Cliente</th>
+                                    <th>Pagamento</th>
+                                    <th class="numeric">Total</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for venda in ultimas_vendas[:5] %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('venda_detalhe', venda_id=venda.id) }}" class="table-link">
+                                                #{{ venda.id }}
+                                            </a>
+                                            <small>{{ venda.data_venda|datetime_br }}</small>
+                                        </td>
+                                        <td>{{ venda.cliente_nome }}</td>
+                                        <td>{{ (venda.pagamentos_descricao or venda.forma_pagamento)|title }}</td>
+                                        <td class="numeric"><strong>{{ venda.valor_total|moeda_br }}</strong></td>
+                                        <td>
+                                            {% if venda.status == "CONCLUIDA" %}
+                                                <span class="dashboard-table-status success">Concluída</span>
+                                            {% else %}
+                                                <span class="dashboard-table-status danger">Cancelada</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="5" class="empty-state">Nenhuma venda registrada ainda.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
-                {% endif %}
+                </article>
 
-                                {% if clientes_reativar.total > 0 %}
-                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-reativar')">
-                        <span>Clientes para reativar</span>
-                        <strong>{{ clientes_reativar.total }}</strong>
-                        <small>Sem comprar há 30+ dias</small>
-                    </button>
-                {% else %}
-                    <div class="card">
-                        <span>Clientes para reativar</span>
-                        <strong>0</strong>
-                        <small>Sem comprar há 30+ dias</small>
+                <article class="panel dashboard-table-card">
+                    <div class="dashboard-section-heading">
+                        <div>
+                            <h2>Estoque crítico</h2>
+                            <p>Produtos com maior prioridade de reposição.</p>
+                        </div>
+                        <a href="{{ url_for('estoque') }}" class="dashboard-section-link">
+                            Gerenciar estoque
+                        </a>
                     </div>
-                {% endif %}
 
-                {% if clientes_vip_dashboard.total > 0 %}
-                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-vip')">
+                    <div class="table-wrapper">
+                        <table class="dashboard-compact-table">
+                            <thead>
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>SKU</th>
+                                    <th class="numeric">Atual</th>
+                                    <th class="numeric">Mínimo</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for produto in produtos_alerta[:5] %}
+                                    <tr>
+                                        <td><strong>{{ produto.nome }}</strong></td>
+                                        <td>{{ produto.sku or "-" }}</td>
+                                        <td class="numeric">{{ produto.estoque_atual }}</td>
+                                        <td class="numeric">{{ produto.estoque_minimo }}</td>
+                                        <td>
+                                            {% if produto.estoque_atual == 0 %}
+                                                <span class="dashboard-table-status danger">Sem estoque</span>
+                                            {% else %}
+                                                <span class="dashboard-table-status warning">Baixo</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="5" class="empty-state">Nenhum produto em alerta.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+            </section>
+
+            <section class="panel dashboard-crm-section">
+                <div class="dashboard-section-heading">
+                    <div>
+                        <h2>Oportunidades de relacionamento</h2>
+                        <p>Segmentos prontos para atendimento e campanhas.</p>
+                    </div>
+                    <a href="{{ url_for('clientes') }}" class="dashboard-section-link">Ver clientes</a>
+                </div>
+
+                <div class="dashboard-crm-grid">
+                    <button type="button" onclick="abrirModalDashboard('modal-vip')">
                         <span>Clientes VIP</span>
                         <strong>{{ clientes_vip_dashboard.total }}</strong>
                         <small>Maiores compradores</small>
                     </button>
-                {% else %}
-                    <div class="card">
-                        <span>Clientes VIP</span>
-                        <strong>0</strong>
-                        <small>Maiores compradores</small>
-                    </div>
-                {% endif %}
-            </section>
-
-            <section class="cards-grid margin-top">
-
-
-                {% if clientes_sem_compra_dashboard.total > 0 %}
-                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-sem-compra')">
-                        <span>Clientes sem compra</span>
+                    <button type="button" onclick="abrirModalDashboard('modal-sem-compra')">
+                        <span>Sem primeira compra</span>
                         <strong>{{ clientes_sem_compra_dashboard.total }}</strong>
-                        <small>Cadastrados e ainda sem compra</small>
+                        <small>Novos clientes para ativar</small>
                     </button>
-                {% else %}
-                    <div class="card">
-                        <span>Clientes sem compra</span>
-                        <strong>0</strong>
-                        <small>Cadastrados e ainda sem compra</small>
-                    </div>
-                {% endif %}
-
-                {% if clientes_sem_tags_dashboard.total > 0 %}
-                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-sem-tags')">
-                        <span>Clientes sem tags</span>
+                    <button type="button" onclick="abrirModalDashboard('modal-sem-tags')">
+                        <span>Cadastro sem tags</span>
                         <strong>{{ clientes_sem_tags_dashboard.total }}</strong>
-                        <small>Cadastro incompleto para campanhas</small>
+                        <small>Segmentação incompleta</small>
                     </button>
-                {% else %}
-                    <div class="card">
-                        <span>Clientes sem tags</span>
-                        <strong>0</strong>
-                        <small>Cadastro incompleto para campanhas</small>
-                    </div>
-                {% endif %}
-
-                {% if clientes_recentes_30_dashboard.total > 0 %}
-                    <button type="button" class="dashboard-insight-card" onclick="abrirModalDashboard('modal-recentes-30')">
-                        <span>Compraram nos últimos 30 dias</span>
+                    <button type="button" onclick="abrirModalDashboard('modal-recentes-30')">
+                        <span>Compraram recentemente</span>
                         <strong>{{ clientes_recentes_30_dashboard.total }}</strong>
                         <small>Pós-venda e fidelização</small>
                     </button>
-                {% else %}
-                    <div class="card">
-                        <span>Compraram nos últimos 30 dias</span>
-                        <strong>0</strong>
-                        <small>Pós-venda e fidelização</small>
-                    </div>
-                {% endif %}
-            </section>
-
-            <section class="panel margin-top">
-                <h2>Primeiros passos</h2>
-
-                <div class="quick-actions">
-                    <a href="{{ url_for('clientes') }}" class="action-card">
-                        <strong>Cadastrar cliente</strong>
-                        <span>Adicionar novo cliente ao CRM</span>
-                    </a>
-
-                    <a href="{{ url_for('produtos') }}" class="action-card">
-                        <strong>Cadastrar produto</strong>
-                        <span>Adicionar produto e estoque inicial</span>
-                    </a>
-
-                    <a href="{{ url_for('vendas') }}" class="action-card">
-                        <strong>Registrar venda</strong>
-                        <span>Vender produtos e baixar estoque</span>
-                    </a>
-                </div>
-            </section>
-
-            <section class="panel margin-top" id="ultimas-vendas">
-                <h2>Últimas vendas</h2>
-
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Nº</th>
-                                <th>Data</th>
-                                <th>Cliente</th>
-                                <th>Pagamento</th>
-                                <th>Total</th>
-                                <th>Lucro</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for venda in ultimas_vendas %}
-                                <tr>
-                                    <td>#{{ venda.id }}</td>
-                                    <td>{{ venda.data_venda|datetime_br }}</td>
-                                    <td>{{ venda.cliente_nome }}</td>
-                                    <td>{{ venda.forma_pagamento }}</td>
-                                    <td>R$ {{ "%.2f"|format(venda.valor_total) }}</td>
-                                    <td>R$ {{ "%.2f"|format(venda.lucro_total) }}</td>
-                                </tr>
-                            {% else %}
-                                <tr>
-                                    <td colspan="6" class="empty-state">
-                                        Nenhuma venda registrada ainda.
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    {% set pagination_endpoint = 'dashboard' %}
-                    {% set pagination_args = {
-                        'page_produtos_atencao': page_produtos_atencao,
-                        'modal': modal_aberto
-                    } %}
-                    {% set pagination_page_param = 'page_ultimas_vendas' %}
-                    {% set pagination_page = page_ultimas_vendas %}
-                    {% set pagination_total_pages = total_paginas_ultimas_vendas %}
-                    {% set pagination_total_records = total_ultimas_vendas %}
-                    {% set pagination_anchor = 'ultimas-vendas' %}
-
-                    {% include 'partials/pagination.html' %}
-                </div>
-            </section>
-
-            <section class="panel margin-top" id="produtos-atencao">
-                <h2>Produtos que precisam de atenção</h2>
-
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Produto</th>
-                                <th>SKU</th>
-                                <th>Estoque atual</th>
-                                <th>Estoque mínimo</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for produto in produtos_alerta %}
-                                {% if produto.estoque_atual == 0 %}
-                                    {% set status = 'Sem estoque' %}
-                                    {% set status_class = 'status-danger' %}
-                                {% else %}
-                                    {% set status = 'Baixo estoque' %}
-                                    {% set status_class = 'status-warning' %}
-                                {% endif %}
-
-                                <tr>
-                                    <td>{{ produto.nome }}</td>
-                                    <td>{{ produto.sku }}</td>
-                                    <td>{{ produto.estoque_atual }}</td>
-                                    <td>{{ produto.estoque_minimo }}</td>
-                                    <td>
-                                        <span class="status-pill {{ status_class }}">
-                                            {{ status }}
-                                        </span>
-                                    </td>
-                                </tr>
-                            {% else %}
-                                <tr>
-                                    <td colspan="5" class="empty-state">
-                                        Nenhum produto em alerta.
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    {% set pagination_endpoint = 'dashboard' %}
-                    {% set pagination_args = {
-                        'page_ultimas_vendas': page_ultimas_vendas,
-                        'modal': modal_aberto
-                    } %}
-                    {% set pagination_page_param = 'page_produtos_atencao' %}
-                    {% set pagination_page = page_produtos_atencao %}
-                    {% set pagination_total_pages = total_paginas_produtos_atencao %}
-                    {% set pagination_total_records = total_produtos_atencao %}
-                    {% set pagination_anchor = 'produtos-atencao' %}
-
-                    {% include 'partials/pagination.html' %}
                 </div>
             </section>
         </main>
-
     </div>
 
     {% set modal_id = 'modal-reativar' %}
@@ -326,6 +414,5 @@
 
     <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}" defer></script>
-
 </body>
 </html>

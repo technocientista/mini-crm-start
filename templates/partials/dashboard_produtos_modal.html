@@ -35,7 +35,7 @@
                             <td>{{ produto.sku or '-' }}</td>
                             <td>{{ produto.estoque_atual }}</td>
                             <td>{{ produto.estoque_minimo }}</td>
-                            <td>R$ {{ "%.2f"|format(produto.preco_venda) }}</td>
+                            <td>{{ produto.preco_venda|moeda_br }}</td>
                             <td>
                                 <div class="table-actions">
                                     <a 

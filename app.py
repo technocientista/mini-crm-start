@@ -29,6 +29,11 @@ def inject_configuracoes():
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE = os.path.join(BASE_DIR, "crm_start.db")
+HISTORICO_IMPORTACOES_PRODUTOS_DIR = os.path.join(
+    BASE_DIR,
+    "exports",
+    "importacoes_produtos"
+)
 
 @app.template_filter("datetime_br")
 def datetime_br(valor):
@@ -79,6 +84,30 @@ def date_br(valor):
     except Exception as erro:
         print(f"Erro ao formatar data: {erro}")
         return valor
+
+
+@app.template_filter("moeda_br")
+def moeda_br(valor):
+    try:
+        numero = float(valor or 0)
+    except (TypeError, ValueError):
+        numero = 0
+
+    formatado = f"{numero:,.2f}"
+    formatado = formatado.replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"R$ {formatado}"
+
+
+@app.template_filter("numero_br")
+def numero_br(valor, casas=1):
+    try:
+        numero = float(valor or 0)
+        casas_decimais = max(0, min(int(casas), 4))
+    except (TypeError, ValueError):
+        numero = 0
+        casas_decimais = 1
+
+    return f"{numero:.{casas_decimais}f}".replace(".", ",")
     
 @app.template_global("whatsapp_link")
 def whatsapp_link(telefone, mensagem):
@@ -1242,64 +1271,25 @@ def dashboard():
         per_page_dashboard
     )
 
-    page_ultimas_vendas = normalizar_pagina(request.args.get("page_ultimas_vendas"))
-    page_produtos_atencao = normalizar_pagina(request.args.get("page_produtos_atencao"))
-
-    offset_ultimas_vendas = (page_ultimas_vendas - 1) * per_page_dashboard
-    offset_produtos_atencao = (page_produtos_atencao - 1) * per_page_dashboard
-
     vendas_hoje = conn.execute("""
-        SELECT COALESCE(SUM(valor_total), 0) AS total
+        SELECT
+            COUNT(*) AS quantidade,
+            COALESCE(SUM(valor_total), 0) AS total,
+            COALESCE(SUM(lucro_total), 0) AS lucro
         FROM vendas
         WHERE date(data_venda) = date('now', 'localtime')
           AND status = 'CONCLUIDA'
     """).fetchone()
 
     faturamento_mes = conn.execute("""
-        SELECT COALESCE(SUM(valor_total), 0) AS total
+        SELECT
+            COUNT(*) AS quantidade,
+            COALESCE(SUM(valor_total), 0) AS total,
+            COALESCE(SUM(lucro_total), 0) AS lucro
         FROM vendas
         WHERE strftime('%Y-%m', data_venda) = strftime('%Y-%m', 'now', 'localtime')
           AND status = 'CONCLUIDA'
     """).fetchone()
-
-    lucro_mes = conn.execute("""
-        SELECT COALESCE(SUM(lucro_total), 0) AS total
-        FROM vendas
-        WHERE strftime('%Y-%m', data_venda) = strftime('%Y-%m', 'now', 'localtime')
-          AND status = 'CONCLUIDA'
-    """).fetchone()
-
-    estoque_baixo = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM produtos
-        WHERE ativo = 1
-          AND estoque_atual > 0
-          AND estoque_atual <= estoque_minimo
-    """).fetchone()
-
-    sem_estoque = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM produtos
-        WHERE ativo = 1
-          AND estoque_atual = 0
-    """).fetchone()
-
-    total_clientes = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM clientes
-        WHERE ativo = 1
-    """).fetchone()
-
-    total_ultimas_vendas = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM vendas
-    """).fetchone()["total"]
-
-    page_ultimas_vendas, total_paginas_ultimas_vendas, offset_ultimas_vendas = calcular_paginacao(
-        total_ultimas_vendas,
-        page_ultimas_vendas,
-        per_page_dashboard
-    )
 
     ultimas_vendas = conn.execute("""
         SELECT
@@ -1310,28 +1300,17 @@ def dashboard():
             v.forma_pagamento,
             v.valor_total,
             v.lucro_total,
-            v.status
+            v.status,
+            (
+                SELECT GROUP_CONCAT(pagamento.forma_pagamento, ' + ')
+                FROM venda_pagamentos pagamento
+                WHERE pagamento.venda_id = v.id
+            ) AS pagamentos_descricao
         FROM vendas v
         LEFT JOIN clientes c ON c.id = v.cliente_id
         ORDER BY v.id DESC
-        LIMIT ? OFFSET ?
-    """, (
-        per_page_dashboard,
-        offset_ultimas_vendas
-    )).fetchall()
-
-    total_produtos_atencao = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM produtos
-        WHERE ativo = 1
-        AND estoque_atual <= estoque_minimo
-    """).fetchone()["total"]
-
-    page_produtos_atencao, total_paginas_produtos_atencao, offset_produtos_atencao = calcular_paginacao(
-        total_produtos_atencao,
-        page_produtos_atencao,
-        per_page_dashboard
-    )
+        LIMIT 5
+    """).fetchall()
 
     produtos_alerta = conn.execute("""
         SELECT
@@ -1346,144 +1325,7 @@ def dashboard():
         WHERE ativo = 1
         AND estoque_atual <= estoque_minimo
         ORDER BY estoque_atual ASC, nome ASC
-        LIMIT ? OFFSET ?
-    """, (
-        per_page_dashboard,
-        offset_produtos_atencao
-    )).fetchall()
-
-    clientes_resumo = conn.execute("""
-        SELECT
-            COUNT(*) AS total_clientes,
-            SUM(CASE WHEN ativo = 1 THEN 1 ELSE 0 END) AS clientes_ativos,
-            SUM(CASE WHEN ativo = 0 THEN 1 ELSE 0 END) AS clientes_inativos
-        FROM clientes
-    """).fetchone()
-
-    clientes_sem_comprar_30 = conn.execute("""
-        SELECT
-            c.id,
-            c.nome,
-            c.telefone,
-            MAX(v.data_venda) AS ultima_compra,
-            COUNT(v.id) AS quantidade_compras,
-            COALESCE(SUM(v.valor_total), 0) AS total_comprado
-        FROM clientes c
-        INNER JOIN vendas v ON v.cliente_id = c.id
-        WHERE c.ativo = 1
-          AND v.status = 'CONCLUIDA'
-        GROUP BY c.id
-        HAVING date(MAX(v.data_venda)) <= date('now', '-30 days')
-        ORDER BY MAX(v.data_venda) ASC
-        LIMIT 10
-    """).fetchall()
-
-    total_clientes_sem_comprar_30 = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM (
-            SELECT
-                c.id,
-                MAX(v.data_venda) AS ultima_compra
-            FROM clientes c
-            INNER JOIN vendas v ON v.cliente_id = c.id
-            WHERE c.ativo = 1
-              AND v.status = 'CONCLUIDA'
-            GROUP BY c.id
-            HAVING date(MAX(v.data_venda)) <= date('now', '-30 days')
-        )
-    """).fetchone()["total"]
-
-    clientes_vip = conn.execute("""
-        SELECT
-            c.id,
-            c.nome,
-            c.telefone,
-            COUNT(v.id) AS quantidade_compras,
-            COALESCE(SUM(v.valor_total), 0) AS total_comprado,
-            MAX(v.data_venda) AS ultima_compra
-        FROM clientes c
-        INNER JOIN vendas v ON v.cliente_id = c.id
-        WHERE c.ativo = 1
-          AND v.status = 'CONCLUIDA'
-        GROUP BY c.id
-        ORDER BY total_comprado DESC
-        LIMIT 10
-    """).fetchall()
-
-    clientes_novos_sem_compra = conn.execute("""
-        SELECT
-            c.id,
-            c.nome,
-            c.telefone,
-            c.created_at
-        FROM clientes c
-        LEFT JOIN vendas v 
-            ON v.cliente_id = c.id
-            AND v.status = 'CONCLUIDA'
-        WHERE c.ativo = 1
-        GROUP BY c.id
-        HAVING COUNT(v.id) = 0
-        ORDER BY c.created_at DESC
-        LIMIT 10
-    """).fetchall()
-
-    total_clientes_novos_sem_compra = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM (
-            SELECT c.id
-            FROM clientes c
-            LEFT JOIN vendas v 
-                ON v.cliente_id = c.id
-                AND v.status = 'CONCLUIDA'
-            WHERE c.ativo = 1
-            GROUP BY c.id
-            HAVING COUNT(v.id) = 0
-        )
-    """).fetchone()["total"]
-
-    clientes_sem_tags = conn.execute("""
-        SELECT
-            c.id,
-            c.nome,
-            c.telefone,
-            c.created_at
-        FROM clientes c
-        LEFT JOIN cliente_tags ct ON ct.cliente_id = c.id
-        WHERE c.ativo = 1
-        GROUP BY c.id
-        HAVING COUNT(ct.id) = 0
-        ORDER BY c.created_at DESC
-        LIMIT 10
-    """).fetchall()
-
-    total_clientes_sem_tags = conn.execute("""
-        SELECT COUNT(*) AS total
-        FROM (
-            SELECT c.id
-            FROM clientes c
-            LEFT JOIN cliente_tags ct ON ct.cliente_id = c.id
-            WHERE c.ativo = 1
-            GROUP BY c.id
-            HAVING COUNT(ct.id) = 0
-        )
-    """).fetchone()["total"]
-
-    clientes_recentes = conn.execute("""
-        SELECT
-            c.id,
-            c.nome,
-            c.telefone,
-            MAX(v.data_venda) AS ultima_compra,
-            COUNT(v.id) AS quantidade_compras,
-            COALESCE(SUM(v.valor_total), 0) AS total_comprado
-        FROM clientes c
-        INNER JOIN vendas v ON v.cliente_id = c.id
-        WHERE c.ativo = 1
-          AND v.status = 'CONCLUIDA'
-          AND date(v.data_venda) >= date('now', '-7 days')
-        GROUP BY c.id
-        ORDER BY MAX(v.data_venda) DESC
-        LIMIT 10
+        LIMIT 5
     """).fetchall()
 
     clientes_reativar = buscar_clientes_dashboard(
@@ -1521,6 +1363,173 @@ def dashboard():
         per_page_dashboard
     )
 
+    hoje_obj = date.today()
+    ontem_obj = hoje_obj - timedelta(days=1)
+    inicio_mes_obj = hoje_obj.replace(day=1)
+    fim_mes_anterior_obj = inicio_mes_obj - timedelta(days=1)
+    inicio_mes_anterior_obj = fim_mes_anterior_obj.replace(day=1)
+    dias_comparacao_mes = min(hoje_obj.day, fim_mes_anterior_obj.day)
+    fim_comparacao_mes_anterior_obj = (
+        inicio_mes_anterior_obj + timedelta(days=dias_comparacao_mes - 1)
+    )
+
+    resumo_ontem = conn.execute("""
+        SELECT
+            COUNT(*) AS quantidade,
+            COALESCE(SUM(valor_total), 0) AS total,
+            COALESCE(SUM(lucro_total), 0) AS lucro
+        FROM vendas
+        WHERE date(data_venda) = date(?)
+          AND status = 'CONCLUIDA'
+    """, (ontem_obj.isoformat(),)).fetchone()
+
+    resumo_mes_anterior = conn.execute("""
+        SELECT
+            COUNT(*) AS quantidade,
+            COALESCE(SUM(valor_total), 0) AS total,
+            COALESCE(SUM(lucro_total), 0) AS lucro
+        FROM vendas
+        WHERE date(data_venda) BETWEEN date(?) AND date(?)
+          AND status = 'CONCLUIDA'
+    """, (
+        inicio_mes_anterior_obj.isoformat(),
+        fim_comparacao_mes_anterior_obj.isoformat(),
+    )).fetchone()
+
+    inicio_serie_obj = hoje_obj - timedelta(days=13)
+    serie_dashboard_rows = conn.execute("""
+        SELECT
+            date(data_venda) AS dia,
+            COALESCE(SUM(valor_total), 0) AS total,
+            COALESCE(SUM(lucro_total), 0) AS lucro
+        FROM vendas
+        WHERE date(data_venda) BETWEEN date(?) AND date(?)
+          AND status = 'CONCLUIDA'
+        GROUP BY date(data_venda)
+        ORDER BY date(data_venda)
+    """, (
+        inicio_serie_obj.isoformat(),
+        hoje_obj.isoformat(),
+    )).fetchall()
+
+    pagamentos_hoje_rows = conn.execute("""
+        SELECT
+            vp.forma_pagamento,
+            COUNT(DISTINCT vp.venda_id) AS quantidade,
+            COALESCE(SUM(vp.valor), 0) AS total
+        FROM venda_pagamentos vp
+        INNER JOIN vendas v ON v.id = vp.venda_id
+        WHERE date(v.data_venda) = date('now', 'localtime')
+          AND v.status = 'CONCLUIDA'
+        GROUP BY vp.forma_pagamento
+        ORDER BY total DESC
+    """).fetchall()
+
+    caixa_aberto_dashboard = obter_caixa_aberto(conn)
+    resumo_caixa_dashboard = (
+        calcular_resumo_caixa(conn, caixa_aberto_dashboard["id"])
+        if caixa_aberto_dashboard
+        else None
+    )
+
+    def calcular_variacao_dashboard(valor_atual, valor_anterior):
+        valor_atual = float(valor_atual or 0)
+        valor_anterior = float(valor_anterior or 0)
+
+        if abs(valor_anterior) <= 0.009:
+            return None if abs(valor_atual) <= 0.009 else 100.0
+
+        return round(((valor_atual - valor_anterior) / abs(valor_anterior)) * 100, 1)
+
+    ticket_medio_hoje = (
+        float(vendas_hoje["total"] or 0) / int(vendas_hoje["quantidade"] or 0)
+        if int(vendas_hoje["quantidade"] or 0) > 0
+        else 0
+    )
+    margem_mes = (
+        float(faturamento_mes["lucro"] or 0)
+        / float(faturamento_mes["total"] or 0)
+        * 100
+        if float(faturamento_mes["total"] or 0) > 0
+        else 0
+    )
+    variacoes_dashboard = {
+        "vendas_hoje": calcular_variacao_dashboard(
+            vendas_hoje["quantidade"],
+            resumo_ontem["quantidade"],
+        ),
+        "faturamento_hoje": calcular_variacao_dashboard(
+            vendas_hoje["total"],
+            resumo_ontem["total"],
+        ),
+        "faturamento_mes": calcular_variacao_dashboard(
+            faturamento_mes["total"],
+            resumo_mes_anterior["total"],
+        ),
+        "lucro_mes": calcular_variacao_dashboard(
+            faturamento_mes["lucro"],
+            resumo_mes_anterior["lucro"],
+        ),
+    }
+
+    serie_por_dia = {
+        row["dia"]: {
+            "total": float(row["total"] or 0),
+            "lucro": float(row["lucro"] or 0),
+        }
+        for row in serie_dashboard_rows
+    }
+    serie_dashboard = []
+
+    for deslocamento in range(14):
+        dia_obj = inicio_serie_obj + timedelta(days=deslocamento)
+        valores = serie_por_dia.get(dia_obj.isoformat(), {})
+        serie_dashboard.append({
+            "label": dia_obj.strftime("%d/%m"),
+            "total": valores.get("total", 0),
+            "lucro": valores.get("lucro", 0),
+        })
+
+    maior_valor_dashboard = max(
+        [
+            max(item["total"], item["lucro"], 0)
+            for item in serie_dashboard
+        ]
+        or [0]
+    )
+
+    for item in serie_dashboard:
+        if maior_valor_dashboard > 0:
+            item["altura_total"] = (
+                max(4, round(item["total"] / maior_valor_dashboard * 100, 2))
+                if item["total"] > 0
+                else 0
+            )
+            item["altura_lucro"] = (
+                max(4, round(max(item["lucro"], 0) / maior_valor_dashboard * 100, 2))
+                if item["lucro"] > 0
+                else 0
+            )
+        else:
+            item["altura_total"] = 0
+            item["altura_lucro"] = 0
+
+    total_pagamentos_hoje = sum(
+        float(item["total"] or 0)
+        for item in pagamentos_hoje_rows
+    )
+    pagamentos_hoje = [
+        {
+            **dict(item),
+            "percentual": (
+                round(float(item["total"] or 0) / total_pagamentos_hoje * 100, 1)
+                if total_pagamentos_hoje > 0
+                else 0
+            ),
+        }
+        for item in pagamentos_hoje_rows
+    ]
+
     modal_aberto = request.args.get("modal", "")
 
     conn.close()
@@ -1529,36 +1538,26 @@ def dashboard():
         "dashboard.html",
         usuario_nome=session.get("usuario_nome"),
         vendas_hoje=vendas_hoje["total"],
+        quantidade_vendas_hoje=vendas_hoje["quantidade"],
+        ticket_medio_hoje=ticket_medio_hoje,
         faturamento_mes=faturamento_mes["total"],
-        lucro_mes=lucro_mes["total"],
-        estoque_baixo=estoque_baixo["total"],
-        sem_estoque=sem_estoque["total"],
-        total_clientes=total_clientes["total"],
+        lucro_mes=faturamento_mes["lucro"],
+        margem_mes=margem_mes,
+        variacoes_dashboard=variacoes_dashboard,
+        serie_dashboard=serie_dashboard,
+        pagamentos_hoje=pagamentos_hoje,
+        caixa_aberto_dashboard=caixa_aberto_dashboard,
+        resumo_caixa_dashboard=resumo_caixa_dashboard,
         ultimas_vendas=ultimas_vendas,
         produtos_alerta=produtos_alerta,
-        clientes_resumo=clientes_resumo,
-        clientes_sem_comprar_30=clientes_sem_comprar_30,
-        total_clientes_sem_comprar_30=total_clientes_sem_comprar_30,
-        clientes_vip=clientes_vip,
-        clientes_novos_sem_compra=clientes_novos_sem_compra,
-        total_clientes_novos_sem_compra=total_clientes_novos_sem_compra,
-        clientes_sem_tags=clientes_sem_tags,
-        total_clientes_sem_tags=total_clientes_sem_tags,
-        clientes_recentes=clientes_recentes,
         clientes_reativar=clientes_reativar,
         clientes_vip_dashboard=clientes_vip_dashboard,
         clientes_sem_compra_dashboard=clientes_sem_compra_dashboard,
         clientes_sem_tags_dashboard=clientes_sem_tags_dashboard,
         clientes_recentes_30_dashboard=clientes_recentes_30_dashboard,
         modal_aberto=modal_aberto,
-        page_ultimas_vendas=page_ultimas_vendas,
-        total_paginas_ultimas_vendas=total_paginas_ultimas_vendas,
-        total_ultimas_vendas=total_ultimas_vendas,
-        page_produtos_atencao=page_produtos_atencao,
-        total_paginas_produtos_atencao=total_paginas_produtos_atencao,
         produtos_baixo_dashboard=produtos_baixo_dashboard,
-        produtos_sem_dashboard=produtos_sem_dashboard,  
-        total_produtos_atencao=total_produtos_atencao
+        produtos_sem_dashboard=produtos_sem_dashboard
     )
 
 @app.route("/clientes", methods=["GET", "POST"])
@@ -1646,6 +1645,22 @@ def clientes():
 
     where_sql = " AND ".join(where_clauses)
 
+    resumo_clientes = conn.execute("""
+        SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN ativo = 1 THEN 1 ELSE 0 END) AS ativos,
+            SUM(CASE WHEN ativo = 0 THEN 1 ELSE 0 END) AS inativos,
+            SUM(
+                CASE
+                    WHEN ativo = 1
+                     AND date(created_at) >= date('now', 'localtime', '-30 days')
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS novos_30_dias
+        FROM clientes
+    """).fetchone()
+
     total_registros = conn.execute(f"""
         SELECT COUNT(DISTINCT c.id) AS total
         FROM clientes c
@@ -1671,9 +1686,23 @@ def clientes():
             c.observacoes,
             c.ativo,
             c.created_at,
-            GROUP_CONCAT(ct.tag, ', ') AS tags
+            GROUP_CONCAT(DISTINCT ct.tag) AS tags,
+            COALESCE(rv.quantidade_compras, 0) AS quantidade_compras,
+            COALESCE(rv.total_comprado, 0) AS total_comprado,
+            rv.ultima_compra
         FROM clientes c
         LEFT JOIN cliente_tags ct ON ct.cliente_id = c.id
+        LEFT JOIN (
+            SELECT
+                cliente_id,
+                COUNT(*) AS quantidade_compras,
+                COALESCE(SUM(valor_total), 0) AS total_comprado,
+                MAX(data_venda) AS ultima_compra
+            FROM vendas
+            WHERE status = 'CONCLUIDA'
+              AND cliente_id IS NOT NULL
+            GROUP BY cliente_id
+        ) rv ON rv.cliente_id = c.id
         WHERE {where_sql}
         GROUP BY c.id
         ORDER BY c.nome ASC
@@ -1690,6 +1719,7 @@ def clientes():
         page=page,
         total_paginas=total_paginas,
         total_registros=total_registros,
+        resumo_clientes=resumo_clientes,
         usuario=usuario_logado()
     )
 
@@ -1895,6 +1925,20 @@ def cliente_detalhe(cliente_id):
           AND status = 'CONCLUIDA'
     """, (cliente_id,)).fetchone()
 
+    quantidade_compras = int(resumo["quantidade_compras"] or 0)
+    total_comprado = float(resumo["total_comprado"] or 0)
+    lucro_gerado = float(resumo["lucro_gerado"] or 0)
+    ticket_medio = (
+        total_comprado / quantidade_compras
+        if quantidade_compras > 0
+        else 0
+    )
+    margem_cliente = (
+        lucro_gerado / total_comprado * 100
+        if total_comprado > 0
+        else 0
+    )
+
     vendas = conn.execute("""
         SELECT
             id,
@@ -1906,7 +1950,12 @@ def cliente_detalhe(cliente_id):
             custo_total,
             lucro_total,
             observacoes,
-            status
+            status,
+            (
+                SELECT GROUP_CONCAT(vp.forma_pagamento, ' + ')
+                FROM venda_pagamentos vp
+                WHERE vp.venda_id = vendas.id
+            ) AS pagamentos_descricao
         FROM vendas
         WHERE cliente_id = ?
         ORDER BY data_venda DESC
@@ -1923,6 +1972,7 @@ def cliente_detalhe(cliente_id):
         INNER JOIN vendas v ON v.id = vi.venda_id
         INNER JOIN produtos p ON p.id = vi.produto_id
         WHERE v.cliente_id = ?
+          AND v.status = 'CONCLUIDA'
         GROUP BY p.id
         ORDER BY quantidade_total DESC, total_gasto DESC
     """, (cliente_id,)).fetchall()
@@ -1936,9 +1986,15 @@ def cliente_detalhe(cliente_id):
         INNER JOIN vendas v ON v.id = vi.venda_id
         INNER JOIN produtos p ON p.id = vi.produto_id
         WHERE v.cliente_id = ?
+          AND v.status = 'CONCLUIDA'
         GROUP BY p.categoria
         ORDER BY quantidade_total DESC, total_gasto DESC
     """, (cliente_id,)).fetchall()
+
+    total_categorias = sum(
+        float(categoria["total_gasto"] or 0)
+        for categoria in categorias_preferidas
+    )
 
     modelos_whatsapp = conn.execute("""
         SELECT
@@ -1957,9 +2013,12 @@ def cliente_detalhe(cliente_id):
         cliente=cliente,
         tags=tags,
         resumo=resumo,
+        ticket_medio=ticket_medio,
+        margem_cliente=margem_cliente,
         vendas=vendas,
         produtos_comprados=produtos_comprados,
         categorias_preferidas=categorias_preferidas,
+        total_categorias=total_categorias,
         modelos_whatsapp=modelos_whatsapp,
         usuario=usuario_logado()
     )
@@ -1978,7 +2037,8 @@ def cliente_editar(cliente_id):
             nome,
             telefone,
             endereco_completo,
-            observacoes
+            observacoes,
+            created_at
         FROM clientes
         WHERE id = ? AND ativo = 1
     """, (cliente_id,)).fetchone()
@@ -2047,6 +2107,7 @@ def cliente_editar(cliente_id):
     """, (cliente_id,)).fetchall()
 
     tags_texto = ", ".join([tag["tag"] for tag in tags])
+    quantidade_tags = len(tags)
 
     conn.close()
 
@@ -2054,6 +2115,7 @@ def cliente_editar(cliente_id):
         "cliente_editar.html",
         cliente=cliente,
         tags_texto=tags_texto,
+        quantidade_tags=quantidade_tags,
         usuario=usuario_logado()
     )
 
@@ -2524,6 +2586,43 @@ def produtos():
 
     where_sql = " AND ".join(where_clauses)
 
+    resumo_produtos = conn.execute("""
+        SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN ativo = 1 THEN 1 ELSE 0 END) AS ativos,
+            SUM(
+                CASE
+                    WHEN ativo = 1
+                    THEN estoque_atual
+                    ELSE 0
+                END
+            ) AS unidades_estoque,
+            SUM(
+                CASE
+                    WHEN ativo = 1
+                     AND estoque_atual > 0
+                     AND estoque_atual <= estoque_minimo
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS estoque_baixo,
+            SUM(
+                CASE
+                    WHEN ativo = 1 AND estoque_atual = 0
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS sem_estoque,
+            SUM(
+                CASE
+                    WHEN ativo = 1
+                    THEN estoque_atual * preco_custo
+                    ELSE 0
+                END
+            ) AS valor_estoque
+        FROM produtos
+    """).fetchone()
+
     total_registros = conn.execute(f"""
         SELECT COUNT(*) AS total
         FROM produtos
@@ -2568,6 +2667,7 @@ def produtos():
         page=page,
         total_paginas=total_paginas,
         total_registros=total_registros,
+        resumo_produtos=resumo_produtos,
         usuario=usuario_logado()
     )
 
@@ -2598,6 +2698,7 @@ def gerar_planilha_produtos_ignorados(registros_ignorados, importados, atualizad
         "Marca",
         "Preço custo",
         "Preço venda",
+        "Tipo de atualização",
         "Estoque atual",
         "Estoque mínimo",
         "Motivo"
@@ -2612,6 +2713,7 @@ def gerar_planilha_produtos_ignorados(registros_ignorados, importados, atualizad
             item.get("marca"),
             item.get("preco_custo"),
             item.get("preco_venda"),
+            item.get("tipo_atualizacao"),
             item.get("estoque_atual"),
             item.get("estoque_minimo"),
             item.get("motivo")
@@ -2630,6 +2732,104 @@ def gerar_planilha_produtos_ignorados(registros_ignorados, importados, atualizad
     wb.save(caminho_arquivo)
 
     return caminho_arquivo, nome_arquivo
+
+
+def gerar_historico_importacao_produtos(nome_arquivo_origem, registros):
+    os.makedirs(HISTORICO_IMPORTACOES_PRODUTOS_DIR, exist_ok=True)
+
+    data_importacao = datetime.now(timezone.utc)
+    nome_historico = (
+        f"importacao_produtos_{data_importacao.strftime('%Y%m%d_%H%M%S_%f')}.csv"
+    )
+    caminho_historico = os.path.join(
+        HISTORICO_IMPORTACOES_PRODUTOS_DIR,
+        nome_historico
+    )
+
+    campos = [
+        "data_importacao",
+        "usuario",
+        "arquivo_origem",
+        "linha",
+        "nome",
+        "sku",
+        "tipo_atualizacao",
+        "quantidade_informada",
+        "estoque_anterior",
+        "estoque_final",
+        "resultado",
+        "motivo"
+    ]
+
+    if not registros:
+        registros = [{
+            "linha": "",
+            "nome": "",
+            "sku": "",
+            "tipo_atualizacao": "",
+            "quantidade_informada": "",
+            "estoque_anterior": "",
+            "estoque_final": "",
+            "resultado": "SEM_REGISTROS",
+            "motivo": "O arquivo não continha linhas de produtos."
+        }]
+
+    with open(caminho_historico, "w", newline="", encoding="utf-8-sig") as arquivo_csv:
+        writer = csv.DictWriter(arquivo_csv, fieldnames=campos, delimiter=";")
+        writer.writeheader()
+
+        for registro in registros:
+            writer.writerow({
+                "data_importacao": data_importacao.strftime("%Y-%m-%d %H:%M:%S"),
+                "usuario": session.get("usuario_nome") or "-",
+                "arquivo_origem": nome_arquivo_origem,
+                "linha": registro.get("linha", ""),
+                "nome": registro.get("nome", ""),
+                "sku": registro.get("sku", ""),
+                "tipo_atualizacao": registro.get("tipo_atualizacao", ""),
+                "quantidade_informada": registro.get("quantidade_informada", ""),
+                "estoque_anterior": registro.get("estoque_anterior", ""),
+                "estoque_final": registro.get("estoque_final", ""),
+                "resultado": registro.get("resultado", ""),
+                "motivo": registro.get("motivo", "")
+            })
+
+    return caminho_historico, nome_historico
+
+
+def ler_resumo_historico_importacao_produtos(caminho_arquivo):
+    resumo = {
+        "data_importacao": "",
+        "usuario": "-",
+        "arquivo_origem": "-",
+        "novos": 0,
+        "atualizados": 0,
+        "ignorados": 0,
+        "total": 0
+    }
+
+    with open(caminho_arquivo, "r", newline="", encoding="utf-8-sig") as arquivo_csv:
+        reader = csv.DictReader(arquivo_csv, delimiter=";")
+
+        for registro in reader:
+            if not resumo["data_importacao"]:
+                resumo["data_importacao"] = registro.get("data_importacao", "")
+                resumo["usuario"] = registro.get("usuario", "-") or "-"
+                resumo["arquivo_origem"] = registro.get("arquivo_origem", "-") or "-"
+
+            resultado = (registro.get("resultado") or "").upper()
+
+            if resultado == "NOVO":
+                resumo["novos"] += 1
+                resumo["total"] += 1
+            elif resultado == "ATUALIZADO":
+                resumo["atualizados"] += 1
+                resumo["total"] += 1
+            elif resultado == "IGNORADO":
+                resumo["ignorados"] += 1
+                resumo["total"] += 1
+
+    return resumo
 
 @app.route("/produtos/importar", methods=["POST"])
 @admin_required
@@ -2652,8 +2852,23 @@ def importar_produtos():
     importados = 0
     atualizados = 0
     registros_ignorados = []
+    registros_historico = []
 
-    def registrar_ignorado(numero_linha, nome, categoria, marca, sku, preco_custo, preco_venda, estoque_atual, estoque_minimo, motivo):
+    def registrar_ignorado(
+        numero_linha,
+        nome,
+        categoria,
+        marca,
+        sku,
+        preco_custo,
+        preco_venda,
+        tipo_atualizacao,
+        estoque_atual,
+        estoque_minimo,
+        motivo,
+        estoque_anterior="",
+        estoque_final=""
+    ):
         registros_ignorados.append({
             "linha": numero_linha,
             "nome": nome,
@@ -2662,8 +2877,20 @@ def importar_produtos():
             "sku": sku,
             "preco_custo": preco_custo,
             "preco_venda": preco_venda,
+            "tipo_atualizacao": tipo_atualizacao,
             "estoque_atual": estoque_atual,
             "estoque_minimo": estoque_minimo,
+            "motivo": motivo
+        })
+        registros_historico.append({
+            "linha": numero_linha,
+            "nome": nome,
+            "sku": sku,
+            "tipo_atualizacao": tipo_atualizacao,
+            "quantidade_informada": estoque_atual,
+            "estoque_anterior": estoque_anterior,
+            "estoque_final": estoque_final,
+            "resultado": "IGNORADO",
             "motivo": motivo
         })
 
@@ -2676,6 +2903,16 @@ def importar_produtos():
         preco_venda = converter_float(get_valor(linha, "preco_venda", "preço_venda", "venda"))
         estoque_atual = converter_int(get_valor(linha, "estoque_atual", "estoque", "quantidade"))
         estoque_minimo = converter_int(get_valor(linha, "estoque_minimo", "estoque_mínimo", "minimo", "mínimo"))
+        tipo_atualizacao = get_valor(
+            linha,
+            "tipo_atualizacao",
+            "tipo_atualização",
+            "operacao",
+            "operação"
+        ).strip().upper()
+
+        if not tipo_atualizacao:
+            tipo_atualizacao = "SUBSTITUIR"
 
         motivos = []
 
@@ -2684,6 +2921,12 @@ def importar_produtos():
 
         if not sku:
             motivos.append("SKU/código do produto não informado")
+
+        if tipo_atualizacao not in ("SUBSTITUIR", "INCREMENTAR"):
+            motivos.append("Tipo de atualização deve ser SUBSTITUIR ou INCREMENTAR")
+
+        if estoque_atual < 0:
+            motivos.append("A quantidade informada não pode ser negativa")
 
         # Categoria e marca não são obrigatórias na importação.
         if motivos:
@@ -2695,6 +2938,7 @@ def importar_produtos():
                 sku,
                 preco_custo,
                 preco_venda,
+                tipo_atualizacao,
                 estoque_atual,
                 estoque_minimo,
                 "; ".join(motivos)
@@ -2702,6 +2946,8 @@ def importar_produtos():
             continue
 
         try:
+            cursor.execute(f"SAVEPOINT importacao_produto_{numero_linha}")
+
             produto_existente = cursor.execute("""
                 SELECT id, estoque_atual
                 FROM produtos
@@ -2712,6 +2958,11 @@ def importar_produtos():
             if produto_existente:
                 produto_id = produto_existente["id"]
                 estoque_anterior = produto_existente["estoque_atual"]
+                estoque_final = (
+                    estoque_anterior + estoque_atual
+                    if tipo_atualizacao == "INCREMENTAR"
+                    else estoque_atual
+                )
 
                 cursor.execute("""
                     UPDATE produtos
@@ -2732,15 +2983,18 @@ def importar_produtos():
                     marca,
                     preco_custo,
                     preco_venda,
-                    estoque_atual,
+                    estoque_final,
                     estoque_minimo,
                     produto_id
                 ))
 
-                if estoque_anterior != estoque_atual:
-                    diferenca = estoque_atual - estoque_anterior
+                if estoque_anterior != estoque_final:
+                    diferenca = estoque_final - estoque_anterior
 
-                    if diferenca > 0:
+                    if tipo_atualizacao == "INCREMENTAR":
+                        tipo = "IMPORTACAO_INCREMENTO_ENTRADA"
+                        quantidade = estoque_atual
+                    elif diferenca > 0:
                         tipo = "IMPORTACAO_AJUSTE_ENTRADA"
                         quantidade = diferenca
                     else:
@@ -2761,13 +3015,17 @@ def importar_produtos():
                         tipo,
                         quantidade,
                         estoque_anterior,
-                        estoque_atual,
-                        "Ajuste por importação de planilha"
+                        estoque_final,
+                        f"{tipo_atualizacao.title()} por importação de planilha"
                     ))
 
                 atualizados += 1
+                resultado = "ATUALIZADO"
 
             else:
+                estoque_anterior = 0
+                estoque_final = estoque_atual
+
                 cursor.execute("""
                     INSERT INTO produtos (
                         nome,
@@ -2787,7 +3045,7 @@ def importar_produtos():
                     sku,
                     preco_custo,
                     preco_venda,
-                    estoque_atual,
+                    estoque_final,
                     estoque_minimo
                 ))
 
@@ -2805,15 +3063,36 @@ def importar_produtos():
                 """, (
                     produto_id,
                     "IMPORTACAO_ENTRADA_INICIAL",
-                    estoque_atual,
+                    estoque_final,
                     0,
-                    estoque_atual,
+                    estoque_final,
                     "Estoque inicial por importação de planilha"
                 ))
 
                 importados += 1
+                resultado = "NOVO"
+
+            cursor.execute(f"RELEASE SAVEPOINT importacao_produto_{numero_linha}")
+
+            registros_historico.append({
+                "linha": numero_linha,
+                "nome": nome,
+                "sku": sku,
+                "tipo_atualizacao": tipo_atualizacao,
+                "quantidade_informada": estoque_atual,
+                "estoque_anterior": estoque_anterior,
+                "estoque_final": estoque_final,
+                "resultado": resultado,
+                "motivo": ""
+            })
 
         except Exception as erro:
+            try:
+                cursor.execute(f"ROLLBACK TO SAVEPOINT importacao_produto_{numero_linha}")
+                cursor.execute(f"RELEASE SAVEPOINT importacao_produto_{numero_linha}")
+            except sqlite3.Error:
+                pass
+
             registrar_ignorado(
                 numero_linha,
                 nome,
@@ -2822,6 +3101,7 @@ def importar_produtos():
                 sku,
                 preco_custo,
                 preco_venda,
+                tipo_atualizacao,
                 estoque_atual,
                 estoque_minimo,
                 f"Erro ao importar linha: {erro}"
@@ -2831,7 +3111,22 @@ def importar_produtos():
     conn.commit()
     conn.close()
 
+    caminho_historico, nome_historico = gerar_historico_importacao_produtos(
+        secure_filename(arquivo.filename),
+        registros_historico
+    )
+
     ignorados = len(registros_ignorados)
+
+    registrar_log(
+        "PRODUTOS_IMPORTADOS",
+        "produtos",
+        descricao=(
+            f"Arquivo {secure_filename(arquivo.filename)}. "
+            f"Novos: {importados}. Atualizados: {atualizados}. "
+            f"Ignorados: {ignorados}. Histórico: {nome_historico}."
+        )
+    )
 
     if ignorados > 0:
         caminho_arquivo, nome_arquivo = gerar_planilha_produtos_ignorados(
@@ -2848,6 +3143,88 @@ def importar_produtos():
 
     flash(f"Importação concluída. Novos: {importados}. Atualizados: {atualizados}. Ignorados: {ignorados}.")
     return redirect(url_for("produtos"))
+
+
+@app.route("/produtos/importacoes")
+@admin_required
+def historico_importacoes_produtos():
+    busca = request.args.get("busca", "").strip().lower()
+    page = normalizar_pagina(request.args.get("page", 1))
+    per_page = 20
+    historico = []
+
+    os.makedirs(HISTORICO_IMPORTACOES_PRODUTOS_DIR, exist_ok=True)
+
+    for nome_arquivo in os.listdir(HISTORICO_IMPORTACOES_PRODUTOS_DIR):
+        if not nome_arquivo.lower().endswith(".csv"):
+            continue
+
+        caminho_arquivo = os.path.join(
+            HISTORICO_IMPORTACOES_PRODUTOS_DIR,
+            nome_arquivo
+        )
+
+        try:
+            resumo = ler_resumo_historico_importacao_produtos(caminho_arquivo)
+            resumo["nome_arquivo"] = nome_arquivo
+
+            texto_busca = (
+                f"{resumo['arquivo_origem']} {resumo['usuario']} {nome_arquivo}"
+            ).lower()
+
+            if not busca or busca in texto_busca:
+                historico.append(resumo)
+        except (OSError, csv.Error, UnicodeError):
+            continue
+
+    historico.sort(
+        key=lambda item: (item["data_importacao"], item["nome_arquivo"]),
+        reverse=True
+    )
+
+    total_registros = len(historico)
+    page, total_paginas, offset = calcular_paginacao(
+        total_registros,
+        page,
+        per_page
+    )
+    historico = historico[offset:offset + per_page]
+
+    return render_template(
+        "historico_importacoes_produtos.html",
+        historico=historico,
+        busca=request.args.get("busca", "").strip(),
+        page=page,
+        total_paginas=total_paginas,
+        total_registros=total_registros,
+        usuario=usuario_logado()
+    )
+
+
+@app.route("/produtos/importacoes/<path:nome_arquivo>/baixar")
+@admin_required
+def baixar_historico_importacao_produtos(nome_arquivo):
+    nome_seguro = secure_filename(nome_arquivo)
+
+    if nome_seguro != nome_arquivo or not nome_seguro.lower().endswith(".csv"):
+        flash("Arquivo de histórico inválido.")
+        return redirect(url_for("historico_importacoes_produtos"))
+
+    caminho_arquivo = os.path.join(
+        HISTORICO_IMPORTACOES_PRODUTOS_DIR,
+        nome_seguro
+    )
+
+    if not os.path.isfile(caminho_arquivo):
+        flash("Histórico de importação não encontrado.")
+        return redirect(url_for("historico_importacoes_produtos"))
+
+    return send_file(
+        caminho_arquivo,
+        as_attachment=True,
+        download_name=nome_seguro,
+        mimetype="text/csv"
+    )
 
 
 @app.route("/produtos/exportar")
@@ -2938,6 +3315,7 @@ def baixar_modelo_produtos():
         "sku",
         "preco_custo",
         "preco_venda",
+        "tipo_atualizacao",
         "estoque_atual",
         "estoque_minimo"
     ])
@@ -2949,6 +3327,7 @@ def baixar_modelo_produtos():
         "CAR-20W-TC",
         35,
         69.90,
+        "SUBSTITUIR",
         10,
         3
     ])
@@ -2960,6 +3339,7 @@ def baixar_modelo_produtos():
         "CAB-USBC-1M",
         8,
         19.90,
+        "INCREMENTAR",
         20,
         5
     ])
@@ -2999,7 +3379,8 @@ def produto_editar(produto_id):
             preco_custo,
             preco_venda,
             estoque_atual,
-            estoque_minimo
+            estoque_minimo,
+            created_at
         FROM produtos
         WHERE id = ? AND ativo = 1
     """, (produto_id,)).fetchone()
@@ -3053,9 +3434,23 @@ def produto_editar(produto_id):
             flash("Erro: já existe outro produto com este SKU/código.")
             return redirect(url_for("produto_editar", produto_id=produto_id))
 
+    lucro_unitario = float(produto["preco_venda"] or 0) - float(produto["preco_custo"] or 0)
+    margem_produto = (
+        lucro_unitario / float(produto["preco_custo"] or 0) * 100
+        if float(produto["preco_custo"] or 0) > 0
+        else 0
+    )
+    valor_estoque = float(produto["estoque_atual"] or 0) * float(produto["preco_custo"] or 0)
+
     conn.close()
 
-    return render_template("produto_editar.html", produto=produto)
+    return render_template(
+        "produto_editar.html",
+        produto=produto,
+        lucro_unitario=lucro_unitario,
+        margem_produto=margem_produto,
+        valor_estoque=valor_estoque
+    )
 
 @app.route("/produtos/<int:produto_id>/inativar", methods=["POST"])
 @admin_required
@@ -3590,14 +3985,12 @@ def vendas():
         return redirect(url_for("login"))
 
     conn = get_db_connection()
+    caixa_aberto = obter_caixa_aberto(conn)
 
-    if request.method == "GET":
-        caixa_aberto = obter_caixa_aberto(conn)
-
-        if not caixa_aberto:
-            conn.close()
-            flash("Abra o caixa antes de registrar vendas.")
-            return redirect(url_for("caixa"))
+    if request.method == "POST" and not caixa_aberto:
+        conn.close()
+        flash("Abra o caixa antes de registrar uma venda.")
+        return redirect(url_for("vendas"))
 
     if request.method == "POST":
         cliente_id = request.form.get("cliente_id")
@@ -3881,7 +4274,11 @@ def vendas():
         )
         conn.close()
 
-        return redirect(url_for("venda_recibo_termico", venda_id=venda_id))
+        return redirect(url_for(
+            "venda_recibo_termico",
+            venda_id=venda_id,
+            auto=1
+        ))
 
     vendedores = conn.execute("""
         SELECT id, nome, email
@@ -3984,6 +4381,8 @@ def vendas():
         page=page,
         total_paginas=total_paginas,
         total_registros=total_registros,
+        caixa_aberto=caixa_aberto,
+        pdv_bloqueado=not caixa_aberto,
         usuario=usuario_logado()
     )
 
@@ -4557,6 +4956,15 @@ def venda_recibo_termico(venda_id):
         ORDER BY vi.id ASC
     """, (venda_id,)).fetchall()
 
+    pagamentos = conn.execute("""
+        SELECT
+            forma_pagamento,
+            valor
+        FROM venda_pagamentos
+        WHERE venda_id = ?
+        ORDER BY id ASC
+    """, (venda_id,)).fetchall()
+
     config = conn.execute("""
         SELECT
             nome_loja,
@@ -4569,13 +4977,25 @@ def venda_recibo_termico(venda_id):
         WHERE id = 1
     """).fetchone()
 
+    total_itens = sum(float(item["subtotal"] or 0) for item in itens)
+    quantidade_itens = sum(int(item["quantidade"] or 0) for item in itens)
+    total_pagamentos = sum(float(pagamento["valor"] or 0) for pagamento in pagamentos)
+    troco = max(total_pagamentos - float(venda["valor_total"] or 0), 0)
+    auto_impressao = request.args.get("auto") == "1"
+
     conn.close()
 
     return render_template(
         "recibo_termico.html",
         venda=venda,
         itens=itens,
-        config=config
+        pagamentos=pagamentos,
+        config=config,
+        total_itens=total_itens,
+        quantidade_itens=quantidade_itens,
+        troco=troco,
+        auto_impressao=auto_impressao,
+        retorno_url=url_for("vendas")
     )
 
 @app.route("/vendas/<int:venda_id>/cancelar", methods=["POST"])
@@ -4951,6 +5371,51 @@ def relatorios():
     if not data_fim:
         data_fim = hoje
 
+    try:
+        data_inicio_obj = date.fromisoformat(data_inicio)
+        data_fim_obj = date.fromisoformat(data_fim)
+    except (TypeError, ValueError):
+        data_inicio_obj = date.today()
+        data_fim_obj = date.today()
+
+    if data_inicio_obj > data_fim_obj:
+        data_inicio_obj, data_fim_obj = data_fim_obj, data_inicio_obj
+
+    data_inicio = data_inicio_obj.isoformat()
+    data_fim = data_fim_obj.isoformat()
+
+    quantidade_dias_periodo = (data_fim_obj - data_inicio_obj).days + 1
+    data_fim_anterior_obj = data_inicio_obj - timedelta(days=1)
+    data_inicio_anterior_obj = data_fim_anterior_obj - timedelta(days=quantidade_dias_periodo - 1)
+
+    atalhos_periodo = [
+        {
+            "label": "Hoje",
+            "inicio": date.today().isoformat(),
+            "fim": date.today().isoformat(),
+        },
+        {
+            "label": "7 dias",
+            "inicio": (date.today() - timedelta(days=6)).isoformat(),
+            "fim": date.today().isoformat(),
+        },
+        {
+            "label": "30 dias",
+            "inicio": (date.today() - timedelta(days=29)).isoformat(),
+            "fim": date.today().isoformat(),
+        },
+        {
+            "label": "Este mês",
+            "inicio": date.today().replace(day=1).isoformat(),
+            "fim": date.today().isoformat(),
+        },
+    ]
+
+    periodo_anterior_label = (
+        f"{data_inicio_anterior_obj.strftime('%d/%m/%Y')} a "
+        f"{data_fim_anterior_obj.strftime('%d/%m/%Y')}"
+    )
+
     page = int(request.args.get("page", 1))
     per_page = 10
 
@@ -4975,7 +5440,14 @@ def relatorios():
         params.append(cliente_id)
 
     if forma_pagamento:
-        where_clauses.append("v.forma_pagamento = ?")
+        where_clauses.append("""
+            EXISTS (
+                SELECT 1
+                FROM venda_pagamentos vp_filtro
+                WHERE vp_filtro.venda_id = v.id
+                  AND vp_filtro.forma_pagamento = ?
+            )
+        """)
         params.append(forma_pagamento)
 
     where_sql = " AND ".join(where_clauses)
@@ -5009,7 +5481,12 @@ def relatorios():
             v.custo_total,
             v.lucro_total,
             v.desconto_total,
-            v.status
+            v.status,
+            (
+                SELECT GROUP_CONCAT(pagamento.forma_pagamento, ' + ')
+                FROM venda_pagamentos pagamento
+                WHERE pagamento.venda_id = v.id
+            ) AS pagamentos_descricao
         FROM vendas v
         LEFT JOIN clientes c ON c.id = v.cliente_id
         WHERE {where_sql}
@@ -5028,14 +5505,43 @@ def relatorios():
         WHERE {where_sql}
     """, params).fetchone()
 
-    formas_pagamento = conn.execute(f"""
+    params_periodo_anterior = [
+        data_inicio_anterior_obj.isoformat(),
+        data_fim_anterior_obj.isoformat(),
+        *params[2:],
+    ]
+
+    resumo_periodo_anterior = conn.execute(f"""
         SELECT
-            v.forma_pagamento,
-            COUNT(*) AS quantidade,
-            COALESCE(SUM(v.valor_total), 0) AS total
+            COUNT(*) AS quantidade_vendas,
+            COALESCE(SUM(v.valor_total), 0) AS total_vendido,
+            COALESCE(SUM(v.custo_total), 0) AS total_custo,
+            COALESCE(SUM(v.lucro_total), 0) AS total_lucro,
+            COALESCE(SUM(v.desconto_total), 0) AS total_desconto
         FROM vendas v
         WHERE {where_sql}
-        GROUP BY v.forma_pagamento
+    """, params_periodo_anterior).fetchone()
+
+    serie_diaria_rows = conn.execute(f"""
+        SELECT
+            date(v.data_venda) AS dia,
+            COALESCE(SUM(v.valor_total), 0) AS total_vendido,
+            COALESCE(SUM(v.lucro_total), 0) AS total_lucro
+        FROM vendas v
+        WHERE {where_sql}
+        GROUP BY date(v.data_venda)
+        ORDER BY date(v.data_venda)
+    """, params).fetchall()
+
+    formas_pagamento_rows = conn.execute(f"""
+        SELECT
+            vp.forma_pagamento,
+            COUNT(DISTINCT vp.venda_id) AS quantidade,
+            COALESCE(SUM(vp.valor), 0) AS total
+        FROM venda_pagamentos vp
+        INNER JOIN vendas v ON v.id = vp.venda_id
+        WHERE {where_sql}
+        GROUP BY vp.forma_pagamento
         ORDER BY total DESC
     """, params).fetchall()
 
@@ -5084,7 +5590,14 @@ def relatorios():
         params_canceladas.append(cliente_id)
 
     if forma_pagamento:
-        where_canceladas_clauses.append("v.forma_pagamento = ?")
+        where_canceladas_clauses.append("""
+            EXISTS (
+                SELECT 1
+                FROM venda_pagamentos vp_filtro
+                WHERE vp_filtro.venda_id = v.id
+                  AND vp_filtro.forma_pagamento = ?
+            )
+        """)
         params_canceladas.append(forma_pagamento)
 
     where_canceladas_sql = " AND ".join(where_canceladas_clauses)
@@ -5135,7 +5648,7 @@ def relatorios():
 
     formas_pagamento_opcoes = conn.execute("""
         SELECT DISTINCT forma_pagamento
-        FROM vendas
+        FROM venda_pagamentos
         WHERE forma_pagamento IS NOT NULL
           AND forma_pagamento != ''
         ORDER BY forma_pagamento ASC
@@ -5147,6 +5660,179 @@ def relatorios():
 
     ticket_medio = total_vendido / quantidade_vendas if quantidade_vendas > 0 else 0
     margem_media = (total_lucro / total_vendido * 100) if total_vendido > 0 else 0
+
+    quantidade_vendas_anterior = resumo_periodo_anterior["quantidade_vendas"] or 0
+    total_vendido_anterior = resumo_periodo_anterior["total_vendido"] or 0
+    total_lucro_anterior = resumo_periodo_anterior["total_lucro"] or 0
+    ticket_medio_anterior = (
+        total_vendido_anterior / quantidade_vendas_anterior
+        if quantidade_vendas_anterior > 0
+        else 0
+    )
+    margem_media_anterior = (
+        total_lucro_anterior / total_vendido_anterior * 100
+        if total_vendido_anterior > 0
+        else 0
+    )
+
+    def calcular_variacao_percentual(valor_atual, valor_anterior):
+        valor_atual = float(valor_atual or 0)
+        valor_anterior = float(valor_anterior or 0)
+
+        if abs(valor_anterior) <= 0.009:
+            return None if abs(valor_atual) <= 0.009 else 100.0
+
+        return round(((valor_atual - valor_anterior) / abs(valor_anterior)) * 100, 1)
+
+    variacoes = {
+        "quantidade_vendas": calcular_variacao_percentual(
+            quantidade_vendas,
+            quantidade_vendas_anterior,
+        ),
+        "total_vendido": calcular_variacao_percentual(
+            total_vendido,
+            total_vendido_anterior,
+        ),
+        "total_lucro": calcular_variacao_percentual(
+            total_lucro,
+            total_lucro_anterior,
+        ),
+        "ticket_medio": calcular_variacao_percentual(
+            ticket_medio,
+            ticket_medio_anterior,
+        ),
+        "margem_media": round(margem_media - margem_media_anterior, 1),
+    }
+
+    dados_diarios = {
+        date.fromisoformat(row["dia"]): {
+            "total_vendido": float(row["total_vendido"] or 0),
+            "total_lucro": float(row["total_lucro"] or 0),
+        }
+        for row in serie_diaria_rows
+        if row["dia"]
+    }
+
+    limite_colunas_grafico = 16
+    tamanho_bloco = max(
+        1,
+        (quantidade_dias_periodo + limite_colunas_grafico - 1)
+        // limite_colunas_grafico,
+    )
+    serie_temporal = []
+
+    for deslocamento in range(0, quantidade_dias_periodo, tamanho_bloco):
+        inicio_bloco = data_inicio_obj + timedelta(days=deslocamento)
+        fim_bloco = min(
+            inicio_bloco + timedelta(days=tamanho_bloco - 1),
+            data_fim_obj,
+        )
+        cursor_dia = inicio_bloco
+        total_bloco = 0
+        lucro_bloco = 0
+
+        while cursor_dia <= fim_bloco:
+            valores_dia = dados_diarios.get(cursor_dia, {})
+            total_bloco += valores_dia.get("total_vendido", 0)
+            lucro_bloco += valores_dia.get("total_lucro", 0)
+            cursor_dia += timedelta(days=1)
+
+        if inicio_bloco == fim_bloco:
+            label_bloco = inicio_bloco.strftime("%d/%m")
+        else:
+            label_bloco = (
+                f"{inicio_bloco.strftime('%d/%m')}–"
+                f"{fim_bloco.strftime('%d/%m')}"
+            )
+
+        serie_temporal.append({
+            "label": label_bloco,
+            "total_vendido": total_bloco,
+            "total_lucro": lucro_bloco,
+        })
+
+    maior_valor_serie = max(
+        [
+            max(item["total_vendido"], item["total_lucro"], 0)
+            for item in serie_temporal
+        ]
+        or [0]
+    )
+
+    for item in serie_temporal:
+        if maior_valor_serie > 0:
+            percentual_total = item["total_vendido"] / maior_valor_serie * 100
+            percentual_lucro = max(item["total_lucro"], 0) / maior_valor_serie * 100
+            item["altura_total"] = max(4, round(percentual_total, 2)) if item["total_vendido"] > 0 else 0
+            item["altura_lucro"] = max(4, round(percentual_lucro, 2)) if item["total_lucro"] > 0 else 0
+        else:
+            item["altura_total"] = 0
+            item["altura_lucro"] = 0
+
+    total_formas_pagamento = sum(
+        float(item["total"] or 0)
+        for item in formas_pagamento_rows
+    )
+    formas_pagamento = []
+
+    for item in formas_pagamento_rows:
+        valor_forma = float(item["total"] or 0)
+        formas_pagamento.append({
+            "forma_pagamento": item["forma_pagamento"],
+            "quantidade": item["quantidade"],
+            "total": valor_forma,
+            "percentual": (
+                round(valor_forma / total_formas_pagamento * 100, 1)
+                if total_formas_pagamento > 0
+                else 0
+            ),
+        })
+
+    maior_total_produto = max(
+        [float(item["total_vendido"] or 0) for item in produtos_mais_vendidos]
+        or [0]
+    )
+    produtos_ranking = [
+        {
+            **dict(item),
+            "percentual": (
+                round(float(item["total_vendido"] or 0) / maior_total_produto * 100, 1)
+                if maior_total_produto > 0
+                else 0
+            ),
+        }
+        for item in produtos_mais_vendidos
+    ]
+
+    maior_total_cliente = max(
+        [float(item["total_comprado"] or 0) for item in clientes_mais_compraram]
+        or [0]
+    )
+    clientes_ranking = [
+        {
+            **dict(item),
+            "percentual": (
+                round(float(item["total_comprado"] or 0) / maior_total_cliente * 100, 1)
+                if maior_total_cliente > 0
+                else 0
+            ),
+        }
+        for item in clientes_mais_compraram
+    ]
+
+    periodo_label = (
+        data_inicio_obj.strftime("%d/%m/%Y")
+        if data_inicio_obj == data_fim_obj
+        else (
+            f"{data_inicio_obj.strftime('%d/%m/%Y')} a "
+            f"{data_fim_obj.strftime('%d/%m/%Y')}"
+        )
+    )
+    filtros_ativos = sum(bool(valor) for valor in (
+        vendedor_id,
+        cliente_id,
+        forma_pagamento,
+    ))
 
     conn.close()
 
@@ -5169,6 +5855,14 @@ def relatorios():
         forma_pagamento=forma_pagamento,
         ticket_medio=ticket_medio,
         margem_media=margem_media,
+        variacoes=variacoes,
+        serie_temporal=serie_temporal,
+        produtos_ranking=produtos_ranking,
+        clientes_ranking=clientes_ranking,
+        atalhos_periodo=atalhos_periodo,
+        periodo_label=periodo_label,
+        periodo_anterior_label=periodo_anterior_label,
+        filtros_ativos=filtros_ativos,
         page=page,
         total_paginas=total_paginas,
         total_registros=total_registros,
@@ -5238,6 +5932,11 @@ def relatorio_caixas():
     resumo = conn.execute(f"""
         SELECT
             COUNT(*) AS quantidade_caixas,
+            COALESCE(SUM(CASE WHEN c.status = 'ABERTO' THEN 1 ELSE 0 END), 0) AS caixas_abertos,
+            COALESCE(SUM(CASE WHEN c.status = 'FECHADO' THEN 1 ELSE 0 END), 0) AS caixas_fechados,
+            COALESCE(SUM(
+                CASE WHEN ABS(COALESCE(c.diferenca, 0)) > 0.009 THEN 1 ELSE 0 END
+            ), 0) AS caixas_com_diferenca,
             COALESCE(SUM(c.valor_inicial), 0) AS total_inicial,
             COALESCE(SUM(c.total_vendas), 0) AS total_vendas,
             COALESCE(SUM(c.total_dinheiro), 0) AS total_dinheiro,
@@ -5248,7 +5947,13 @@ def relatorio_caixas():
             COALESCE(SUM(c.saidas_manuais), 0) AS total_saidas,
             COALESCE(SUM(c.valor_esperado), 0) AS total_esperado,
             COALESCE(SUM(c.valor_informado), 0) AS total_informado,
-            COALESCE(SUM(c.diferenca), 0) AS total_diferenca
+            COALESCE(SUM(c.diferenca), 0) AS total_diferenca,
+            COALESCE(SUM(
+                CASE WHEN COALESCE(c.diferenca, 0) > 0.009 THEN c.diferenca ELSE 0 END
+            ), 0) AS total_sobras,
+            COALESCE(SUM(
+                CASE WHEN COALESCE(c.diferenca, 0) < -0.009 THEN ABS(c.diferenca) ELSE 0 END
+            ), 0) AS total_faltas
         FROM caixas c
         WHERE {where_sql}
     """, params).fetchone()
@@ -5310,7 +6015,14 @@ def exportar_relatorio():
         params.append(cliente_id)
 
     if forma_pagamento:
-        where_clauses.append("v.forma_pagamento = ?")
+        where_clauses.append("""
+            EXISTS (
+                SELECT 1
+                FROM venda_pagamentos vp_filtro
+                WHERE vp_filtro.venda_id = v.id
+                  AND vp_filtro.forma_pagamento = ?
+            )
+        """)
         params.append(forma_pagamento)
 
     where_sql = " AND ".join(where_clauses)
@@ -5329,7 +6041,12 @@ def exportar_relatorio():
             v.valor_total,
             v.custo_total,
             v.lucro_total,
-            v.status
+            v.status,
+            (
+                SELECT GROUP_CONCAT(pagamento.forma_pagamento, ' + ')
+                FROM venda_pagamentos pagamento
+                WHERE pagamento.venda_id = v.id
+            ) AS pagamentos_descricao
         FROM vendas v
         LEFT JOIN clientes c ON c.id = v.cliente_id
         WHERE {where_sql}
@@ -5363,7 +6080,7 @@ def exportar_relatorio():
             venda["cliente_nome"],
             venda["cliente_telefone"],
             venda["vendedor"],
-            venda["forma_pagamento"],
+            venda["pagamentos_descricao"] or venda["forma_pagamento"],
             venda["desconto_total"],
             venda["valor_total"],
             venda["custo_total"],
@@ -5371,10 +6088,10 @@ def exportar_relatorio():
             venda["status"]
         ])
 
-    os.makedirs("exports", exist_ok=True)
-
     nome_arquivo = f"relatorio_vendas_{data_inicio}_a_{data_fim}.xlsx"
-    caminho_arquivo = os.path.join("exports", nome_arquivo)
+    diretorio_exportacoes = os.path.join(BASE_DIR, "exports")
+    os.makedirs(diretorio_exportacoes, exist_ok=True)
+    caminho_arquivo = os.path.join(diretorio_exportacoes, nome_arquivo)
 
     wb.save(caminho_arquivo)
 

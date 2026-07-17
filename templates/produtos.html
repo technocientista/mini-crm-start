@@ -4,20 +4,46 @@
     <meta charset="UTF-8">
     <title>Produtos - Start CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
-
+<body class="ui-refreshed products-page">
     <div class="app-layout">
-
         {% include 'partials/sidebar.html' %}
 
         <main class="main-content">
-            <header class="topbar">
+            <header class="topbar products-page-topbar">
                 <div>
                     <h1>Produtos</h1>
-                    <p>Cadastre produtos, preços, SKU e estoque inicial.</p>
+                    <p>Gerencie catálogo, preços, margens e disponibilidade de estoque.</p>
+                </div>
+
+                <div class="products-page-actions">
+                    <button
+                        type="button"
+                        class="ui-command-action ui-icon-product-add"
+                        onclick="abrirModalProduto()"
+                    >
+                        Novo produto
+                    </button>
+                    <button
+                        type="button"
+                        class="ui-command-action ui-icon-download"
+                        onclick="abrirModalImportarProdutos()"
+                    >
+                        Importar produtos
+                    </button>
+                    <a
+                        href="{{ url_for('exportar_produtos') }}"
+                        class="ui-command-action ui-icon-upload"
+                    >
+                        Exportar produtos
+                    </a>
+                    <a
+                        href="{{ url_for('historico_importacoes_produtos') }}"
+                        class="ui-command-action ui-icon-history"
+                    >
+                        Histórico de importações
+                    </a>
                 </div>
             </header>
 
@@ -29,130 +55,148 @@
                 {% endif %}
             {% endwith %}
 
-            <section class="clients-command-panel products-command-panel margin-top" aria-label="Ações de produtos">
-                <div class="clients-command-bar">
-                    <button type="button" class="command-button" onclick="abrirModalProduto()">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M4.75 7.25 12 3.5l7.25 3.75L12 11 4.75 7.25Z"/>
-                            <path d="M4.75 7.25v9.5L12 20.5l7.25-3.75v-9.5"/>
-                            <path d="M12 11v9.5"/>
-                            <path d="M18.5 2.75v5M16 5.25h5"/>
-                        </svg>
-                        <span>Novo produto</span>
-                    </button>
+            <section class="products-overview-grid" aria-label="Resumo do catálogo">
+                <article class="products-overview-card featured">
+                    <span>Produtos ativos</span>
+                    <strong>{{ resumo_produtos.ativos or 0 }}</strong>
+                    <small>{{ resumo_produtos.total or 0 }} cadastros no catálogo</small>
+                </article>
+                <article class="products-overview-card inventory">
+                    <span>Unidades em estoque</span>
+                    <strong>{{ resumo_produtos.unidades_estoque or 0 }}</strong>
+                    <small>Custo imobilizado: {{ resumo_produtos.valor_estoque|moeda_br }}</small>
+                </article>
+                <article class="products-overview-card warning">
+                    <span>Estoque baixo</span>
+                    <strong>{{ resumo_produtos.estoque_baixo or 0 }}</strong>
+                    <small>Produtos próximos do mínimo</small>
+                </article>
+                <article class="products-overview-card danger">
+                    <span>Sem estoque</span>
+                    <strong>{{ resumo_produtos.sem_estoque or 0 }}</strong>
+                    <small>Produtos que exigem reposição</small>
+                </article>
+            </section>
 
-                    <span class="command-separator" aria-hidden="true"></span>
-
-                    <button type="button" class="command-button" onclick="abrirModalImportarProdutos()">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 3.75v10.5"/>
-                            <path d="m8.25 10.5 3.75 3.75 3.75-3.75"/>
-                            <path d="M4.75 16.75v1.5a2 2 0 0 0 2 2h10.5a2 2 0 0 0 2-2v-1.5"/>
-                        </svg>
-                        <span>Importar produtos</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        class="command-button"
-                        onclick="window.location.href='{{ url_for('exportar_produtos') }}'"
-                    >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 20.25V9.75"/>
-                            <path d="m8.25 13.5 3.75-3.75 3.75 3.75"/>
-                            <path d="M4.75 7.25v-1.5a2 2 0 0 1 2-2h10.5a2 2 0 0 1 2 2v1.5"/>
-                        </svg>
-                        <span>Exportar produtos</span>
-                    </button>
+            <section class="panel products-directory-panel" id="lista-produtos">
+                <div class="products-directory-heading">
+                    <div>
+                        <h2>Catálogo de produtos</h2>
+                        <p>Consulte preços, margem e situação do estoque.</p>
+                    </div>
+                    <span class="products-results-badge">
+                        {{ total_registros }} resultado{% if total_registros != 1 %}s{% endif %}
+                    </span>
                 </div>
 
-                <form method="GET" action="{{ url_for('produtos') }}" class="clients-filter-bar products-filter-bar">
-                    <div class="clients-search-field">
+                <form method="GET" action="{{ url_for('produtos') }}" class="products-directory-filters">
+                    <label class="clients-search-field products-search-field">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <circle cx="10.75" cy="10.75" r="6.5"/>
                             <path d="m15.5 15.5 4.25 4.25"/>
                         </svg>
                         <input
-                            type="text"
+                            type="search"
                             name="busca"
                             value="{{ busca or '' }}"
                             placeholder="Buscar por nome, SKU, categoria ou marca..."
                             aria-label="Buscar produtos"
                         >
-                    </div>
+                    </label>
 
-                    <select name="status" aria-label="Filtrar produtos por status">
-                        <option value="ativos" {% if status == 'ativos' %}selected{% endif %}>Ativos</option>
-                        <option value="inativos" {% if status == 'inativos' %}selected{% endif %}>Inativos</option>
-                        <option value="todos" {% if status == 'todos' %}selected{% endif %}>Todos</option>
-                    </select>
+                    <label class="products-status-filter">
+                        <span>Status</span>
+                        <select name="status" aria-label="Filtrar produtos por status">
+                            <option value="ativos" {% if status == 'ativos' %}selected{% endif %}>Ativos</option>
+                            <option value="inativos" {% if status == 'inativos' %}selected{% endif %}>Inativos</option>
+                            <option value="todos" {% if status == 'todos' %}selected{% endif %}>Todos</option>
+                        </select>
+                    </label>
 
-                    <button type="submit" class="command-button command-button-compact">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <circle cx="10.75" cy="10.75" r="6.5"/>
-                            <path d="m15.5 15.5 4.25 4.25"/>
-                        </svg>
-                        <span>Buscar</span>
+                    <button type="submit" class="ui-command-action ui-icon-search">
+                        Buscar
                     </button>
-
-                    <a href="{{ url_for('produtos') }}" class="command-button command-button-compact command-button-muted">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M4 5.75h16"/>
-                            <path d="M7 11.75h10"/>
-                            <path d="M10 17.75h4"/>
-                            <path d="m18.5 14.5 3 3"/>
-                            <path d="m21.5 14.5-3 3"/>
-                        </svg>
-                        <span>Limpar</span>
+                    <a
+                        href="{{ url_for('produtos') }}"
+                        class="ui-command-action ui-icon-filter-clear products-clear-filter"
+                    >
+                        Limpar filtros
                     </a>
                 </form>
-            </section>
 
-            <section class="panel margin-top" id="lista-produtos">
-                <h2>Produtos cadastrados</h2>
+                {% if busca or status != "ativos" %}
+                    <div class="products-active-filter">
+                        <span>Filtros aplicados</span>
+                        {% if busca %}
+                            <strong>Busca: “{{ busca }}”</strong>
+                        {% endif %}
+                        {% if status != "ativos" %}
+                            <strong>Status: {{ status|title }}</strong>
+                        {% endif %}
+                    </div>
+                {% endif %}
 
-                <div class="table-wrapper">
-                    <table>
+                <div class="table-wrapper products-directory-table-wrapper">
+                    <table class="products-directory-table">
                         <thead>
                             <tr>
                                 <th>Produto</th>
-                                <th>Categoria</th>
-                                <th>Marca</th>
                                 <th>SKU</th>
-                                <th>Custo</th>
-                                <th>Venda</th>
-                                <th>Lucro</th>
+                                <th>Preços</th>
+                                <th>Margem</th>
                                 <th>Estoque</th>
                                 <th>Situação</th>
                                 <th>Status</th>
-                                <th>Ações</th>
+                                <th>Cadastro</th>
+                                <th class="products-actions-column">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for produto in produtos %}
                                 {% set lucro = produto.preco_venda - produto.preco_custo %}
-
-                                {% if produto.estoque_atual == 0 %}
-                                    {% set status = 'Sem estoque' %}
-                                    {% set status_class = 'status-danger' %}
-                                {% elif produto.estoque_atual <= produto.estoque_minimo %}
-                                    {% set status = 'Baixo estoque' %}
-                                    {% set status_class = 'status-warning' %}
-                                {% else %}
-                                    {% set status = 'OK' %}
-                                    {% set status_class = 'status-ok' %}
-                                {% endif %}
-
                                 <tr>
-                                    <td>{{ produto.nome }}</td>
-                                    <td>{{ produto.categoria }}</td>
-                                    <td>{{ produto.marca or '-' }}</td>
-                                    <td>{{ produto.sku }}</td>
-                                    <td>R$ {{ "%.2f"|format(produto.preco_custo) }}</td>
-                                    <td>R$ {{ "%.2f"|format(produto.preco_venda) }}</td>
-                                    <td>R$ {{ "%.2f"|format(lucro) }}</td>
-                                    <td>{{ produto.estoque_atual }}</td>
-
+                                    <td>
+                                        <div class="product-identity">
+                                            <span class="product-avatar" aria-hidden="true"></span>
+                                            <span>
+                                                <a
+                                                    href="{{ url_for('produto_editar', produto_id=produto.id) }}"
+                                                    class="table-link"
+                                                >
+                                                    {{ produto.nome }}
+                                                </a>
+                                                <small>
+                                                    {{ produto.categoria or "Sem categoria" }}
+                                                    {% if produto.marca %} · {{ produto.marca }}{% endif %}
+                                                </small>
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="product-sku">{{ produto.sku or "Sem SKU" }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="product-prices">
+                                            <strong>{{ produto.preco_venda|moeda_br }}</strong>
+                                            <small>Custo: {{ produto.preco_custo|moeda_br }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="product-margin">
+                                            <strong>{{ lucro|moeda_br }}</strong>
+                                            {% if produto.preco_custo > 0 %}
+                                                <small>{{ ((lucro / produto.preco_custo) * 100)|numero_br }}% sobre o custo</small>
+                                            {% else %}
+                                                <small>Custo não informado</small>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="product-stock">
+                                            <strong>{{ produto.estoque_atual }}</strong>
+                                            <small>Mínimo: {{ produto.estoque_minimo }}</small>
+                                        </div>
+                                    </td>
                                     <td>
                                         {% if produto.estoque_atual == 0 %}
                                             <span class="modern-status modern-status--danger">
@@ -168,7 +212,7 @@
                                                     <path d="M10.45 4.6 3.4 17a1.55 1.55 0 0 0 1.35 2.3h14.5A1.55 1.55 0 0 0 20.6 17L13.55 4.6a1.78 1.78 0 0 0-3.1 0Z"/>
                                                     <path d="M12 9v4.1M12 16.25v.1"/>
                                                 </svg>
-                                                <span>Baixo estoque</span>
+                                                <span>Estoque baixo</span>
                                             </span>
                                         {% else %}
                                             <span class="modern-status modern-status--success">
@@ -180,7 +224,6 @@
                                             </span>
                                         {% endif %}
                                     </td>
-
                                     <td>
                                         {% if produto.ativo == 1 %}
                                             <span class="modern-status modern-status--success">
@@ -200,52 +243,55 @@
                                             </span>
                                         {% endif %}
                                     </td>
-
                                     <td>
-                                        <div class="table-actions">
+                                        <span class="product-created-date">{{ produto.created_at|date_br }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="table-actions products-row-actions">
                                             {% if produto.ativo == 1 %}
-                                                <a 
-                                                    href="{{ url_for('produto_editar', produto_id=produto.id) }}" 
+                                                <a
+                                                    href="{{ url_for('produto_editar', produto_id=produto.id) }}"
                                                     class="table-outline-button"
                                                     title="Editar produto"
-                                                    aria-label="Editar produto"
+                                                    aria-label="Editar produto {{ produto.nome }}"
                                                 >
                                                     <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.04a1 1 0 0 0 0-1.41l-2.51-2.51a1 1 0 0 0-1.41 0l-1.96 1.96 3.75 3.75 2.13-1.79z"/>
+                                                        <path d="m14.25 5.25 4.5 4.5"/>
+                                                        <path d="M5.5 18.5 6.4 14l9.95-9.95a1.8 1.8 0 0 1 2.55 0l1.05 1.05a1.8 1.8 0 0 1 0 2.55L10 17.6l-4.5.9Z"/>
                                                     </svg>
                                                 </a>
-
-                                                <form 
-                                                    method="POST" 
+                                                <form
+                                                    method="POST"
                                                     action="{{ url_for('produto_inativar', produto_id=produto.id) }}"
                                                     onsubmit="return confirm('Tem certeza que deseja inativar este produto?');"
                                                 >
-                                                    <button 
-                                                        type="submit" 
-                                                        class="small-danger-button"
+                                                    <button
+                                                        type="submit"
+                                                        class="table-outline-button product-danger-action"
                                                         title="Inativar"
-                                                        aria-label="Inativar produto"
+                                                        aria-label="Inativar produto {{ produto.nome }}"
                                                     >
                                                         <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                            <circle cx="12" cy="12" r="8.5"></circle>
-                                                            <path d="M6 6l12 12"></path>
+                                                            <circle cx="12" cy="12" r="8.5"/>
+                                                            <path d="m6 6 12 12"/>
                                                         </svg>
                                                     </button>
                                                 </form>
                                             {% else %}
-                                                <form 
-                                                    method="POST" 
+                                                <form
+                                                    method="POST"
                                                     action="{{ url_for('produto_reativar', produto_id=produto.id) }}"
                                                     onsubmit="return confirm('Deseja reativar este produto?');"
                                                 >
-                                                    <button 
-                                                        type="submit" 
+                                                    <button
+                                                        type="submit"
                                                         class="table-outline-button"
                                                         title="Reativar"
-                                                        aria-label="Reativar produto"
+                                                        aria-label="Reativar produto {{ produto.nome }}"
                                                     >
                                                         <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                            <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V6a6 6 0 1 1-5.65 8H4.26A8 8 0 1 0 17.65 6.35z"/>
+                                                            <path d="M19 7.5V3.75h-3.75"/>
+                                                            <path d="M18.25 5.25A8 8 0 1 0 20 14"/>
                                                         </svg>
                                                     </button>
                                                 </form>
@@ -255,14 +301,37 @@
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td colspan="11" class="empty-state">
-                                        Nenhum produto cadastrado ainda.
+                                    <td colspan="9">
+                                        <div class="products-empty-state">
+                                            <span class="products-empty-icon" aria-hidden="true"></span>
+                                            {% if busca or status != "ativos" %}
+                                                <strong>Nenhum produto corresponde aos filtros</strong>
+                                                <p>Revise a busca ou remova os filtros para consultar todo o catálogo.</p>
+                                                <a
+                                                    href="{{ url_for('produtos') }}"
+                                                    class="ui-command-action ui-icon-filter-clear"
+                                                >
+                                                    Limpar filtros
+                                                </a>
+                                            {% else %}
+                                                <strong>Seu catálogo de produtos está vazio</strong>
+                                                <p>Cadastre o primeiro produto para começar a controlar preços e estoque.</p>
+                                                <button
+                                                    type="button"
+                                                    class="ui-command-action ui-icon-product-add"
+                                                    onclick="abrirModalProduto()"
+                                                >
+                                                    Cadastrar produto
+                                                </button>
+                                            {% endif %}
+                                        </div>
                                     </td>
                                 </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+
                 {% set pagination_endpoint = 'produtos' %}
                 {% set pagination_args = {'busca': busca, 'status': status} %}
                 {% set pagination_page_param = 'page' %}
@@ -270,127 +339,196 @@
                 {% set pagination_total_pages = total_paginas %}
                 {% set pagination_total_records = total_registros %}
                 {% set pagination_anchor = 'lista-produtos' %}
-
-                {% include 'partials/pagination.html' %}
+                <footer class="products-directory-footer">
+                    {% include 'partials/pagination.html' %}
+                </footer>
             </section>
         </main>
-
     </div>
 
     <div id="modalProduto" class="modal-overlay">
-        <div class="modal-card modal-large">
-            <div class="modal-header">
-                <h2>Novo produto</h2>
-
-                <button type="button" class="modal-close" onclick="fecharModalProduto()">
+        <div class="modal-card products-form-modal">
+            <div class="modal-header products-form-modal-header">
+                <div class="products-form-modal-title">
+                    <span class="products-form-modal-icon" aria-hidden="true"></span>
+                    <div>
+                        <span class="products-form-modal-eyebrow">Catálogo</span>
+                        <h2>Novo produto</h2>
+                        <p>Cadastre identificação, preços e níveis de estoque.</p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    class="modal-close"
+                    onclick="fecharModalProduto()"
+                    aria-label="Fechar modal"
+                >
                     ×
                 </button>
             </div>
 
-            <form method="POST" action="{{ url_for('produtos') }}" class="form-grid compact-form">
-                <div class="form-group">
-                    <label for="nome">Nome do produto</label>
-                    <input type="text" id="nome" name="nome" required>
+            <form method="POST" action="{{ url_for('produtos') }}" class="products-modal-form">
+                <section class="products-form-section">
+                    <header class="products-form-section-heading">
+                        <span>1</span>
+                        <div>
+                            <h3>Identificação do produto</h3>
+                            <p>Informações usadas para localizar e organizar o item no catálogo.</p>
+                        </div>
+                    </header>
+
+                    <div class="products-form-fields products-identification-fields">
+                        <div class="form-group products-name-field">
+                            <label for="nome">Nome do produto <em>Obrigatório</em></label>
+                            <input type="text" id="nome" name="nome" placeholder="Nome comercial do produto" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="categoria">Categoria <em>Obrigatório</em></label>
+                            <select id="categoria" name="categoria" required>
+                                <option value="">Selecione uma categoria</option>
+                                <option value="Capinhas">Capinhas</option>
+                                <option value="Películas">Películas</option>
+                                <option value="Carregadores">Carregadores</option>
+                                <option value="Cabos">Cabos</option>
+                                <option value="Adaptadores">Adaptadores</option>
+                                <option value="Fones">Fones</option>
+                                <option value="Caixas de som">Caixas de som</option>
+                                <option value="Suportes">Suportes</option>
+                                <option value="Acessórios gamer">Acessórios gamer</option>
+                                <option value="Acessórios de informática">Acessórios de informática</option>
+                                <option value="Outros">Outros</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="marca">Marca <em>Opcional</em></label>
+                            <input type="text" id="marca" name="marca" placeholder="Ex.: Start">
+                        </div>
+                        <div class="form-group">
+                            <label for="sku">SKU / Código <em>Obrigatório</em></label>
+                            <input type="text" id="sku" name="sku" placeholder="Código único do produto" required>
+                            <small>Utilize um código exclusivo para busca e leitura.</small>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="products-form-lower-grid">
+                    <section class="products-form-section">
+                        <header class="products-form-section-heading">
+                            <span>2</span>
+                            <div>
+                                <h3>Precificação</h3>
+                                <p>Defina custo e preço praticado na venda.</p>
+                            </div>
+                        </header>
+                        <div class="products-form-fields products-paired-fields">
+                            <div class="form-group">
+                                <label for="preco_custo">Preço de custo</label>
+                                <div class="products-money-field">
+                                    <span>R$</span>
+                                    <input type="number" id="preco_custo" name="preco_custo" step="0.01" min="0" placeholder="0,00" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="preco_venda">Preço de venda</label>
+                                <div class="products-money-field">
+                                    <span>R$</span>
+                                    <input type="number" id="preco_venda" name="preco_venda" step="0.01" min="0" placeholder="0,00" required>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="products-form-section">
+                        <header class="products-form-section-heading">
+                            <span>3</span>
+                            <div>
+                                <h3>Controle de estoque</h3>
+                                <p>Informe o saldo inicial e o alerta de reposição.</p>
+                            </div>
+                        </header>
+                        <div class="products-form-fields products-paired-fields">
+                            <div class="form-group">
+                                <label for="estoque_atual">Estoque atual</label>
+                                <input type="number" id="estoque_atual" name="estoque_atual" min="0" placeholder="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="estoque_minimo">Estoque mínimo</label>
+                                <input type="number" id="estoque_minimo" name="estoque_minimo" min="0" placeholder="0" required>
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
-                <div class="form-group">
-                    <label for="categoria">Categoria</label>
-                    <select id="categoria" name="categoria" required>
-                        <option value="">Selecione</option>
-                        <option value="Capinhas">Capinhas</option>
-                        <option value="Películas">Películas</option>
-                        <option value="Carregadores">Carregadores</option>
-                        <option value="Cabos">Cabos</option>
-                        <option value="Adaptadores">Adaptadores</option>
-                        <option value="Fones">Fones</option>
-                        <option value="Caixas de som">Caixas de som</option>
-                        <option value="Suportes">Suportes</option>
-                        <option value="Acessórios gamer">Acessórios gamer</option>
-                        <option value="Acessórios de informática">Acessórios de informática</option>
-                        <option value="Outros">Outros</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="marca">Marca</label>
-                    <input type="text" id="marca" name="marca">
-                </div>
-
-                <div class="form-group">
-                    <label for="sku">SKU / Código</label>
-                    <input type="text" id="sku" name="sku" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="preco_custo">Preço de custo</label>
-                    <input type="number" id="preco_custo" name="preco_custo" step="0.01" min="0" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="preco_venda">Preço de venda</label>
-                    <input type="number" id="preco_venda" name="preco_venda" step="0.01" min="0" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="estoque_atual">Estoque atual</label>
-                    <input type="number" id="estoque_atual" name="estoque_atual" min="0" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="estoque_minimo">Estoque mínimo</label>
-                    <input type="number" id="estoque_minimo" name="estoque_minimo" min="0" required>
-                </div>
-
-                <div class="modal-actions full">
-                    <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalProduto()">
-                        Cancelar
-                    </button>
-
-                    <button type="submit" class="ui-command-action ui-icon-save">
-                        Salvar produto
-                    </button>
-                </div>
+                <footer class="products-form-actions">
+                    <p>Os campos indicados como obrigatórios precisam ser preenchidos.</p>
+                    <div>
+                        <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalProduto()">Cancelar</button>
+                        <button type="submit" class="ui-command-action ui-icon-save">Salvar produto</button>
+                    </div>
+                </footer>
             </form>
         </div>
     </div>
 
     <div id="modalImportarProdutos" class="modal-overlay">
-        <div class="modal-card">
+        <div class="modal-card products-import-modal">
             <div class="modal-header">
-                <h2>Importar produtos</h2>
-
-                <button type="button" class="modal-close" onclick="fecharModalImportarProdutos()">
+                <div>
+                    <h2>Importar produtos</h2>
+                    <p>Atualize catálogo, preços e estoque usando um arquivo CSV ou Excel.</p>
+                </div>
+                <button
+                    type="button"
+                    class="modal-close"
+                    onclick="fecharModalImportarProdutos()"
+                    aria-label="Fechar modal"
+                >
                     ×
                 </button>
             </div>
 
-            <p class="muted-text">
-                Envie um arquivo CSV ou Excel com as colunas:
-                nome, categoria, marca, sku, preco_custo, preco_venda, estoque_atual, estoque_minimo.
-            </p>
-
-            <div class="import-actions">
-                <a href="{{ url_for('baixar_modelo_produtos') }}" class="button-link secondary ui-command-action ui-icon-download">
+            <div class="products-import-guide">
+                <strong>Como o estoque será atualizado?</strong>
+                <p>
+                    Use <b>SUBSTITUIR</b> para definir o saldo total ou <b>INCREMENTAR</b>
+                    para somar a quantidade ao estoque existente. Se ficar vazio, será usado SUBSTITUIR.
+                </p>
+                <a
+                    href="{{ url_for('baixar_modelo_produtos') }}"
+                    class="ui-command-action ui-icon-download"
+                >
                     Baixar modelo de produtos
                 </a>
             </div>
 
-            <form 
-                method="POST" 
-                action="{{ url_for('importar_produtos') }}" 
-                enctype="multipart/form-data" 
-                class="import-form modal-import-form"
+            <form
+                method="POST"
+                action="{{ url_for('importar_produtos') }}"
+                enctype="multipart/form-data"
+                class="import-form modal-import-form products-import-form"
             >
-                <input type="file" name="arquivo" accept=".csv,.xlsx" required>
+                <label class="products-file-field">
+                    <span>Arquivo para importação</span>
+                    <input type="file" name="arquivo" accept=".csv,.xlsx" required>
+                    <small>Formatos aceitos: CSV e XLSX.</small>
+                </label>
 
-                <button type="submit" class="ui-command-action ui-icon-upload">
-                    Importar produtos
-                </button>
+                <div class="modal-actions">
+                    <button
+                        type="button"
+                        class="button-secondary ui-command-action ui-icon-close"
+                        onclick="fecharModalImportarProdutos()"
+                    >
+                        Cancelar
+                    </button>
+                    <button type="submit" class="ui-command-action ui-icon-download">
+                        Importar produtos
+                    </button>
+                </div>
             </form>
         </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
-
 </body>
 </html>

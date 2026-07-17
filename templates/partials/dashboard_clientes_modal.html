@@ -58,7 +58,7 @@
 
                             <td>{{ cliente.quantidade_compras }}</td>
 
-                            <td>R$ {{ "%.2f"|format(cliente.total_comprado) }}</td>
+                            <td>{{ cliente.total_comprado|moeda_br }}</td>
 
                             <td>{{ cliente.tags or '-' }}</td>
 

@@ -4,137 +4,123 @@
     <meta charset="UTF-8">
     <title>Usuários - Start CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
-
+{% set stats = namespace(ativos=0, inativos=0, admins=0, vendedores=0) %}
+{% for item in usuarios %}
+    {% if item.ativo == 1 %}{% set stats.ativos = stats.ativos + 1 %}{% else %}{% set stats.inativos = stats.inativos + 1 %}{% endif %}
+    {% if item.perfil == "ADMIN" %}{% set stats.admins = stats.admins + 1 %}{% else %}{% set stats.vendedores = stats.vendedores + 1 %}{% endif %}
+{% endfor %}
+<body class="ui-refreshed management-page users-page">
     <div class="app-layout">
-
         {% include 'partials/sidebar.html' %}
 
         <main class="main-content">
-            <header class="topbar">
+            <header class="topbar management-topbar">
                 <div>
                     <h1>Usuários</h1>
-                    <p>Cadastre administradores e vendedores.</p>
+                    <p>Gerencie acessos, perfis e regras de comissão da equipe.</p>
+                </div>
+                <div class="management-topbar-actions">
+                    <a href="{{ url_for('comissoes') }}" class="ui-command-action ui-icon-chart">Ver comissões</a>
+                    <button type="button" class="ui-command-action ui-icon-user-plus" onclick="abrirModalPorId('modalUsuario')">Novo usuário</button>
                 </div>
             </header>
 
             {% with messages = get_flashed_messages() %}
-                {% if messages %}
-                    <div class="success-alert">
-                        {{ messages[0] }}
-                    </div>
-                {% endif %}
+                {% if messages %}<div class="success-alert">{{ messages[0] }}</div>{% endif %}
             {% endwith %}
 
-            <section class="panel">
-                <h2>Novo usuário</h2>
-
-                <form method="POST" action="{{ url_for('usuarios') }}" class="form-grid">
-                    <div class="form-group">
-                        <label for="nome">Nome</label>
-                        <input type="text" id="nome" name="nome" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="email">E-mail</label>
-                        <input type="email" id="email" name="email" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="senha">Senha</label>
-                        <input type="password" id="senha" name="senha" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="perfil">Perfil</label>
-                        <select id="perfil" name="perfil" required>
-                            <option value="VENDEDOR">Vendedor</option>
-                            <option value="ADMIN">Admin</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="comissao_percentual">Comissão (%)</label>
-                        <input 
-                            type="number" 
-                            id="comissao_percentual" 
-                            name="comissao_percentual" 
-                            step="0.01" 
-                            min="0" 
-                            value="0"
-                        >
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="ui-command-action ui-icon-save">Salvar usuário</button>
-                    </div>
-                </form>
+            <section class="management-overview-grid" aria-label="Resumo dos usuários">
+                <article class="management-overview-card featured"><span>Usuários cadastrados</span><strong>{{ usuarios|length }}</strong><small>Contas da equipe</small></article>
+                <article class="management-overview-card success"><span>Usuários ativos</span><strong>{{ stats.ativos }}</strong><small>Com acesso ao sistema</small></article>
+                <article class="management-overview-card info"><span>Vendedores</span><strong>{{ stats.vendedores }}</strong><small>Perfis comerciais</small></article>
+                <article class="management-overview-card neutral"><span>Administradores</span><strong>{{ stats.admins }}</strong><small>Acesso administrativo</small></article>
             </section>
 
-            <section class="panel margin-top">
-                <h2>Usuários cadastrados</h2>
+            <section class="panel management-directory-panel">
+                <header class="management-panel-heading">
+                    <div>
+                        <span class="management-eyebrow">Controle de acesso</span>
+                        <h2>Equipe cadastrada</h2>
+                        <p>Consulte perfil, comissão, status e data de inclusão.</p>
+                    </div>
+                    <span class="management-results-badge">{{ usuarios|length }} usuário{% if usuarios|length != 1 %}s{% endif %}</span>
+                </header>
 
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>E-mail</th>
-                                <th>Perfil</th>
-                                <th>Comissão</th>
-                                <th>Status</th>
-                                <th>Cadastro</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
+                <div class="table-wrapper management-table-wrapper">
+                    <table class="management-table users-directory-table">
+                        <thead><tr><th>Usuário</th><th>Perfil</th><th>Comissão</th><th>Status</th><th>Cadastro</th><th class="management-actions-column">Ação</th></tr></thead>
                         <tbody>
                             {% for item in usuarios %}
                                 <tr>
-                                    <td>{{ item.nome }}</td>
-                                    <td>{{ item.email }}</td>
-                                    <td>{{ item.perfil }}</td>
-                                    <td>{{ "%.2f"|format(item.comissao_percentual) }}%</td>
                                     <td>
-                                        {% if item.ativo == 1 %}
-                                            <span class="status-pill status-ok">Ativo</span>
+                                        <div class="management-identity">
+                                            <span class="management-avatar management-avatar--user">{{ item.nome[0]|upper }}</span>
+                                            <span>
+                                                <strong>{{ item.nome }}{% if item.id == usuario.id %}<em class="management-you-badge">Você</em>{% endif %}</strong>
+                                                <small>{{ item.email }}</small>
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if item.perfil == "ADMIN" %}
+                                            <span class="management-role management-role--admin">Administrador</span>
                                         {% else %}
-                                            <span class="status-pill status-danger">Inativo</span>
+                                            <span class="management-role management-role--seller">Vendedor</span>
                                         {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="management-value"><strong>{{ item.comissao_percentual|numero_br(2) }}%</strong><small>Sobre o total vendido</small></div>
+                                    </td>
+                                    <td>
+                                        {% if item.ativo == 1 %}<span class="status-pill status-ok">Ativo</span>{% else %}<span class="status-pill status-danger">Inativo</span>{% endif %}
                                     </td>
                                     <td>{{ item.created_at|datetime_br }}</td>
                                     <td>
-                                        <div class="table-actions">
-                                            <a
-                                                href="{{ url_for('usuario_editar', usuario_id=item.id) }}"
-                                                class="table-outline-button"
-                                                title="Editar usuário"
-                                                aria-label="Editar usuário"
-                                            >
-                                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                    <path d="m14.25 5.25 4.5 4.5"/>
-                                                    <path d="M5.5 18.5 6.4 14l9.95-9.95a1.8 1.8 0 0 1 2.55 0l1.05 1.05a1.8 1.8 0 0 1 0 2.55L10 17.6l-4.5.9Z"/>
-                                                </svg>
+                                        <div class="table-actions management-row-actions">
+                                            <a href="{{ url_for('usuario_editar', usuario_id=item.id) }}" class="table-outline-button" title="Editar usuário" aria-label="Editar usuário {{ item.nome }}">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.25 5.25 4.5 4.5"/><path d="M5.5 18.5 6.4 14l9.95-9.95a1.8 1.8 0 0 1 2.55 0l1.05 1.05a1.8 1.8 0 0 1 0 2.55L10 17.6l-4.5.9Z"/></svg>
                                             </a>
                                         </div>
                                     </td>
                                 </tr>
                             {% else %}
-                                <tr>
-                                    <td colspan="7" class="empty-state">
-                                        Nenhum usuário cadastrado.
-                                    </td>
-                                </tr>
+                                <tr><td colspan="6"><div class="management-empty-state"><span class="management-empty-icon management-empty-icon--users" aria-hidden="true"></span><strong>Nenhum usuário cadastrado</strong><p>Cadastre a primeira pessoa da equipe para começar.</p><button type="button" class="ui-command-action ui-icon-user-plus" onclick="abrirModalPorId('modalUsuario')">Cadastrar usuário</button></div></td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </section>
         </main>
-
     </div>
 
+    <div id="modalUsuario" class="modal-overlay">
+        <div class="modal-card modal-large management-form-modal">
+            <div class="modal-header">
+                <div><h2>Novo usuário</h2><p>Cadastre acesso, perfil e percentual de comissão.</p></div>
+                <button type="button" class="modal-close" onclick="fecharModalPorId('modalUsuario')" aria-label="Fechar modal">×</button>
+            </div>
+            <form method="POST" action="{{ url_for('usuarios') }}" class="form-grid compact-form management-modal-form">
+                <div class="form-group"><label for="nome">Nome</label><input type="text" id="nome" name="nome" placeholder="Nome completo" required></div>
+                <div class="form-group"><label for="email">E-mail</label><input type="email" id="email" name="email" placeholder="usuario@empresa.com" required></div>
+                <div class="form-group"><label for="senha">Senha inicial</label><input type="password" id="senha" name="senha" placeholder="Defina uma senha segura" required></div>
+                <div class="form-group">
+                    <label for="perfil">Perfil de acesso</label>
+                    <select id="perfil" name="perfil" required><option value="VENDEDOR">Vendedor</option><option value="ADMIN">Administrador</option></select>
+                </div>
+                <div class="form-group full">
+                    <label for="comissao_percentual">Comissão sobre vendas (%)</label>
+                    <input type="number" id="comissao_percentual" name="comissao_percentual" step="0.01" min="0" value="0">
+                    <small>Aplicada automaticamente às vendas atribuídas ao usuário.</small>
+                </div>
+                <div class="modal-actions full">
+                    <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalPorId('modalUsuario')">Cancelar</button>
+                    <button type="submit" class="ui-command-action ui-icon-save">Salvar usuário</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
 </body>
 </html>
