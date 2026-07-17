@@ -2,22 +2,28 @@
 <html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
 <head>
     <meta charset="UTF-8">
-    <title>Editar Produto - Start CRM</title>
+    <title>Editar {{ produto.nome }} - Start CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
-
+<body class="ui-refreshed product-edit-page">
     <div class="app-layout">
-
         {% include 'partials/sidebar.html' %}
 
         <main class="main-content">
-            <header class="topbar">
+            <header class="topbar product-edit-topbar">
                 <div>
                     <h1>Editar produto</h1>
-                    <p>Atualize os dados do produto {{ produto.nome }}.</p>
+                    <p>Atualize identificação, preços e política de estoque de {{ produto.nome }}.</p>
+                </div>
+
+                <div class="product-edit-topbar-actions">
+                    <a
+                        href="{{ url_for('produtos') }}"
+                        class="ui-command-action ui-icon-back"
+                    >
+                        Voltar para produtos
+                    </a>
                 </div>
             </header>
 
@@ -29,108 +35,288 @@
                 {% endif %}
             {% endwith %}
 
-            <section class="panel">
-                <form method="POST" action="{{ url_for('produto_editar', produto_id=produto.id) }}" class="form-grid">
-                    <div class="form-group">
-                        <label for="nome">Nome do produto</label>
-                        <input type="text" id="nome" name="nome" value="{{ produto.nome }}" required>
+            <div class="product-edit-layout">
+                <section class="panel product-edit-form-card">
+                    <div class="product-edit-form-heading">
+                        <span class="product-edit-avatar" aria-hidden="true"></span>
+                        <div>
+                            <span class="modern-status modern-status--success">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="8.25"/>
+                                    <path d="m8.4 12.1 2.25 2.25 4.95-5.05"/>
+                                </svg>
+                                <span>Produto ativo</span>
+                            </span>
+                            <h2>{{ produto.nome }}</h2>
+                            <small>{{ produto.sku or "Sem SKU" }} · Produto #{{ produto.id }}</small>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="categoria">Categoria</label>
-                        <select id="categoria" name="categoria" required>
-                            {% set categorias = [
-                                'Capinhas',
-                                'Películas',
-                                'Carregadores',
-                                'Cabos',
-                                'Adaptadores',
-                                'Fones',
-                                'Caixas de som',
-                                'Suportes',
-                                'Acessórios gamer',
-                                'Acessórios de informática',
-                                'Outros'
-                            ] %}
+                    <form
+                        method="POST"
+                        action="{{ url_for('produto_editar', produto_id=produto.id) }}"
+                        class="product-edit-form"
+                    >
+                        <fieldset class="product-edit-section">
+                            <legend>
+                                <span>1</span>
+                                <strong>Identificação do produto</strong>
+                                <small>Dados utilizados na busca, venda e organização do catálogo.</small>
+                            </legend>
 
-                            {% for categoria in categorias %}
-                                <option value="{{ categoria }}" {% if produto.categoria == categoria %}selected{% endif %}>
-                                    {{ categoria }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                            <div class="product-edit-fields">
+                                <div class="form-group">
+                                    <label for="nome">Nome do produto <em>Obrigatório</em></label>
+                                    <input
+                                        type="text"
+                                        id="nome"
+                                        name="nome"
+                                        value="{{ produto.nome }}"
+                                        placeholder="Nome comercial do produto"
+                                        required
+                                    >
+                                </div>
 
-                    <div class="form-group">
-                        <label for="marca">Marca</label>
-                        <input type="text" id="marca" name="marca" value="{{ produto.marca or '' }}">
-                    </div>
+                                <div class="form-group">
+                                    <label for="categoria">Categoria <em>Obrigatório</em></label>
+                                    <select id="categoria" name="categoria" required>
+                                        {% set categorias = [
+                                            'Capinhas',
+                                            'Películas',
+                                            'Carregadores',
+                                            'Cabos',
+                                            'Adaptadores',
+                                            'Fones',
+                                            'Caixas de som',
+                                            'Suportes',
+                                            'Acessórios gamer',
+                                            'Acessórios de informática',
+                                            'Outros'
+                                        ] %}
+                                        {% for categoria in categorias %}
+                                            <option
+                                                value="{{ categoria }}"
+                                                {% if produto.categoria == categoria %}selected{% endif %}
+                                            >
+                                                {{ categoria }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
 
-                    <div class="form-group">
-                        <label for="sku">SKU / Código</label>
-                        <input type="text" id="sku" name="sku" value="{{ produto.sku }}" required>
-                    </div>
+                                <div class="form-group">
+                                    <label for="marca">Marca</label>
+                                    <input
+                                        type="text"
+                                        id="marca"
+                                        name="marca"
+                                        value="{{ produto.marca or '' }}"
+                                        placeholder="Ex.: Start"
+                                    >
+                                </div>
 
-                    <div class="form-group">
-                        <label for="preco_custo">Preço de custo</label>
-                        <input 
-                            type="number" 
-                            id="preco_custo" 
-                            name="preco_custo" 
-                            step="0.01" 
-                            min="0" 
-                            value="{{ produto.preco_custo }}"
-                            required
-                        >
-                    </div>
+                                <div class="form-group">
+                                    <label for="sku">SKU / Código <em>Obrigatório</em></label>
+                                    <input
+                                        type="text"
+                                        id="sku"
+                                        name="sku"
+                                        value="{{ produto.sku }}"
+                                        placeholder="Código único do produto"
+                                        required
+                                    >
+                                    <small>O SKU deve ser único no catálogo.</small>
+                                </div>
+                            </div>
+                        </fieldset>
 
-                    <div class="form-group">
-                        <label for="preco_venda">Preço de venda</label>
-                        <input 
-                            type="number" 
-                            id="preco_venda" 
-                            name="preco_venda" 
-                            step="0.01" 
-                            min="0" 
-                            value="{{ produto.preco_venda }}"
-                            required
-                        >
-                    </div>
+                        <fieldset class="product-edit-section">
+                            <legend>
+                                <span>2</span>
+                                <strong>Preços e margem</strong>
+                                <small>Valores usados para calcular faturamento, custo e lucro.</small>
+                            </legend>
 
-                    <div class="form-group">
-                        <label>Estoque atual</label>
-                        <input type="number" value="{{ produto.estoque_atual }}" disabled>
-                        <small class="field-help">
-                            Para alterar o estoque, use a tela Estoque.
-                        </small>
-                    </div>
+                            <div class="product-edit-fields">
+                                <div class="form-group">
+                                    <label for="preco_custo">Preço de custo <em>Obrigatório</em></label>
+                                    <input
+                                        type="number"
+                                        id="preco_custo"
+                                        name="preco_custo"
+                                        step="0.01"
+                                        min="0"
+                                        value="{{ produto.preco_custo }}"
+                                        required
+                                    >
+                                </div>
 
-                    <div class="form-group">
-                        <label for="estoque_minimo">Estoque mínimo</label>
-                        <input 
-                            type="number" 
-                            id="estoque_minimo" 
-                            name="estoque_minimo" 
-                            min="0" 
-                            value="{{ produto.estoque_minimo }}"
-                            required
-                        >
-                    </div>
+                                <div class="form-group">
+                                    <label for="preco_venda">Preço de venda <em>Obrigatório</em></label>
+                                    <input
+                                        type="number"
+                                        id="preco_venda"
+                                        name="preco_venda"
+                                        step="0.01"
+                                        min="0"
+                                        value="{{ produto.preco_venda }}"
+                                        required
+                                    >
+                                </div>
+                            </div>
+                        </fieldset>
 
-                    <div class="edit-actions-row">
-                        <button type="submit" class="icon-action-button ui-command-action ui-icon-save">
-                            Salvar
-                        </button>
+                        <fieldset class="product-edit-section">
+                            <legend>
+                                <span>3</span>
+                                <strong>Política de estoque</strong>
+                                <small>Defina o nível mínimo usado nos alertas de reposição.</small>
+                            </legend>
 
-                        <a href="{{ url_for('produtos') }}" class="icon-action-button secondary ui-command-action ui-icon-close">
-                            Cancelar
-                        </a>
-                    </div>
-                </form>
-            </section>
+                            <div class="product-edit-stock-grid">
+                                <div class="product-edit-current-stock">
+                                    <span>Estoque atual</span>
+                                    <strong>{{ produto.estoque_atual }}</strong>
+                                    <small>O saldo é alterado somente por movimentações de estoque.</small>
+                                    <a
+                                        href="{{ url_for('estoque', busca=produto.sku) }}"
+                                        class="product-edit-stock-link"
+                                    >
+                                        Ajustar na tela de estoque
+                                    </a>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="estoque_minimo">Estoque mínimo <em>Obrigatório</em></label>
+                                    <input
+                                        type="number"
+                                        id="estoque_minimo"
+                                        name="estoque_minimo"
+                                        min="0"
+                                        value="{{ produto.estoque_minimo }}"
+                                        required
+                                    >
+                                    <small>O produto entrará em alerta ao atingir este saldo.</small>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <footer class="product-edit-form-actions">
+                            <small>As alterações serão aplicadas às próximas vendas e relatórios.</small>
+                            <div>
+                                <a
+                                    href="{{ url_for('produtos') }}"
+                                    class="ui-command-action ui-icon-close"
+                                >
+                                    Cancelar
+                                </a>
+                                <button type="submit" class="ui-command-action ui-icon-save">
+                                    Salvar alterações
+                                </button>
+                            </div>
+                        </footer>
+                    </form>
+                </section>
+
+                <aside class="product-edit-sidebar">
+                    <section class="panel product-edit-summary-card">
+                        <div class="product-edit-sidebar-heading">
+                            <h2>Resumo comercial</h2>
+                            <p>Indicadores calculados com os valores atuais.</p>
+                        </div>
+
+                        <dl>
+                            <div>
+                                <dt>Preço de venda</dt>
+                                <dd class="positive">{{ produto.preco_venda|moeda_br }}</dd>
+                            </div>
+                            <div>
+                                <dt>Preço de custo</dt>
+                                <dd>{{ produto.preco_custo|moeda_br }}</dd>
+                            </div>
+                            <div>
+                                <dt>Lucro unitário</dt>
+                                <dd class="positive">{{ lucro_unitario|moeda_br }}</dd>
+                            </div>
+                            <div>
+                                <dt>Margem sobre custo</dt>
+                                <dd>{{ margem_produto|numero_br }}%</dd>
+                            </div>
+                            <div>
+                                <dt>Valor em estoque</dt>
+                                <dd>{{ valor_estoque|moeda_br }}</dd>
+                            </div>
+                        </dl>
+                    </section>
+
+                    <section class="panel product-edit-inventory-card">
+                        <div class="product-edit-sidebar-heading">
+                            <h2>Situação do estoque</h2>
+                            <p>Comparação entre saldo atual e estoque mínimo.</p>
+                        </div>
+
+                        <div class="product-edit-stock-status">
+                            {% if produto.estoque_atual == 0 %}
+                                <span class="modern-status modern-status--danger">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="8.25"/>
+                                        <path d="m9.25 9.25 5.5 5.5M14.75 9.25l-5.5 5.5"/>
+                                    </svg>
+                                    <span>Sem estoque</span>
+                                </span>
+                            {% elif produto.estoque_atual <= produto.estoque_minimo %}
+                                <span class="modern-status modern-status--warning">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M10.45 4.6 3.4 17a1.55 1.55 0 0 0 1.35 2.3h14.5A1.55 1.55 0 0 0 20.6 17L13.55 4.6a1.78 1.78 0 0 0-3.1 0Z"/>
+                                        <path d="M12 9v4.1M12 16.25v.1"/>
+                                    </svg>
+                                    <span>Estoque baixo</span>
+                                </span>
+                            {% else %}
+                                <span class="modern-status modern-status--success">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="8.25"/>
+                                        <path d="m8.4 12.1 2.25 2.25 4.95-5.05"/>
+                                    </svg>
+                                    <span>Estoque saudável</span>
+                                </span>
+                            {% endif %}
+                        </div>
+
+                        <div class="product-edit-stock-numbers">
+                            <span>
+                                <small>Atual</small>
+                                <strong>{{ produto.estoque_atual }}</strong>
+                            </span>
+                            <span>
+                                <small>Mínimo</small>
+                                <strong>{{ produto.estoque_minimo }}</strong>
+                            </span>
+                        </div>
+                    </section>
+
+                    <section class="panel product-edit-metadata-card">
+                        <div class="product-edit-sidebar-heading">
+                            <h2>Dados do cadastro</h2>
+                        </div>
+                        <dl>
+                            <div>
+                                <dt>Produto</dt>
+                                <dd>#{{ produto.id }}</dd>
+                            </div>
+                            <div>
+                                <dt>Cadastro</dt>
+                                <dd>{{ produto.created_at|date_br }}</dd>
+                            </div>
+                            <div>
+                                <dt>Categoria</dt>
+                                <dd>{{ produto.categoria or "-" }}</dd>
+                            </div>
+                        </dl>
+                    </section>
+                </aside>
+            </div>
         </main>
-
     </div>
-
 </body>
 </html>

@@ -2,77 +2,216 @@
 <html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
 <head>
     <meta charset="UTF-8">
-    <title>Editar Cliente - Start CRM</title>
+    <title>Editar {{ cliente.nome }} - Start CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
-
+<body class="ui-refreshed client-edit-page">
     <div class="app-layout">
-
         {% include 'partials/sidebar.html' %}
 
         <main class="main-content">
-            <header class="topbar">
+            <header class="topbar client-edit-topbar">
                 <div>
                     <h1>Editar cliente</h1>
-                    <p>Atualize os dados de {{ cliente.nome }}.</p>
+                    <p>Atualize os dados de contato e relacionamento de {{ cliente.nome }}.</p>
+                </div>
+
+                <div class="client-edit-topbar-actions">
+                    <a
+                        href="{{ url_for('cliente_detalhe', cliente_id=cliente.id) }}"
+                        class="ui-command-action ui-icon-back"
+                    >
+                        Voltar para o perfil
+                    </a>
                 </div>
             </header>
 
-            <section class="panel">
-                <form method="POST" action="{{ url_for('cliente_editar', cliente_id=cliente.id) }}" class="form-grid">
-                    <div class="form-group">
-                        <label for="nome">Nome</label>
-                        <input type="text" id="nome" name="nome" value="{{ cliente.nome }}" required>
+            <div class="client-edit-layout">
+                <section class="panel client-edit-form-card">
+                    <div class="client-edit-form-heading">
+                        <span class="client-edit-avatar" aria-hidden="true">
+                            {{ cliente.nome[:1]|upper }}
+                        </span>
+                        <div>
+                            <span class="modern-status modern-status--success">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="8.25"/>
+                                    <path d="m8.4 12.1 2.25 2.25 4.95-5.05"/>
+                                </svg>
+                                <span>Cliente ativo</span>
+                            </span>
+                            <h2>{{ cliente.nome }}</h2>
+                            <small>Cliente #{{ cliente.id }}</small>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="telefone">Telefone / WhatsApp</label>
-                        <input type="text" id="telefone" name="telefone" value="{{ cliente.telefone }}" required>
-                    </div>
+                    <form
+                        method="POST"
+                        action="{{ url_for('cliente_editar', cliente_id=cliente.id) }}"
+                        class="client-edit-form"
+                    >
+                        <fieldset class="client-edit-section">
+                            <legend>
+                                <span>1</span>
+                                <strong>Identificação e contato</strong>
+                                <small>Informações utilizadas no atendimento e nas vendas.</small>
+                            </legend>
 
-                    <div class="form-group full">
-                        <label for="endereco_completo">Endereço completo</label>
-                        <input 
-                            type="text" 
-                            id="endereco_completo" 
-                            name="endereco_completo" 
-                            value="{{ cliente.endereco_completo or '' }}"
-                        >
-                    </div>
+                            <div class="client-edit-fields">
+                                <div class="form-group">
+                                    <label for="nome">Nome <em>Obrigatório</em></label>
+                                    <input
+                                        type="text"
+                                        id="nome"
+                                        name="nome"
+                                        value="{{ cliente.nome }}"
+                                        placeholder="Nome completo"
+                                        autocomplete="name"
+                                        required
+                                    >
+                                </div>
 
-                    <div class="form-group full">
-                        <label for="tags">Tags / interesses</label>
-                        <input 
-                            type="text" 
-                            id="tags" 
-                            name="tags" 
-                            value="{{ tags_texto }}"
-                            placeholder="Ex: iPhone, Capinhas, Películas"
-                        >
-                    </div>
+                                <div class="form-group">
+                                    <label for="telefone">Telefone / WhatsApp <em>Obrigatório</em></label>
+                                    <input
+                                        type="text"
+                                        id="telefone"
+                                        name="telefone"
+                                        value="{{ cliente.telefone }}"
+                                        placeholder="Ex.: 11999999999"
+                                        autocomplete="tel"
+                                        required
+                                    >
+                                </div>
 
-                    <div class="form-group full">
-                        <label for="observacoes">Observações</label>
-                        <textarea id="observacoes" name="observacoes" rows="3">{{ cliente.observacoes or '' }}</textarea>
-                    </div>
+                                <div class="form-group full">
+                                    <label for="endereco_completo">Endereço completo</label>
+                                    <input
+                                        type="text"
+                                        id="endereco_completo"
+                                        name="endereco_completo"
+                                        value="{{ cliente.endereco_completo or '' }}"
+                                        placeholder="Rua, número, bairro e cidade"
+                                        autocomplete="street-address"
+                                    >
+                                </div>
+                            </div>
+                        </fieldset>
 
-                    <div class="edit-actions-row">
-                        <button type="submit" class="icon-action-button ui-command-action ui-icon-save">
-                            Salvar
-                        </button>
+                        <fieldset class="client-edit-section">
+                            <legend>
+                                <span>2</span>
+                                <strong>Segmentação</strong>
+                                <small>Interesses ajudam a personalizar campanhas e ofertas.</small>
+                            </legend>
 
-                        <a href="{{ url_for('cliente_detalhe', cliente_id=cliente.id) }}" class="icon-action-button secondary ui-command-action ui-icon-close">
-                            Cancelar
-                        </a>
-                    </div>
-                </form>
-            </section>
+                            <div class="client-edit-fields">
+                                <div class="form-group full">
+                                    <label for="tags">Tags / interesses</label>
+                                    <input
+                                        type="text"
+                                        id="tags"
+                                        name="tags"
+                                        value="{{ tags_texto }}"
+                                        placeholder="Ex.: iPhone, Capinhas, Películas"
+                                    >
+                                    <small>Separe cada interesse por vírgula.</small>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="client-edit-section">
+                            <legend>
+                                <span>3</span>
+                                <strong>Observações internas</strong>
+                                <small>Registre preferências ou informações importantes para a equipe.</small>
+                            </legend>
+
+                            <div class="client-edit-fields">
+                                <div class="form-group full">
+                                    <label for="observacoes">Observações</label>
+                                    <textarea
+                                        id="observacoes"
+                                        name="observacoes"
+                                        rows="5"
+                                        placeholder="Preferências, histórico ou detalhes relevantes"
+                                    >{{- cliente.observacoes or '' -}}</textarea>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <footer class="client-edit-form-actions">
+                            <small>As alterações serão aplicadas ao perfil e às próximas vendas.</small>
+                            <div>
+                                <a
+                                    href="{{ url_for('cliente_detalhe', cliente_id=cliente.id) }}"
+                                    class="ui-command-action ui-icon-close"
+                                >
+                                    Cancelar
+                                </a>
+                                <button type="submit" class="ui-command-action ui-icon-save">
+                                    Salvar alterações
+                                </button>
+                            </div>
+                        </footer>
+                    </form>
+                </section>
+
+                <aside class="client-edit-sidebar">
+                    <section class="panel client-edit-summary-card">
+                        <div class="client-edit-sidebar-heading">
+                            <h2>Resumo do cadastro</h2>
+                            <p>Informações atuais do perfil.</p>
+                        </div>
+
+                        <dl>
+                            <div>
+                                <dt>Status</dt>
+                                <dd><span class="client-edit-status-dot"></span> Ativo</dd>
+                            </div>
+                            <div>
+                                <dt>Cliente</dt>
+                                <dd>#{{ cliente.id }}</dd>
+                            </div>
+                            <div>
+                                <dt>Cadastro</dt>
+                                <dd>{{ cliente.created_at|date_br }}</dd>
+                            </div>
+                            <div>
+                                <dt>Interesses</dt>
+                                <dd>
+                                    {{ quantidade_tags }}
+                                    tag{% if quantidade_tags != 1 %}s{% endif %}
+                                </dd>
+                            </div>
+                        </dl>
+                    </section>
+
+                    <section class="panel client-edit-guidance-card">
+                        <div class="client-edit-sidebar-heading">
+                            <h2>Boas práticas</h2>
+                            <p>Mantenha o cadastro útil para toda a equipe.</p>
+                        </div>
+
+                        <ul>
+                            <li>
+                                <span aria-hidden="true">1</span>
+                                <p>Use um telefone com DDD para facilitar o contato pelo WhatsApp.</p>
+                            </li>
+                            <li>
+                                <span aria-hidden="true">2</span>
+                                <p>Cadastre interesses objetivos e separados por vírgulas.</p>
+                            </li>
+                            <li>
+                                <span aria-hidden="true">3</span>
+                                <p>Registre somente observações relevantes ao atendimento.</p>
+                            </li>
+                        </ul>
+                    </section>
+                </aside>
+            </div>
         </main>
-
     </div>
-
 </body>
 </html>

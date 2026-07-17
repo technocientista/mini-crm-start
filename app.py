@@ -1925,6 +1925,20 @@ def cliente_detalhe(cliente_id):
           AND status = 'CONCLUIDA'
     """, (cliente_id,)).fetchone()
 
+    quantidade_compras = int(resumo["quantidade_compras"] or 0)
+    total_comprado = float(resumo["total_comprado"] or 0)
+    lucro_gerado = float(resumo["lucro_gerado"] or 0)
+    ticket_medio = (
+        total_comprado / quantidade_compras
+        if quantidade_compras > 0
+        else 0
+    )
+    margem_cliente = (
+        lucro_gerado / total_comprado * 100
+        if total_comprado > 0
+        else 0
+    )
+
     vendas = conn.execute("""
         SELECT
             id,
@@ -1936,7 +1950,12 @@ def cliente_detalhe(cliente_id):
             custo_total,
             lucro_total,
             observacoes,
-            status
+            status,
+            (
+                SELECT GROUP_CONCAT(vp.forma_pagamento, ' + ')
+                FROM venda_pagamentos vp
+                WHERE vp.venda_id = vendas.id
+            ) AS pagamentos_descricao
         FROM vendas
         WHERE cliente_id = ?
         ORDER BY data_venda DESC
@@ -1953,6 +1972,7 @@ def cliente_detalhe(cliente_id):
         INNER JOIN vendas v ON v.id = vi.venda_id
         INNER JOIN produtos p ON p.id = vi.produto_id
         WHERE v.cliente_id = ?
+          AND v.status = 'CONCLUIDA'
         GROUP BY p.id
         ORDER BY quantidade_total DESC, total_gasto DESC
     """, (cliente_id,)).fetchall()
@@ -1966,9 +1986,15 @@ def cliente_detalhe(cliente_id):
         INNER JOIN vendas v ON v.id = vi.venda_id
         INNER JOIN produtos p ON p.id = vi.produto_id
         WHERE v.cliente_id = ?
+          AND v.status = 'CONCLUIDA'
         GROUP BY p.categoria
         ORDER BY quantidade_total DESC, total_gasto DESC
     """, (cliente_id,)).fetchall()
+
+    total_categorias = sum(
+        float(categoria["total_gasto"] or 0)
+        for categoria in categorias_preferidas
+    )
 
     modelos_whatsapp = conn.execute("""
         SELECT
@@ -1987,9 +2013,12 @@ def cliente_detalhe(cliente_id):
         cliente=cliente,
         tags=tags,
         resumo=resumo,
+        ticket_medio=ticket_medio,
+        margem_cliente=margem_cliente,
         vendas=vendas,
         produtos_comprados=produtos_comprados,
         categorias_preferidas=categorias_preferidas,
+        total_categorias=total_categorias,
         modelos_whatsapp=modelos_whatsapp,
         usuario=usuario_logado()
     )
@@ -2008,7 +2037,8 @@ def cliente_editar(cliente_id):
             nome,
             telefone,
             endereco_completo,
-            observacoes
+            observacoes,
+            created_at
         FROM clientes
         WHERE id = ? AND ativo = 1
     """, (cliente_id,)).fetchone()
@@ -2077,6 +2107,7 @@ def cliente_editar(cliente_id):
     """, (cliente_id,)).fetchall()
 
     tags_texto = ", ".join([tag["tag"] for tag in tags])
+    quantidade_tags = len(tags)
 
     conn.close()
 
@@ -2084,6 +2115,7 @@ def cliente_editar(cliente_id):
         "cliente_editar.html",
         cliente=cliente,
         tags_texto=tags_texto,
+        quantidade_tags=quantidade_tags,
         usuario=usuario_logado()
     )
 
@@ -3347,7 +3379,8 @@ def produto_editar(produto_id):
             preco_custo,
             preco_venda,
             estoque_atual,
-            estoque_minimo
+            estoque_minimo,
+            created_at
         FROM produtos
         WHERE id = ? AND ativo = 1
     """, (produto_id,)).fetchone()
@@ -3401,9 +3434,23 @@ def produto_editar(produto_id):
             flash("Erro: já existe outro produto com este SKU/código.")
             return redirect(url_for("produto_editar", produto_id=produto_id))
 
+    lucro_unitario = float(produto["preco_venda"] or 0) - float(produto["preco_custo"] or 0)
+    margem_produto = (
+        lucro_unitario / float(produto["preco_custo"] or 0) * 100
+        if float(produto["preco_custo"] or 0) > 0
+        else 0
+    )
+    valor_estoque = float(produto["estoque_atual"] or 0) * float(produto["preco_custo"] or 0)
+
     conn.close()
 
-    return render_template("produto_editar.html", produto=produto)
+    return render_template(
+        "produto_editar.html",
+        produto=produto,
+        lucro_unitario=lucro_unitario,
+        margem_produto=margem_produto,
+        valor_estoque=valor_estoque
+    )
 
 @app.route("/produtos/<int:produto_id>/inativar", methods=["POST"])
 @admin_required
@@ -4227,7 +4274,11 @@ def vendas():
         )
         conn.close()
 
-        return redirect(url_for("venda_recibo_termico", venda_id=venda_id))
+        return redirect(url_for(
+            "venda_recibo_termico",
+            venda_id=venda_id,
+            auto=1
+        ))
 
     vendedores = conn.execute("""
         SELECT id, nome, email
@@ -4905,6 +4956,15 @@ def venda_recibo_termico(venda_id):
         ORDER BY vi.id ASC
     """, (venda_id,)).fetchall()
 
+    pagamentos = conn.execute("""
+        SELECT
+            forma_pagamento,
+            valor
+        FROM venda_pagamentos
+        WHERE venda_id = ?
+        ORDER BY id ASC
+    """, (venda_id,)).fetchall()
+
     config = conn.execute("""
         SELECT
             nome_loja,
@@ -4917,13 +4977,25 @@ def venda_recibo_termico(venda_id):
         WHERE id = 1
     """).fetchone()
 
+    total_itens = sum(float(item["subtotal"] or 0) for item in itens)
+    quantidade_itens = sum(int(item["quantidade"] or 0) for item in itens)
+    total_pagamentos = sum(float(pagamento["valor"] or 0) for pagamento in pagamentos)
+    troco = max(total_pagamentos - float(venda["valor_total"] or 0), 0)
+    auto_impressao = request.args.get("auto") == "1"
+
     conn.close()
 
     return render_template(
         "recibo_termico.html",
         venda=venda,
         itens=itens,
-        config=config
+        pagamentos=pagamentos,
+        config=config,
+        total_itens=total_itens,
+        quantidade_itens=quantidade_itens,
+        troco=troco,
+        auto_impressao=auto_impressao,
+        retorno_url=url_for("vendas")
     )
 
 @app.route("/vendas/<int:venda_id>/cancelar", methods=["POST"])
