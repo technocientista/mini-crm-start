@@ -64,6 +64,18 @@
                         </svg>
                         <span>Exportar produtos</span>
                     </button>
+
+                    <button
+                        type="button"
+                        class="command-button"
+                        onclick="window.location.href='{{ url_for('historico_importacoes_produtos') }}'"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M4.75 5.25h14.5v14.5H4.75z"/>
+                            <path d="M8 9h8M8 12.5h8M8 16h5"/>
+                        </svg>
+                        <span>Histórico de importações</span>
+                    </button>
                 </div>
 
                 <form method="GET" action="{{ url_for('produtos') }}" class="clients-filter-bar products-filter-bar">
@@ -366,7 +378,14 @@
 
             <p class="muted-text">
                 Envie um arquivo CSV ou Excel com as colunas:
-                nome, categoria, marca, sku, preco_custo, preco_venda, estoque_atual, estoque_minimo.
+                nome, categoria, marca, sku, preco_custo, preco_venda, tipo_atualizacao,
+                estoque_atual, estoque_minimo.
+            </p>
+
+            <p class="muted-text">
+                Use <strong>SUBSTITUIR</strong> para definir o saldo total ou
+                <strong>INCREMENTAR</strong> para somar a quantidade informada ao estoque existente.
+                Se o tipo ficar vazio, será usado SUBSTITUIR.
             </p>
 
             <div class="import-actions">

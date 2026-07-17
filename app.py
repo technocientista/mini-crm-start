@@ -29,6 +29,11 @@ def inject_configuracoes():
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE = os.path.join(BASE_DIR, "crm_start.db")
+HISTORICO_IMPORTACOES_PRODUTOS_DIR = os.path.join(
+    BASE_DIR,
+    "exports",
+    "importacoes_produtos"
+)
 
 @app.template_filter("datetime_br")
 def datetime_br(valor):
@@ -2598,6 +2603,7 @@ def gerar_planilha_produtos_ignorados(registros_ignorados, importados, atualizad
         "Marca",
         "Preço custo",
         "Preço venda",
+        "Tipo de atualização",
         "Estoque atual",
         "Estoque mínimo",
         "Motivo"
@@ -2612,6 +2618,7 @@ def gerar_planilha_produtos_ignorados(registros_ignorados, importados, atualizad
             item.get("marca"),
             item.get("preco_custo"),
             item.get("preco_venda"),
+            item.get("tipo_atualizacao"),
             item.get("estoque_atual"),
             item.get("estoque_minimo"),
             item.get("motivo")
@@ -2630,6 +2637,104 @@ def gerar_planilha_produtos_ignorados(registros_ignorados, importados, atualizad
     wb.save(caminho_arquivo)
 
     return caminho_arquivo, nome_arquivo
+
+
+def gerar_historico_importacao_produtos(nome_arquivo_origem, registros):
+    os.makedirs(HISTORICO_IMPORTACOES_PRODUTOS_DIR, exist_ok=True)
+
+    data_importacao = datetime.now(timezone.utc)
+    nome_historico = (
+        f"importacao_produtos_{data_importacao.strftime('%Y%m%d_%H%M%S_%f')}.csv"
+    )
+    caminho_historico = os.path.join(
+        HISTORICO_IMPORTACOES_PRODUTOS_DIR,
+        nome_historico
+    )
+
+    campos = [
+        "data_importacao",
+        "usuario",
+        "arquivo_origem",
+        "linha",
+        "nome",
+        "sku",
+        "tipo_atualizacao",
+        "quantidade_informada",
+        "estoque_anterior",
+        "estoque_final",
+        "resultado",
+        "motivo"
+    ]
+
+    if not registros:
+        registros = [{
+            "linha": "",
+            "nome": "",
+            "sku": "",
+            "tipo_atualizacao": "",
+            "quantidade_informada": "",
+            "estoque_anterior": "",
+            "estoque_final": "",
+            "resultado": "SEM_REGISTROS",
+            "motivo": "O arquivo não continha linhas de produtos."
+        }]
+
+    with open(caminho_historico, "w", newline="", encoding="utf-8-sig") as arquivo_csv:
+        writer = csv.DictWriter(arquivo_csv, fieldnames=campos, delimiter=";")
+        writer.writeheader()
+
+        for registro in registros:
+            writer.writerow({
+                "data_importacao": data_importacao.strftime("%Y-%m-%d %H:%M:%S"),
+                "usuario": session.get("usuario_nome") or "-",
+                "arquivo_origem": nome_arquivo_origem,
+                "linha": registro.get("linha", ""),
+                "nome": registro.get("nome", ""),
+                "sku": registro.get("sku", ""),
+                "tipo_atualizacao": registro.get("tipo_atualizacao", ""),
+                "quantidade_informada": registro.get("quantidade_informada", ""),
+                "estoque_anterior": registro.get("estoque_anterior", ""),
+                "estoque_final": registro.get("estoque_final", ""),
+                "resultado": registro.get("resultado", ""),
+                "motivo": registro.get("motivo", "")
+            })
+
+    return caminho_historico, nome_historico
+
+
+def ler_resumo_historico_importacao_produtos(caminho_arquivo):
+    resumo = {
+        "data_importacao": "",
+        "usuario": "-",
+        "arquivo_origem": "-",
+        "novos": 0,
+        "atualizados": 0,
+        "ignorados": 0,
+        "total": 0
+    }
+
+    with open(caminho_arquivo, "r", newline="", encoding="utf-8-sig") as arquivo_csv:
+        reader = csv.DictReader(arquivo_csv, delimiter=";")
+
+        for registro in reader:
+            if not resumo["data_importacao"]:
+                resumo["data_importacao"] = registro.get("data_importacao", "")
+                resumo["usuario"] = registro.get("usuario", "-") or "-"
+                resumo["arquivo_origem"] = registro.get("arquivo_origem", "-") or "-"
+
+            resultado = (registro.get("resultado") or "").upper()
+
+            if resultado == "NOVO":
+                resumo["novos"] += 1
+                resumo["total"] += 1
+            elif resultado == "ATUALIZADO":
+                resumo["atualizados"] += 1
+                resumo["total"] += 1
+            elif resultado == "IGNORADO":
+                resumo["ignorados"] += 1
+                resumo["total"] += 1
+
+    return resumo
 
 @app.route("/produtos/importar", methods=["POST"])
 @admin_required
@@ -2652,8 +2757,23 @@ def importar_produtos():
     importados = 0
     atualizados = 0
     registros_ignorados = []
+    registros_historico = []
 
-    def registrar_ignorado(numero_linha, nome, categoria, marca, sku, preco_custo, preco_venda, estoque_atual, estoque_minimo, motivo):
+    def registrar_ignorado(
+        numero_linha,
+        nome,
+        categoria,
+        marca,
+        sku,
+        preco_custo,
+        preco_venda,
+        tipo_atualizacao,
+        estoque_atual,
+        estoque_minimo,
+        motivo,
+        estoque_anterior="",
+        estoque_final=""
+    ):
         registros_ignorados.append({
             "linha": numero_linha,
             "nome": nome,
@@ -2662,8 +2782,20 @@ def importar_produtos():
             "sku": sku,
             "preco_custo": preco_custo,
             "preco_venda": preco_venda,
+            "tipo_atualizacao": tipo_atualizacao,
             "estoque_atual": estoque_atual,
             "estoque_minimo": estoque_minimo,
+            "motivo": motivo
+        })
+        registros_historico.append({
+            "linha": numero_linha,
+            "nome": nome,
+            "sku": sku,
+            "tipo_atualizacao": tipo_atualizacao,
+            "quantidade_informada": estoque_atual,
+            "estoque_anterior": estoque_anterior,
+            "estoque_final": estoque_final,
+            "resultado": "IGNORADO",
             "motivo": motivo
         })
 
@@ -2676,6 +2808,16 @@ def importar_produtos():
         preco_venda = converter_float(get_valor(linha, "preco_venda", "preço_venda", "venda"))
         estoque_atual = converter_int(get_valor(linha, "estoque_atual", "estoque", "quantidade"))
         estoque_minimo = converter_int(get_valor(linha, "estoque_minimo", "estoque_mínimo", "minimo", "mínimo"))
+        tipo_atualizacao = get_valor(
+            linha,
+            "tipo_atualizacao",
+            "tipo_atualização",
+            "operacao",
+            "operação"
+        ).strip().upper()
+
+        if not tipo_atualizacao:
+            tipo_atualizacao = "SUBSTITUIR"
 
         motivos = []
 
@@ -2684,6 +2826,12 @@ def importar_produtos():
 
         if not sku:
             motivos.append("SKU/código do produto não informado")
+
+        if tipo_atualizacao not in ("SUBSTITUIR", "INCREMENTAR"):
+            motivos.append("Tipo de atualização deve ser SUBSTITUIR ou INCREMENTAR")
+
+        if estoque_atual < 0:
+            motivos.append("A quantidade informada não pode ser negativa")
 
         # Categoria e marca não são obrigatórias na importação.
         if motivos:
@@ -2695,6 +2843,7 @@ def importar_produtos():
                 sku,
                 preco_custo,
                 preco_venda,
+                tipo_atualizacao,
                 estoque_atual,
                 estoque_minimo,
                 "; ".join(motivos)
@@ -2702,6 +2851,8 @@ def importar_produtos():
             continue
 
         try:
+            cursor.execute(f"SAVEPOINT importacao_produto_{numero_linha}")
+
             produto_existente = cursor.execute("""
                 SELECT id, estoque_atual
                 FROM produtos
@@ -2712,6 +2863,11 @@ def importar_produtos():
             if produto_existente:
                 produto_id = produto_existente["id"]
                 estoque_anterior = produto_existente["estoque_atual"]
+                estoque_final = (
+                    estoque_anterior + estoque_atual
+                    if tipo_atualizacao == "INCREMENTAR"
+                    else estoque_atual
+                )
 
                 cursor.execute("""
                     UPDATE produtos
@@ -2732,15 +2888,18 @@ def importar_produtos():
                     marca,
                     preco_custo,
                     preco_venda,
-                    estoque_atual,
+                    estoque_final,
                     estoque_minimo,
                     produto_id
                 ))
 
-                if estoque_anterior != estoque_atual:
-                    diferenca = estoque_atual - estoque_anterior
+                if estoque_anterior != estoque_final:
+                    diferenca = estoque_final - estoque_anterior
 
-                    if diferenca > 0:
+                    if tipo_atualizacao == "INCREMENTAR":
+                        tipo = "IMPORTACAO_INCREMENTO_ENTRADA"
+                        quantidade = estoque_atual
+                    elif diferenca > 0:
                         tipo = "IMPORTACAO_AJUSTE_ENTRADA"
                         quantidade = diferenca
                     else:
@@ -2761,13 +2920,17 @@ def importar_produtos():
                         tipo,
                         quantidade,
                         estoque_anterior,
-                        estoque_atual,
-                        "Ajuste por importação de planilha"
+                        estoque_final,
+                        f"{tipo_atualizacao.title()} por importação de planilha"
                     ))
 
                 atualizados += 1
+                resultado = "ATUALIZADO"
 
             else:
+                estoque_anterior = 0
+                estoque_final = estoque_atual
+
                 cursor.execute("""
                     INSERT INTO produtos (
                         nome,
@@ -2787,7 +2950,7 @@ def importar_produtos():
                     sku,
                     preco_custo,
                     preco_venda,
-                    estoque_atual,
+                    estoque_final,
                     estoque_minimo
                 ))
 
@@ -2805,15 +2968,36 @@ def importar_produtos():
                 """, (
                     produto_id,
                     "IMPORTACAO_ENTRADA_INICIAL",
-                    estoque_atual,
+                    estoque_final,
                     0,
-                    estoque_atual,
+                    estoque_final,
                     "Estoque inicial por importação de planilha"
                 ))
 
                 importados += 1
+                resultado = "NOVO"
+
+            cursor.execute(f"RELEASE SAVEPOINT importacao_produto_{numero_linha}")
+
+            registros_historico.append({
+                "linha": numero_linha,
+                "nome": nome,
+                "sku": sku,
+                "tipo_atualizacao": tipo_atualizacao,
+                "quantidade_informada": estoque_atual,
+                "estoque_anterior": estoque_anterior,
+                "estoque_final": estoque_final,
+                "resultado": resultado,
+                "motivo": ""
+            })
 
         except Exception as erro:
+            try:
+                cursor.execute(f"ROLLBACK TO SAVEPOINT importacao_produto_{numero_linha}")
+                cursor.execute(f"RELEASE SAVEPOINT importacao_produto_{numero_linha}")
+            except sqlite3.Error:
+                pass
+
             registrar_ignorado(
                 numero_linha,
                 nome,
@@ -2822,6 +3006,7 @@ def importar_produtos():
                 sku,
                 preco_custo,
                 preco_venda,
+                tipo_atualizacao,
                 estoque_atual,
                 estoque_minimo,
                 f"Erro ao importar linha: {erro}"
@@ -2831,7 +3016,22 @@ def importar_produtos():
     conn.commit()
     conn.close()
 
+    caminho_historico, nome_historico = gerar_historico_importacao_produtos(
+        secure_filename(arquivo.filename),
+        registros_historico
+    )
+
     ignorados = len(registros_ignorados)
+
+    registrar_log(
+        "PRODUTOS_IMPORTADOS",
+        "produtos",
+        descricao=(
+            f"Arquivo {secure_filename(arquivo.filename)}. "
+            f"Novos: {importados}. Atualizados: {atualizados}. "
+            f"Ignorados: {ignorados}. Histórico: {nome_historico}."
+        )
+    )
 
     if ignorados > 0:
         caminho_arquivo, nome_arquivo = gerar_planilha_produtos_ignorados(
@@ -2848,6 +3048,88 @@ def importar_produtos():
 
     flash(f"Importação concluída. Novos: {importados}. Atualizados: {atualizados}. Ignorados: {ignorados}.")
     return redirect(url_for("produtos"))
+
+
+@app.route("/produtos/importacoes")
+@admin_required
+def historico_importacoes_produtos():
+    busca = request.args.get("busca", "").strip().lower()
+    page = normalizar_pagina(request.args.get("page", 1))
+    per_page = 20
+    historico = []
+
+    os.makedirs(HISTORICO_IMPORTACOES_PRODUTOS_DIR, exist_ok=True)
+
+    for nome_arquivo in os.listdir(HISTORICO_IMPORTACOES_PRODUTOS_DIR):
+        if not nome_arquivo.lower().endswith(".csv"):
+            continue
+
+        caminho_arquivo = os.path.join(
+            HISTORICO_IMPORTACOES_PRODUTOS_DIR,
+            nome_arquivo
+        )
+
+        try:
+            resumo = ler_resumo_historico_importacao_produtos(caminho_arquivo)
+            resumo["nome_arquivo"] = nome_arquivo
+
+            texto_busca = (
+                f"{resumo['arquivo_origem']} {resumo['usuario']} {nome_arquivo}"
+            ).lower()
+
+            if not busca or busca in texto_busca:
+                historico.append(resumo)
+        except (OSError, csv.Error, UnicodeError):
+            continue
+
+    historico.sort(
+        key=lambda item: (item["data_importacao"], item["nome_arquivo"]),
+        reverse=True
+    )
+
+    total_registros = len(historico)
+    page, total_paginas, offset = calcular_paginacao(
+        total_registros,
+        page,
+        per_page
+    )
+    historico = historico[offset:offset + per_page]
+
+    return render_template(
+        "historico_importacoes_produtos.html",
+        historico=historico,
+        busca=request.args.get("busca", "").strip(),
+        page=page,
+        total_paginas=total_paginas,
+        total_registros=total_registros,
+        usuario=usuario_logado()
+    )
+
+
+@app.route("/produtos/importacoes/<path:nome_arquivo>/baixar")
+@admin_required
+def baixar_historico_importacao_produtos(nome_arquivo):
+    nome_seguro = secure_filename(nome_arquivo)
+
+    if nome_seguro != nome_arquivo or not nome_seguro.lower().endswith(".csv"):
+        flash("Arquivo de histórico inválido.")
+        return redirect(url_for("historico_importacoes_produtos"))
+
+    caminho_arquivo = os.path.join(
+        HISTORICO_IMPORTACOES_PRODUTOS_DIR,
+        nome_seguro
+    )
+
+    if not os.path.isfile(caminho_arquivo):
+        flash("Histórico de importação não encontrado.")
+        return redirect(url_for("historico_importacoes_produtos"))
+
+    return send_file(
+        caminho_arquivo,
+        as_attachment=True,
+        download_name=nome_seguro,
+        mimetype="text/csv"
+    )
 
 
 @app.route("/produtos/exportar")
@@ -2938,6 +3220,7 @@ def baixar_modelo_produtos():
         "sku",
         "preco_custo",
         "preco_venda",
+        "tipo_atualizacao",
         "estoque_atual",
         "estoque_minimo"
     ])
@@ -2949,6 +3232,7 @@ def baixar_modelo_produtos():
         "CAR-20W-TC",
         35,
         69.90,
+        "SUBSTITUIR",
         10,
         3
     ])
@@ -2960,6 +3244,7 @@ def baixar_modelo_produtos():
         "CAB-USBC-1M",
         8,
         19.90,
+        "INCREMENTAR",
         20,
         5
     ])
