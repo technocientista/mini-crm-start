@@ -1645,6 +1645,22 @@ def clientes():
 
     where_sql = " AND ".join(where_clauses)
 
+    resumo_clientes = conn.execute("""
+        SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN ativo = 1 THEN 1 ELSE 0 END) AS ativos,
+            SUM(CASE WHEN ativo = 0 THEN 1 ELSE 0 END) AS inativos,
+            SUM(
+                CASE
+                    WHEN ativo = 1
+                     AND date(created_at) >= date('now', 'localtime', '-30 days')
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS novos_30_dias
+        FROM clientes
+    """).fetchone()
+
     total_registros = conn.execute(f"""
         SELECT COUNT(DISTINCT c.id) AS total
         FROM clientes c
@@ -1670,9 +1686,23 @@ def clientes():
             c.observacoes,
             c.ativo,
             c.created_at,
-            GROUP_CONCAT(ct.tag, ', ') AS tags
+            GROUP_CONCAT(DISTINCT ct.tag) AS tags,
+            COALESCE(rv.quantidade_compras, 0) AS quantidade_compras,
+            COALESCE(rv.total_comprado, 0) AS total_comprado,
+            rv.ultima_compra
         FROM clientes c
         LEFT JOIN cliente_tags ct ON ct.cliente_id = c.id
+        LEFT JOIN (
+            SELECT
+                cliente_id,
+                COUNT(*) AS quantidade_compras,
+                COALESCE(SUM(valor_total), 0) AS total_comprado,
+                MAX(data_venda) AS ultima_compra
+            FROM vendas
+            WHERE status = 'CONCLUIDA'
+              AND cliente_id IS NOT NULL
+            GROUP BY cliente_id
+        ) rv ON rv.cliente_id = c.id
         WHERE {where_sql}
         GROUP BY c.id
         ORDER BY c.nome ASC
@@ -1689,6 +1719,7 @@ def clientes():
         page=page,
         total_paginas=total_paginas,
         total_registros=total_registros,
+        resumo_clientes=resumo_clientes,
         usuario=usuario_logado()
     )
 
