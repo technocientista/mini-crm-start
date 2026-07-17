@@ -4,178 +4,147 @@
     <meta charset="UTF-8">
     <title>Estoque - Start CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
-
+<body class="ui-refreshed management-page stock-page">
     <div class="app-layout">
-
         {% include 'partials/sidebar.html' %}
 
         <main class="main-content">
-            <header class="topbar">
+            <header class="topbar management-topbar">
                 <div>
                     <h1>Estoque</h1>
-                    <p>Acompanhe saldos, estoque baixo e movimentações.</p>
+                    <p>Controle saldos, níveis mínimos e o histórico de movimentações.</p>
+                </div>
+                <div class="management-topbar-actions">
+                    <a href="{{ url_for('produtos') }}" class="ui-command-action ui-icon-product-add">Gerenciar produtos</a>
+                    <button type="button" class="ui-command-action ui-icon-adjust" onclick="abrirModalAjusteEstoque()">
+                        Ajustar estoque
+                    </button>
                 </div>
             </header>
 
             {% with messages = get_flashed_messages() %}
-                {% if messages %}
-                    <div class="success-alert">
-                        {{ messages[0] }}
-                    </div>
-                {% endif %}
+                {% if messages %}<div class="success-alert">{{ messages[0] }}</div>{% endif %}
             {% endwith %}
 
-            <section class="cards-grid">
-                <div class="card">
-                    <span>Total de produtos</span>
+            <section class="management-overview-grid" aria-label="Resumo do estoque">
+                <article class="management-overview-card featured">
+                    <span>Produtos monitorados</span>
                     <strong>{{ resumo_estoque.total_produtos or 0 }}</strong>
-                </div>
-
-                <div class="card">
-                    <span>Estoque OK</span>
+                    <small>Itens ativos no catálogo</small>
+                </article>
+                <article class="management-overview-card success">
+                    <span>Estoque saudável</span>
                     <strong>{{ resumo_estoque.estoque_ok or 0 }}</strong>
-                </div>
-
-                <div class="card">
-                    <span>Baixo estoque</span>
+                    <small>Acima do nível mínimo</small>
+                </article>
+                <article class="management-overview-card warning">
+                    <span>Estoque baixo</span>
                     <strong>{{ resumo_estoque.baixo_estoque or 0 }}</strong>
-                </div>
-
-                <div class="card">
+                    <small>Produtos próximos da ruptura</small>
+                </article>
+                <article class="management-overview-card danger">
                     <span>Sem estoque</span>
                     <strong>{{ resumo_estoque.sem_estoque or 0 }}</strong>
-                </div>
+                    <small>Produtos que exigem reposição</small>
+                </article>
             </section>
 
-            <section class="clients-command-panel stock-command-panel margin-top" aria-label="Ações e filtros de estoque">
-                <div class="clients-command-bar">
-                    <button type="button" class="command-button" onclick="abrirModalAjusteEstoque()">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 3.75v16.5M3.75 12h16.5"/>
-                        </svg>
-                        <span>Ajustar estoque</span>
-                    </button>
-                </div>
-
-                <form method="GET" action="{{ url_for('estoque') }}" class="clients-filter-bar stock-filter-bar">
-                    <div class="clients-search-field">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <circle cx="10.75" cy="10.75" r="6.5"/>
-                            <path d="m15.5 15.5 4.25 4.25"/>
-                        </svg>
-                        <input
-                            type="text"
-                            name="busca"
-                            value="{{ busca or '' }}"
-                            placeholder="Buscar por produto, SKU, categoria ou marca..."
-                            aria-label="Buscar produtos no estoque"
-                        >
+            <section class="panel management-directory-panel" id="lista-estoque">
+                <header class="management-panel-heading">
+                    <div>
+                        <span class="management-eyebrow">Inventário atual</span>
+                        <h2>Produtos em estoque</h2>
+                        <p>Consulte disponibilidade, nível mínimo e valor imobilizado.</p>
                     </div>
+                    <span class="management-results-badge">{{ total_produtos }} resultado{% if total_produtos != 1 %}s{% endif %}</span>
+                </header>
 
-                    <select name="status" aria-label="Filtrar por situação do estoque">
-                        <option value="todos" {% if status == 'todos' %}selected{% endif %}>Todos</option>
-                        <option value="ok" {% if status == 'ok' %}selected{% endif %}>Estoque OK</option>
-                        <option value="baixo" {% if status == 'baixo' %}selected{% endif %}>Baixo estoque</option>
-                        <option value="sem" {% if status == 'sem' %}selected{% endif %}>Sem estoque</option>
-                    </select>
-
-                    <button type="submit" class="command-button command-button-compact">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <circle cx="10.75" cy="10.75" r="6.5"/>
-                            <path d="m15.5 15.5 4.25 4.25"/>
-                        </svg>
-                        <span>Buscar</span>
-                    </button>
-
-                    <a href="{{ url_for('estoque') }}#lista-estoque" class="command-button command-button-compact command-button-muted">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M4 5.75h16"/>
-                            <path d="M7 11.75h10"/>
-                            <path d="M10 17.75h4"/>
-                            <path d="m18.5 14.5 3 3"/>
-                            <path d="m21.5 14.5-3 3"/>
-                        </svg>
-                        <span>Limpar</span>
-                    </a>
+                <form method="GET" action="{{ url_for('estoque') }}#lista-estoque" class="management-filter-bar stock-management-filter">
+                    <label class="management-search-field">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.75" cy="10.75" r="6.5"/><path d="m15.5 15.5 4.25 4.25"/></svg>
+                        <input type="search" name="busca" value="{{ busca or '' }}" placeholder="Buscar por produto, SKU, categoria ou marca..." aria-label="Buscar produtos no estoque">
+                    </label>
+                    <label class="management-select-field">
+                        <span>Situação</span>
+                        <select name="status">
+                            <option value="todos" {% if status == "todos" %}selected{% endif %}>Todos</option>
+                            <option value="ok" {% if status == "ok" %}selected{% endif %}>Estoque saudável</option>
+                            <option value="baixo" {% if status == "baixo" %}selected{% endif %}>Estoque baixo</option>
+                            <option value="sem" {% if status == "sem" %}selected{% endif %}>Sem estoque</option>
+                        </select>
+                    </label>
+                    <button type="submit" class="ui-command-action ui-icon-search">Buscar</button>
+                    <a href="{{ url_for('estoque') }}#lista-estoque" class="ui-command-action ui-icon-filter-clear">Limpar filtros</a>
                 </form>
-            </section>
 
-            <section class="panel margin-top" id="lista-estoque">
-                <h2>Produtos em estoque</h2>
+                {% if busca or status != "todos" %}
+                    <div class="management-active-filters">
+                        <span>Filtros aplicados</span>
+                        {% if busca %}<strong>Busca: “{{ busca }}”</strong>{% endif %}
+                        {% if status != "todos" %}<strong>Situação: {{ status|title }}</strong>{% endif %}
+                    </div>
+                {% endif %}
 
-                <div class="table-wrapper">
-                    <table>
+                <div class="table-wrapper management-table-wrapper">
+                    <table class="management-table stock-directory-table">
                         <thead>
                             <tr>
                                 <th>Produto</th>
-                                <th>Categoria</th>
-                                <th>Marca</th>
                                 <th>SKU</th>
-                                <th>Estoque atual</th>
-                                <th>Estoque mínimo</th>
-                                <th>Status</th>
+                                <th>Saldo</th>
+                                <th>Situação</th>
                                 <th>Valor em estoque</th>
+                                <th class="management-actions-column">Ação</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for produto in produtos %}
-                                {% if produto.estoque_atual == 0 %}
-                                    {% set status = 'Sem estoque' %}
-                                    {% set status_class = 'status-danger' %}
-                                {% elif produto.estoque_atual <= produto.estoque_minimo %}
-                                    {% set status = 'Baixo estoque' %}
-                                    {% set status_class = 'status-warning' %}
-                                {% else %}
-                                    {% set status = 'OK' %}
-                                    {% set status_class = 'status-ok' %}
-                                {% endif %}
-
                                 <tr>
-                                    <td>{{ produto.nome }}</td>
-                                    <td>{{ produto.categoria }}</td>
-                                    <td>{{ produto.marca or '-' }}</td>
-                                    <td>{{ produto.sku }}</td>
-                                    <td>{{ produto.estoque_atual }}</td>
-                                    <td>{{ produto.estoque_minimo }}</td>
+                                    <td>
+                                        <div class="management-identity">
+                                            <span class="management-avatar management-avatar--product" aria-hidden="true"></span>
+                                            <span>
+                                                <strong>{{ produto.nome }}</strong>
+                                                <small>{{ produto.categoria or "Sem categoria" }}{% if produto.marca %} · {{ produto.marca }}{% endif %}</small>
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td><span class="management-code">{{ produto.sku or "Sem SKU" }}</span></td>
+                                    <td>
+                                        <div class="stock-balance">
+                                            <strong>{{ produto.estoque_atual }}</strong>
+                                            <small>Mínimo: {{ produto.estoque_minimo }}</small>
+                                        </div>
+                                    </td>
                                     <td>
                                         {% if produto.estoque_atual == 0 %}
-                                            <span class="modern-status modern-status--danger">
-                                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                    <circle cx="12" cy="12" r="8.25"/>
-                                                    <path d="m9.25 9.25 5.5 5.5M14.75 9.25l-5.5 5.5"/>
-                                                </svg>
-                                                <span>Sem estoque</span>
-                                            </span>
+                                            <span class="modern-status modern-status--danger"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"/><path d="m9.25 9.25 5.5 5.5M14.75 9.25l-5.5 5.5"/></svg><span>Sem estoque</span></span>
                                         {% elif produto.estoque_atual <= produto.estoque_minimo %}
-                                            <span class="modern-status modern-status--warning">
-                                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                    <path d="M10.45 4.6 3.4 17a1.55 1.55 0 0 0 1.35 2.3h14.5A1.55 1.55 0 0 0 20.6 17L13.55 4.6a1.78 1.78 0 0 0-3.1 0Z"/>
-                                                    <path d="M12 9v4.1M12 16.25v.1"/>
-                                                </svg>
-                                                <span>Baixo estoque</span>
-                                            </span>
+                                            <span class="modern-status modern-status--warning"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.45 4.6 3.4 17a1.55 1.55 0 0 0 1.35 2.3h14.5A1.55 1.55 0 0 0 20.6 17L13.55 4.6a1.78 1.78 0 0 0-3.1 0Z"/><path d="M12 9v4.1M12 16.25v.1"/></svg><span>Estoque baixo</span></span>
                                         {% else %}
-                                            <span class="modern-status modern-status--success">
-                                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                    <circle cx="12" cy="12" r="8.25"/>
-                                                    <path d="m8.4 12.1 2.25 2.25 4.95-5.05"/>
-                                                </svg>
-                                                <span>Estoque OK</span>
-                                            </span>
+                                            <span class="modern-status modern-status--success"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.25"/><path d="m8.4 12.1 2.25 2.25 4.95-5.05"/></svg><span>Estoque saudável</span></span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        R$ {{ "%.2f"|format(produto.preco_custo * produto.estoque_atual) }}
+                                        <div class="management-value"><strong>{{ (produto.preco_custo * produto.estoque_atual)|moeda_br }}</strong><small>Custo unitário: {{ produto.preco_custo|moeda_br }}</small></div>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="table-outline-button stock-row-adjust" title="Ajustar estoque" aria-label="Ajustar estoque de {{ produto.nome }}" data-product-id="{{ produto.id }}" onclick="selecionarProdutoAjuste(this.dataset.productId)">
+                                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6"/></svg>
+                                        </button>
                                     </td>
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td colspan="8" class="empty-state">
-                                        Nenhum produto cadastrado.
+                                    <td colspan="6">
+                                        <div class="management-empty-state">
+                                            <span class="management-empty-icon management-empty-icon--stock" aria-hidden="true"></span>
+                                            <strong>Nenhum produto corresponde aos filtros</strong>
+                                            <p>Revise a busca ou remova os filtros para consultar o inventário.</p>
+                                            <a href="{{ url_for('estoque') }}#lista-estoque" class="ui-command-action ui-icon-filter-clear">Limpar filtros</a>
+                                        </div>
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -190,120 +159,94 @@
                 {% set pagination_total_pages = total_paginas_produtos %}
                 {% set pagination_total_records = total_produtos %}
                 {% set pagination_anchor = 'lista-estoque' %}
-
-                {% include 'partials/pagination.html' %}
+                <footer class="management-panel-footer">{% include 'partials/pagination.html' %}</footer>
             </section>
 
-            <section class="panel margin-top" id="lista-movimentacoes">
-                <h2>Últimas movimentações</h2>
-
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Data</th>
-                                <th>Produto</th>
-                                <th>SKU</th>
-                                <th>Tipo</th>
-                                <th>Quantidade</th>
-                                <th>Anterior</th>
-                                <th>Atual</th>
-                                <th>Observações</th>
-                            </tr>
-                        </thead>
+            <section class="panel management-directory-panel stock-movements-panel" id="lista-movimentacoes">
+                <header class="management-panel-heading">
+                    <div>
+                        <span class="management-eyebrow">Rastreabilidade</span>
+                        <h2>Movimentações de estoque</h2>
+                        <p>Acompanhe entradas, saídas e ajustes manuais dos produtos.</p>
+                    </div>
+                    <span class="management-results-badge">{{ total_movimentacoes }} registro{% if total_movimentacoes != 1 %}s{% endif %}</span>
+                </header>
+                <div class="table-wrapper management-table-wrapper">
+                    <table class="management-table stock-movements-table">
+                        <thead><tr><th>Data</th><th>Produto</th><th>Movimento</th><th>Alteração</th><th>Saldo</th><th>Observação</th></tr></thead>
                         <tbody>
                             {% for mov in movimentacoes %}
                                 <tr>
                                     <td>{{ mov.created_at|datetime_br }}</td>
-                                    <td>{{ mov.produto_nome }}</td>
-                                    <td>{{ mov.produto_sku }}</td>
-                                    <td>{{ mov.tipo }}</td>
-                                    <td>{{ mov.quantidade }}</td>
-                                    <td>{{ mov.estoque_anterior }}</td>
-                                    <td>{{ mov.estoque_atual }}</td>
-                                    <td>{{ mov.observacoes or '-' }}</td>
+                                    <td>
+                                        <div class="management-table-stack"><strong>{{ mov.produto_nome }}</strong><small>SKU: {{ mov.produto_sku or "—" }}</small></div>
+                                    </td>
+                                    <td>
+                                        {% if "ENTRADA" in mov.tipo %}
+                                            <span class="stock-movement stock-movement--entry">Entrada</span>
+                                        {% else %}
+                                            <span class="stock-movement stock-movement--exit">Saída</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><strong class="{% if 'ENTRADA' in mov.tipo %}management-positive{% else %}management-negative{% endif %}">{% if "ENTRADA" in mov.tipo %}+{% else %}−{% endif %} {{ mov.quantidade }}</strong></td>
+                                    <td><span class="stock-balance-change">{{ mov.estoque_anterior }} <b>→</b> {{ mov.estoque_atual }}</span></td>
+                                    <td>{{ mov.observacoes or "Sem observação" }}</td>
                                 </tr>
                             {% else %}
-                                <tr>
-                                    <td colspan="8" class="empty-state">
-                                        Nenhuma movimentação registrada.
-                                    </td>
-                                </tr>
+                                <tr><td colspan="6"><div class="management-empty-state"><span class="management-empty-icon management-empty-icon--history" aria-hidden="true"></span><strong>Nenhuma movimentação registrada</strong><p>Os ajustes de estoque aparecerão neste histórico.</p></div></td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
                 {% set pagination_endpoint = 'estoque' %}
-                {% set pagination_args = {
-                    'busca': busca,
-                    'status': status,
-                    'page_produtos': page_produtos
-                } %}
+                {% set pagination_args = {'busca': busca, 'status': status, 'page_produtos': page_produtos} %}
                 {% set pagination_page_param = 'page_movimentacoes' %}
                 {% set pagination_page = page_movimentacoes %}
                 {% set pagination_total_pages = total_paginas_movimentacoes %}
                 {% set pagination_total_records = total_movimentacoes %}
                 {% set pagination_anchor = 'lista-movimentacoes' %}
-
-                {% include 'partials/pagination.html' %}
+                <footer class="management-panel-footer">{% include 'partials/pagination.html' %}</footer>
             </section>
-
         </main>
-
     </div>
 
     <div id="modalAjusteEstoque" class="modal-overlay">
-        <div class="modal-card modal-large">
+        <div class="modal-card modal-large management-form-modal">
             <div class="modal-header">
-                <h2>Ajuste manual de estoque</h2>
-
-                <button type="button" class="modal-close" onclick="fecharModalAjusteEstoque()">
-                    ×
-                </button>
+                <div><h2>Ajuste manual de estoque</h2><p>Defina o novo saldo e registre o motivo da conferência.</p></div>
+                <button type="button" class="modal-close" onclick="fecharModalAjusteEstoque()" aria-label="Fechar modal">×</button>
             </div>
-
-            <form method="POST" action="{{ url_for('estoque') }}" class="form-grid compact-form">
+            <form method="POST" action="{{ url_for('estoque') }}" class="form-grid compact-form management-modal-form">
                 <div class="form-group">
                     <label for="produto_id">Produto</label>
                     <select id="produto_id" name="produto_id" required>
                         <option value="">Selecione o produto</option>
-                        {% for produto in produtos_ajuste %}
-                            <option value="{{ produto.id }}">
-                                {{ produto.nome }} | SKU: {{ produto.sku }} | Atual: {{ produto.estoque_atual }}
-                            </option>
-                        {% endfor %}
+                        {% for produto in produtos_ajuste %}<option value="{{ produto.id }}">{{ produto.nome }} · SKU: {{ produto.sku }} · Atual: {{ produto.estoque_atual }}</option>{% endfor %}
                     </select>
                 </div>
-
                 <div class="form-group">
-                    <label for="novo_estoque">Novo estoque</label>
-                    <input type="number" id="novo_estoque" name="novo_estoque" min="0" required>
+                    <label for="novo_estoque">Novo saldo</label>
+                    <input type="number" id="novo_estoque" name="novo_estoque" min="0" placeholder="0" required>
                 </div>
-
                 <div class="form-group full">
-                    <label for="observacoes">Observações</label>
-                    <textarea 
-                        id="observacoes" 
-                        name="observacoes" 
-                        rows="3" 
-                        placeholder="Ex: conferência de estoque, entrada manual, perda, correção..."
-                    ></textarea>
+                    <label for="observacoes">Motivo do ajuste</label>
+                    <textarea id="observacoes" name="observacoes" rows="3" placeholder="Ex.: conferência, perda, entrada manual ou correção"></textarea>
                 </div>
-
                 <div class="modal-actions full">
-                    <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalAjusteEstoque()">
-                        Cancelar
-                    </button>
-
-                    <button type="submit" class="ui-command-action ui-icon-adjust">
-                        Ajustar estoque
-                    </button>
+                    <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalAjusteEstoque()">Cancelar</button>
+                    <button type="submit" class="ui-command-action ui-icon-adjust">Salvar ajuste</button>
                 </div>
             </form>
         </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
-
+    <script>
+        function selecionarProdutoAjuste(produtoId) {
+            const campoProduto = document.getElementById("produto_id");
+            if (campoProduto) campoProduto.value = produtoId;
+            abrirModalAjusteEstoque();
+        }
+    </script>
 </body>
 </html>

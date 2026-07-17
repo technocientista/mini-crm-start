@@ -347,11 +347,15 @@
     </div>
 
     <div id="modalProduto" class="modal-overlay">
-        <div class="modal-card modal-large products-form-modal">
-            <div class="modal-header">
-                <div>
-                    <h2>Novo produto</h2>
-                    <p>Cadastre identificação, preços e níveis de estoque.</p>
+        <div class="modal-card products-form-modal">
+            <div class="modal-header products-form-modal-header">
+                <div class="products-form-modal-title">
+                    <span class="products-form-modal-icon" aria-hidden="true"></span>
+                    <div>
+                        <span class="products-form-modal-eyebrow">Catálogo</span>
+                        <h2>Novo produto</h2>
+                        <p>Cadastre identificação, preços e níveis de estoque.</p>
+                    </div>
                 </div>
                 <button
                     type="button"
@@ -363,65 +367,105 @@
                 </button>
             </div>
 
-            <form method="POST" action="{{ url_for('produtos') }}" class="form-grid compact-form products-modal-form">
-                <div class="form-group">
-                    <label for="nome">Nome do produto</label>
-                    <input type="text" id="nome" name="nome" placeholder="Nome comercial do produto" required>
-                </div>
-                <div class="form-group">
-                    <label for="categoria">Categoria</label>
-                    <select id="categoria" name="categoria" required>
-                        <option value="">Selecione</option>
-                        <option value="Capinhas">Capinhas</option>
-                        <option value="Películas">Películas</option>
-                        <option value="Carregadores">Carregadores</option>
-                        <option value="Cabos">Cabos</option>
-                        <option value="Adaptadores">Adaptadores</option>
-                        <option value="Fones">Fones</option>
-                        <option value="Caixas de som">Caixas de som</option>
-                        <option value="Suportes">Suportes</option>
-                        <option value="Acessórios gamer">Acessórios gamer</option>
-                        <option value="Acessórios de informática">Acessórios de informática</option>
-                        <option value="Outros">Outros</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="marca">Marca</label>
-                    <input type="text" id="marca" name="marca" placeholder="Ex.: Start">
-                </div>
-                <div class="form-group">
-                    <label for="sku">SKU / Código</label>
-                    <input type="text" id="sku" name="sku" placeholder="Código único do produto" required>
-                </div>
-                <div class="form-group">
-                    <label for="preco_custo">Preço de custo</label>
-                    <input type="number" id="preco_custo" name="preco_custo" step="0.01" min="0" placeholder="0,00" required>
-                </div>
-                <div class="form-group">
-                    <label for="preco_venda">Preço de venda</label>
-                    <input type="number" id="preco_venda" name="preco_venda" step="0.01" min="0" placeholder="0,00" required>
-                </div>
-                <div class="form-group">
-                    <label for="estoque_atual">Estoque atual</label>
-                    <input type="number" id="estoque_atual" name="estoque_atual" min="0" placeholder="0" required>
-                </div>
-                <div class="form-group">
-                    <label for="estoque_minimo">Estoque mínimo</label>
-                    <input type="number" id="estoque_minimo" name="estoque_minimo" min="0" placeholder="0" required>
+            <form method="POST" action="{{ url_for('produtos') }}" class="products-modal-form">
+                <section class="products-form-section">
+                    <header class="products-form-section-heading">
+                        <span>1</span>
+                        <div>
+                            <h3>Identificação do produto</h3>
+                            <p>Informações usadas para localizar e organizar o item no catálogo.</p>
+                        </div>
+                    </header>
+
+                    <div class="products-form-fields products-identification-fields">
+                        <div class="form-group products-name-field">
+                            <label for="nome">Nome do produto <em>Obrigatório</em></label>
+                            <input type="text" id="nome" name="nome" placeholder="Nome comercial do produto" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="categoria">Categoria <em>Obrigatório</em></label>
+                            <select id="categoria" name="categoria" required>
+                                <option value="">Selecione uma categoria</option>
+                                <option value="Capinhas">Capinhas</option>
+                                <option value="Películas">Películas</option>
+                                <option value="Carregadores">Carregadores</option>
+                                <option value="Cabos">Cabos</option>
+                                <option value="Adaptadores">Adaptadores</option>
+                                <option value="Fones">Fones</option>
+                                <option value="Caixas de som">Caixas de som</option>
+                                <option value="Suportes">Suportes</option>
+                                <option value="Acessórios gamer">Acessórios gamer</option>
+                                <option value="Acessórios de informática">Acessórios de informática</option>
+                                <option value="Outros">Outros</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="marca">Marca <em>Opcional</em></label>
+                            <input type="text" id="marca" name="marca" placeholder="Ex.: Start">
+                        </div>
+                        <div class="form-group">
+                            <label for="sku">SKU / Código <em>Obrigatório</em></label>
+                            <input type="text" id="sku" name="sku" placeholder="Código único do produto" required>
+                            <small>Utilize um código exclusivo para busca e leitura.</small>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="products-form-lower-grid">
+                    <section class="products-form-section">
+                        <header class="products-form-section-heading">
+                            <span>2</span>
+                            <div>
+                                <h3>Precificação</h3>
+                                <p>Defina custo e preço praticado na venda.</p>
+                            </div>
+                        </header>
+                        <div class="products-form-fields products-paired-fields">
+                            <div class="form-group">
+                                <label for="preco_custo">Preço de custo</label>
+                                <div class="products-money-field">
+                                    <span>R$</span>
+                                    <input type="number" id="preco_custo" name="preco_custo" step="0.01" min="0" placeholder="0,00" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="preco_venda">Preço de venda</label>
+                                <div class="products-money-field">
+                                    <span>R$</span>
+                                    <input type="number" id="preco_venda" name="preco_venda" step="0.01" min="0" placeholder="0,00" required>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="products-form-section">
+                        <header class="products-form-section-heading">
+                            <span>3</span>
+                            <div>
+                                <h3>Controle de estoque</h3>
+                                <p>Informe o saldo inicial e o alerta de reposição.</p>
+                            </div>
+                        </header>
+                        <div class="products-form-fields products-paired-fields">
+                            <div class="form-group">
+                                <label for="estoque_atual">Estoque atual</label>
+                                <input type="number" id="estoque_atual" name="estoque_atual" min="0" placeholder="0" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="estoque_minimo">Estoque mínimo</label>
+                                <input type="number" id="estoque_minimo" name="estoque_minimo" min="0" placeholder="0" required>
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
-                <div class="modal-actions full">
-                    <button
-                        type="button"
-                        class="button-secondary ui-command-action ui-icon-close"
-                        onclick="fecharModalProduto()"
-                    >
-                        Cancelar
-                    </button>
-                    <button type="submit" class="ui-command-action ui-icon-save">
-                        Salvar produto
-                    </button>
-                </div>
+                <footer class="products-form-actions">
+                    <p>Os campos indicados como obrigatórios precisam ser preenchidos.</p>
+                    <div>
+                        <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalProduto()">Cancelar</button>
+                        <button type="submit" class="ui-command-action ui-icon-save">Salvar produto</button>
+                    </div>
+                </footer>
             </form>
         </div>
     </div>
