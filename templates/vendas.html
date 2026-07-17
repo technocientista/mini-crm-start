@@ -7,9 +7,12 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
+<body class="ui-refreshed{% if pdv_bloqueado %} pdv-bloqueado{% endif %}">
 
-    <div class="app-layout">
+    <div
+        class="app-layout"
+        {% if pdv_bloqueado %}inert aria-hidden="true"{% endif %}
+    >
 
         {% include 'partials/sidebar.html' %}
 
@@ -67,51 +70,62 @@
 
 
                     <div class="pdv-step-content full" data-step-content="cliente">
+                        <div class="client-step-layout">
+                            <section class="pdv-entry-card client-selection-card">
+                                <div class="pdv-section-heading">
+                                    <div>
+                                        <strong>Cliente da venda</strong>
+                                        <small>Busque pelo nome ou telefone para vincular à venda.</small>
+                                    </div>
+                                    <span class="pdv-optional-badge">Opcional</span>
+                                </div>
 
-                        <div class="form-group client-search-group">
-                            <label for="cliente_busca">Cliente opcional</label>
+                                <div class="form-group client-search-group">
+                                    <label for="cliente_busca">Buscar cliente</label>
 
-                            <div class="inline-search-action">
-                                <input 
-                                    type="text" 
-                                    id="cliente_busca" 
-                                    placeholder="Digite pelo menos 3 caracteres..."
-                                    autocomplete="off"
-                                >
+                                    <input
+                                        type="text"
+                                        id="cliente_busca"
+                                        placeholder="Digite pelo menos 3 caracteres..."
+                                        autocomplete="off"
+                                    >
 
-                                <button 
-                                    type="button" 
-                                    class="action-icon-button add-client-button"
-                                    title="Cadastrar novo cliente"
-                                    onclick="abrirModalNovoClienteVenda()"
-                                >
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M12 5v14"></path>
-                                        <path d="M5 12h14"></path>
-                                    </svg>
-                                </button>
-                            </div>
+                                    <input type="hidden" id="cliente_id" name="cliente_id">
 
-                            <input type="hidden" id="cliente_id" name="cliente_id">
+                                    <small id="cliente_selecionado_info" class="field-help cliente-field-help">
+                                        Nenhum cliente selecionado. A venda será registrada sem identificação.
+                                    </small>
 
-                            <small id="cliente_selecionado_info" class="field-help cliente-field-help">
-                                Nenhum cliente selecionado. A venda será registrada sem identificação.
-                            </small>
+                                    <div id="cliente_resultados" class="autocomplete-results"></div>
+                                </div>
+                            </section>
 
-                            <div id="cliente_resultados" class="autocomplete-results"></div>
+                            <section class="pdv-entry-card client-notes-card">
+                                <div class="pdv-section-heading">
+                                    <div>
+                                        <strong>Observações da venda</strong>
+                                        <small>Adicione informações úteis para o atendimento.</small>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="observacoes">Observações</label>
+                                    <textarea
+                                        id="observacoes"
+                                        name="observacoes"
+                                        rows="4"
+                                        placeholder="Ex.: preferência do cliente, prazo combinado ou detalhes da entrega"
+                                    ></textarea>
+                                </div>
+                            </section>
                         </div>
 
-                        <div class="form-group full">
-                            <label for="observacoes">Observações</label>
-                            <textarea id="observacoes" name="observacoes" rows="3"></textarea>
-                        </div>
-
-                        <div class="pdv-step-actions">
+                        <div class="pdv-step-actions client-step-actions">
                             <button type="button" class="icon-action-button secondary ui-command-action ui-icon-back" onclick="irParaEtapaPDV('produtos')">
                                 Voltar
                             </button>
 
-                            <button type="button" class="icon-action-button" onclick="irParaEtapaPDV('pagamento')">
+                            <button type="button" class="icon-action-button ui-command-action ui-icon-next" onclick="irParaEtapaPDV('pagamento')">
                                 Avançar para Pagamento
                             </button>
                         </div>
@@ -121,56 +135,56 @@
                     <input type="hidden" id="vendedor_id" name="vendedor_id">
 
                     <div class="pdv-step-content active full" data-step-content="produtos">
-                        <div class="product-entry-row full">
-                            <div class="form-group product-search-group">
-                                <label for="produto_busca">Produto</label>
+                        <section class="pdv-entry-card product-entry-card">
+                            <div class="pdv-section-heading">
+                                <div>
+                                    <strong>Adicionar produto</strong>
+                                    <small>Busque pelo nome, SKU ou leia o código de barras.</small>
+                                </div>
+                            </div>
 
-                                <div class="inline-search-action">
-                                    <input 
-                                        type="text" 
-                                        id="produto_busca" 
+                            <div class="product-entry-row full">
+                                <div class="form-group product-search-group">
+                                    <label for="produto_busca">Produto</label>
+
+                                    <input
+                                        type="text"
+                                        id="produto_busca"
                                         placeholder="Digite ou leia o código de barras/SKU..."
                                         autocomplete="off"
                                     >
 
-                                    <button 
-                                        type="button" 
-                                        class="action-icon-button add-product-button"
-                                        title="Cadastrar novo produto"
-                                        onclick="abrirModalNovoProdutoVenda()"
-                                    >
-                                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                                            <path d="M12 5v14"></path>
-                                            <path d="M5 12h14"></path>
-                                        </svg>
-                                    </button>
+                                    <input type="hidden" id="produto_id">
+
+                                    <small id="produto_selecionado_info" class="field-help produto-field-help">
+                                        Nenhum produto selecionado.
+                                    </small>
+
+                                    <div id="produto_resultados" class="autocomplete-results"></div>
                                 </div>
 
-                                <input type="hidden" id="produto_id">
+                                <div class="form-group quantity-product-group">
+                                    <label for="quantidade">Quantidade</label>
+                                    <input type="number" id="quantidade" min="1" value="1">
+                                </div>
 
-                                <small id="produto_selecionado_info" class="field-help produto-field-help">
-                                    Nenhum produto selecionado.
-                                </small>
-                                <br>
-
-                                <div id="produto_resultados" class="autocomplete-results"></div>
+                                <div class="form-group add-product-action-group">
+                                    <label>&nbsp;</label>
+                                    <button type="button" onclick="adicionarProduto()" class="add-product-sale-button ui-command-action ui-icon-add">
+                                        Adicionar produto
+                                    </button>
+                                </div>
                             </div>
+                        </section>
 
-                            <div class="form-group quantity-product-group">
-                                <label for="quantidade">Quantidade</label>
-                                <input type="number" id="quantidade" min="1" value="1">
+                        <section class="pdv-items-card full">
+                            <div class="pdv-items-header">
+                                <div>
+                                    <strong>Itens da venda</strong>
+                                    <small>Revise produtos, quantidades e valores antes de avançar.</small>
+                                </div>
+                                <span id="itens_contador" class="pdv-items-count">0 itens</span>
                             </div>
-
-                            <div class="form-group add-product-action-group">
-                                <label>&nbsp;</label>
-                                <button type="button" onclick="adicionarProduto()" class="add-product-sale-button ui-command-action ui-icon-add">
-                                    Adicionar produto
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="full">
-                            <label for="desconto_tipo">Itens da venda</label>
 
                             <div class="table-wrapper">
                                 <table>
@@ -193,19 +207,15 @@
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
+                        </section>
 
-                        <div class="sale-preview product-total-summary full">
-                            <strong>Valor total:</strong>
-
-                            <div class="product-total-summary-grid">
-                                <span>Total:</span>
+                        <div class="pdv-step-actions product-step-actions">
+                            <div class="product-total-summary">
+                                <strong class="product-total-label">Valor total</strong>
                                 <strong id="preview-venda">R$ 0,00</strong>
                             </div>
-                        </div>
 
-                        <div class="pdv-step-actions">
-                            <button type="button" class="icon-action-button" onclick="irParaEtapaPDV('cliente')">
+                            <button type="button" class="icon-action-button ui-command-action ui-icon-next" onclick="irParaEtapaPDV('cliente')">
                                 Avançar para Cliente
                             </button>
                         </div>
@@ -220,21 +230,21 @@
 
                             <div class="payment-step-right">
                                 <div class="sale-preview payment-sale-summary">
-                                    <strong>Resumo da venda:</strong>
+                                    <strong>Resumo da venda</strong>
 
                                     <div class="payment-sale-summary-grid">
                                         <span>
-                                            <b>Subtotal:</b>
+                                            <b>Subtotal</b>
                                             <strong id="pagamento_resumo_subtotal">R$ 0,00</strong>
                                         </span>
 
                                         <span>
-                                            <b>Desconto:</b>
+                                            <b>Desconto</b>
                                             <strong id="pagamento_resumo_desconto">R$ 0,00</strong>
                                         </span>
 
                                         <span>
-                                            <b>Total:</b>
+                                            <b>Total final</b>
                                             <strong id="pagamento_resumo_total">R$ 0,00</strong>
                                         </span>
                                     </div>
@@ -294,34 +304,29 @@
                                         <div class="payment-split-grid">
                                             <div class="form-group payment-value-field" data-payment-value="PIX" style="display: none;">
                                                 <label for="valor_pix">Pix</label>
-                                                <input type="text" id="valor_pix" name="valor_pix" placeholder="0,00">
+                                                <input type="text" id="valor_pix" name="valor_pix" placeholder="0,00" autocomplete="off">
                                             </div>
 
                                             <div class="form-group payment-value-field" data-payment-value="DINHEIRO" style="display: none;">
                                                 <label for="valor_dinheiro">Dinheiro</label>
-                                                <input type="text" id="valor_dinheiro" name="valor_dinheiro" placeholder="0,00">
+                                                <input type="text" id="valor_dinheiro" name="valor_dinheiro" placeholder="0,00" autocomplete="off">
                                             </div>
 
                                             <div class="form-group payment-value-field" data-payment-value="CARTAO" style="display: none;">
                                                 <label for="valor_cartao">Cartão</label>
-                                                <input type="text" id="valor_cartao" name="valor_cartao" placeholder="0,00">
+                                                <input type="text" id="valor_cartao" name="valor_cartao" placeholder="0,00" autocomplete="off">
                                             </div>
                                         </div>
 
                                         <div class="payment-split-summary">
                                             <div>
-                                                <span>Valor final da venda</span>
-                                                <strong id="total_venda_pagamento">R$ 0,00</strong>
-                                            </div>
-
-                                            <div>
                                                 <span>Total informado</span>
-                                                <strong id="total_pagamentos_informado">R$ 0,00</strong>
+                                                <strong id="total_pagamentos_informado">0,00</strong>
                                             </div>
 
-                                            <div>
-                                                <span id="label_pagamento_restante">Falta informar</span>
-                                                <strong id="total_pagamentos_restante">R$ 0,00</strong>
+                                            <div class="payment-balance-card">
+                                                <span id="label_pagamento_restante">Saldo restante</span>
+                                                <strong id="total_pagamentos_restante">0,00</strong>
                                             </div>
                                         </div>
                                     </div>
@@ -349,7 +354,7 @@
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="valor_final_input">Valor final</label>
+                                        <label for="valor_final_input">Total final</label>
                                         <input 
                                             type="text" 
                                             id="valor_final_input" 
@@ -365,24 +370,54 @@
 
                         </div>
 
-                        <div class="pdv-step-actions">
+                        <div class="pdv-step-actions payment-step-actions">
                             <button type="button" class="icon-action-button secondary ui-command-action ui-icon-back" onclick="irParaEtapaPDV('cliente')">
                                 Voltar
                             </button>
 
-                            <button type="submit" class="icon-action-button ui-command-action ui-icon-check">
+                            <button
+                                type="submit"
+                                id="finalizar_venda_button"
+                                class="icon-action-button pdv-finalize-button ui-command-action ui-icon-check"
+                                disabled
+                                aria-disabled="true"
+                                title="Selecione uma forma de pagamento"
+                            >
                                 Finalizar venda
                             </button>
                         </div>
                     </div>
-
-                    <input type="hidden" id="desconto_total" name="desconto_total" value="0">
 
                 </form>
             </section>
         </main>
 
     </div>
+
+    {% if pdv_bloqueado %}
+        <div
+            id="modalAbrirCaixaPDV"
+            class="modal-overlay pdv-caixa-modal show"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tituloAbrirCaixaPDV"
+            data-modal-bloqueado="true"
+        >
+            <div class="modal-card">
+                <div class="modal-header">
+                    <div>
+                        <h2 id="tituloAbrirCaixaPDV">Abra o caixa para acessar o PDV</h2>
+                        <p class="muted-text">
+                            Informe o valor inicial do caixa. O PDV será liberado
+                            automaticamente após a abertura.
+                        </p>
+                    </div>
+                </div>
+
+                {% include 'partials/abrir_caixa_form.html' %}
+            </div>
+        </div>
+    {% endif %}
 
     <div id="modalVendedor" class="modal-overlay">
         <div class="modal-card">
@@ -411,7 +446,7 @@
                 </button>
 
                 <button type="button" onclick="confirmarVendedorEVender()" class="ui-command-action ui-icon-check">
-                    Confirmar e finalizar venda
+                    Finalizar venda
                 </button>
             </div>
         </div>

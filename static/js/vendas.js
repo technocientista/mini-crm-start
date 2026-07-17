@@ -23,8 +23,10 @@
     const descontoInput = document.getElementById("desconto_input");
     const descontoTotalInput = document.getElementById("desconto_total");
     const valorFinalInput = document.getElementById("valor_final_input");
+    const finalizarVendaButton = document.getElementById("finalizar_venda_button");
 
     const itensTabela = document.getElementById("itensTabela");
+    const itensContador = document.getElementById("itens_contador");
     const preview = document.getElementById("preview-venda");
     const itensJsonInput = document.getElementById("itens_json");
 
@@ -83,6 +85,13 @@
         return Number(valor || 0).toLocaleString("pt-BR", {
             style: "currency",
             currency: "BRL"
+        });
+    }
+
+    function formatarValorMonetario(valor) {
+        return Number(valor || 0).toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
         });
     }
 
@@ -246,6 +255,11 @@
             return;
         }
 
+        if (itensContador) {
+            const quantidadeItens = itensVenda.length;
+            itensContador.textContent = `${quantidadeItens} ${quantidadeItens === 1 ? "item" : "itens"}`;
+        }
+
         if (itensVenda.length === 0) {
             itensTabela.innerHTML = `
                 <tr>
@@ -263,8 +277,8 @@
             const tr = document.createElement("tr");
 
             tr.innerHTML = `
-                <td>${item.nome}</td>
-                <td>${item.sku || "-"}</td>
+                <td class="pdv-product-name">${item.nome}</td>
+                <td class="pdv-product-sku">${item.sku || "-"}</td>
                 <td>
                     <div class="quantity-control">
                         <button type="button" class="quantity-button" onclick="diminuirQuantidade(${item.produto_id})" title="Diminuir quantidade">-</button>
@@ -415,18 +429,26 @@
                 pagamentoDivididoInput.value = "1";
             }
 
-            const totalVenda = Number(valorFinalInput.value || 0);
+            const totalVenda = converterCampoMoedaParaNumero(valorFinalInput.value);
 
-            const totalPagamentos =
-                (formasSelecionadas.includes("PIX") ? converterDinheiroParaNumero(document.getElementById("valor_pix")?.value) : 0) +
-                (formasSelecionadas.includes("DINHEIRO") ? converterDinheiroParaNumero(document.getElementById("valor_dinheiro")?.value) : 0) +
-                (formasSelecionadas.includes("CARTAO") ? converterDinheiroParaNumero(document.getElementById("valor_cartao")?.value) : 0);
+            const totalPagamentos = calcularTotalPagamentosSelecionados(formasSelecionadas);
 
-            if (Math.abs(totalVenda - totalPagamentos) > 0.009) {
+            const diferencaPagamentos = totalVenda - totalPagamentos;
+
+            if (diferencaPagamentos > 0.009) {
                 mostrarToast(
-                    "O total dos pagamentos precisa ser igual ao valor final da venda.",
-                    "error",
+                    `Falta informar ${formatarMoeda(diferencaPagamentos)} para concluir a venda.`,
+                    "warning",
                     "Pagamento incompleto"
+                );
+                return false;
+            }
+
+            if (diferencaPagamentos < -0.009) {
+                mostrarToast(
+                    `O valor informado ultrapassa o total da venda em ${formatarMoeda(Math.abs(diferencaPagamentos))}.`,
+                    "error",
+                    "Valor informado a mais"
                 );
                 return false;
             }
@@ -539,7 +561,34 @@
         produtoResultados.innerHTML = "";
 
         if (!produtos || produtos.length === 0) {
-            produtoResultados.innerHTML = `<div class="autocomplete-empty">Nenhum produto encontrado.</div>`;
+            const resultadoVazio = document.createElement("div");
+            resultadoVazio.className = "autocomplete-empty-with-action";
+
+            const mensagem = document.createElement("span");
+            mensagem.className = "autocomplete-empty";
+            mensagem.textContent = "Nenhum produto encontrado.";
+
+            const botaoCadastrar = document.createElement("button");
+            botaoCadastrar.type = "button";
+            botaoCadastrar.className = "command-button autocomplete-create-action";
+            botaoCadastrar.innerHTML = `
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4.75 7.25 12 3.5l7.25 3.75L12 11 4.75 7.25Z"></path>
+                    <path d="M4.75 7.25v9.5L12 20.5l7.25-3.75v-9.5"></path>
+                    <path d="M12 11v9.5"></path>
+                    <path d="M18.5 2.75v5M16 5.25h5"></path>
+                </svg>
+                <span>Cadastrar novo produto</span>
+            `;
+            botaoCadastrar.addEventListener("click", function () {
+                produtoResultados.innerHTML = "";
+                produtoResultados.classList.remove("show");
+                window.abrirModalNovoProdutoVenda();
+            });
+
+            resultadoVazio.appendChild(mensagem);
+            resultadoVazio.appendChild(botaoCadastrar);
+            produtoResultados.appendChild(resultadoVazio);
             produtoResultados.classList.add("show");
             return;
         }
@@ -693,7 +742,33 @@
         clienteResultados.innerHTML = "";
 
         if (!clientes || clientes.length === 0) {
-            clienteResultados.innerHTML = `<div class="autocomplete-empty">Nenhum cliente encontrado.</div>`;
+            const resultadoVazio = document.createElement("div");
+            resultadoVazio.className = "autocomplete-empty-with-action";
+
+            const mensagem = document.createElement("span");
+            mensagem.className = "autocomplete-empty";
+            mensagem.textContent = "Nenhum cliente encontrado.";
+
+            const botaoCadastrar = document.createElement("button");
+            botaoCadastrar.type = "button";
+            botaoCadastrar.className = "command-button autocomplete-create-action";
+            botaoCadastrar.innerHTML = `
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="9" cy="8" r="3.25"></circle>
+                    <path d="M3.75 19a5.25 5.25 0 0 1 10.5 0"></path>
+                    <path d="M17.5 7v6M14.5 10h6"></path>
+                </svg>
+                <span>Cadastrar novo cliente</span>
+            `;
+            botaoCadastrar.addEventListener("click", function () {
+                clienteResultados.innerHTML = "";
+                clienteResultados.classList.remove("show");
+                window.abrirModalNovoClienteVenda();
+            });
+
+            resultadoVazio.appendChild(mensagem);
+            resultadoVazio.appendChild(botaoCadastrar);
+            clienteResultados.appendChild(resultadoVazio);
             clienteResultados.classList.add("show");
             return;
         }
@@ -965,113 +1040,101 @@
         });
     }
 
-    function dinheiroParaNumero(valor) {
-        if (!valor) {
-            return 0;
+    function calcularTotalPagamentosSelecionados(formasSelecionadas) {
+        return (
+            (formasSelecionadas.includes("PIX")
+                ? converterDinheiroParaNumero(document.getElementById("valor_pix")?.value)
+                : 0) +
+            (formasSelecionadas.includes("DINHEIRO")
+                ? converterDinheiroParaNumero(document.getElementById("valor_dinheiro")?.value)
+                : 0) +
+            (formasSelecionadas.includes("CARTAO")
+                ? converterDinheiroParaNumero(document.getElementById("valor_cartao")?.value)
+                : 0)
+        );
+    }
+
+    function atualizarEstadoFinalizacao(formasSelecionadas) {
+        if (!finalizarVendaButton) {
+            return;
         }
 
-        return Number(
-            valor
-                .toString()
-                .replace(/\./g, "")
-                .replace(",", ".")
-        ) || 0;
-    }
-
-    function numeroParaDinheiro(valor) {
-        return valor.toLocaleString("pt-BR", {
-            style: "currency",
-            currency: "BRL"
-        });
-    }
-
-    function obterTotalFinalVenda() {
-        const campoValorFinal = document.getElementById("valor_final");
-
-        if (campoValorFinal) {
-            return dinheiroParaNumero(campoValorFinal.value);
-        }
-
-        return 0;
-    }
-
-    function atualizarResumoVenda() {
+        const totalVenda = converterCampoMoedaParaNumero(valorFinalInput?.value);
         const subtotal = calcularSubtotalVenda();
-        const desconto = calcularDescontoVenda(subtotal);
-        const valorFinal = subtotal - desconto;
+        const desconto = Number(descontoTotalInput?.value || 0);
+        const dadosBasicosValidos =
+            itensVenda.length > 0 &&
+            formasSelecionadas.length > 0 &&
+            totalVenda >= 0 &&
+            desconto <= subtotal;
 
-        subtotalInput.value = subtotal.toFixed(2);
-        descontoTotalInput.value = desconto.toFixed(2);
-        valorFinalInput.value = valorFinal.toFixed(2);
+        finalizarVendaButton.disabled = !dadosBasicosValidos;
+        finalizarVendaButton.setAttribute("aria-disabled", dadosBasicosValidos ? "false" : "true");
 
-        totalVendaResumo.textContent = formatarMoeda(valorFinal);
-
-        atualizarResumoPagamentos();
+        if (!dadosBasicosValidos && formasSelecionadas.length === 0) {
+            finalizarVendaButton.title = "Selecione uma forma de pagamento";
+        } else if (!dadosBasicosValidos) {
+            finalizarVendaButton.title = "Confira os dados da venda";
+        } else if (formasSelecionadas.length > 1) {
+            const totalInformado = calcularTotalPagamentosSelecionados(formasSelecionadas);
+            const pagamentoFechado = Math.abs(totalVenda - totalInformado) <= 0.009;
+            finalizarVendaButton.title = pagamentoFechado
+                ? "Finalizar venda"
+                : "Finalizar venda e validar os valores informados";
+        } else {
+            finalizarVendaButton.title = "Finalizar venda";
+        }
     }
 
     function atualizarResumoPagamentos() {
         const formasSelecionadas = obterFormasPagamentoSelecionadas();
 
         if (formasSelecionadas.length <= 1) {
+            atualizarEstadoFinalizacao(formasSelecionadas);
             return;
         }
 
-        const totalVenda = Number(valorFinalInput?.value || 0);
-
-        const pix = formasSelecionadas.includes("PIX")
-            ? converterDinheiroParaNumero(document.getElementById("valor_pix")?.value)
-            : 0;
-
-        const dinheiro = formasSelecionadas.includes("DINHEIRO")
-            ? converterDinheiroParaNumero(document.getElementById("valor_dinheiro")?.value)
-            : 0;
-
-        const cartao = formasSelecionadas.includes("CARTAO")
-            ? converterDinheiroParaNumero(document.getElementById("valor_cartao")?.value)
-            : 0;
-
-        const totalInformado = pix + dinheiro + cartao;
+        const totalVenda = converterCampoMoedaParaNumero(valorFinalInput?.value);
+        const totalInformado = calcularTotalPagamentosSelecionados(formasSelecionadas);
         const diferenca = totalVenda - totalInformado;
+        const pagamentosFechados = Math.abs(diferenca) <= 0.009;
 
-        const totalVendaEl = document.getElementById("total_venda_pagamento");
         const totalInformadoEl = document.getElementById("total_pagamentos_informado");
         const restanteEl = document.getElementById("total_pagamentos_restante");
         const labelRestanteEl = document.getElementById("label_pagamento_restante");
 
-        if (totalVendaEl) {
-            totalVendaEl.textContent = formatarMoeda(totalVenda);
-        }
-
         if (totalInformadoEl) {
-            totalInformadoEl.textContent = formatarMoeda(totalInformado);
+            totalInformadoEl.textContent = formatarValorMonetario(totalInformado);
         }
 
         if (restanteEl) {
-            restanteEl.classList.remove("text-danger", "text-success");
+            restanteEl.classList.remove("text-danger", "text-success", "text-warning");
 
-            if (Math.abs(diferenca) <= 0.009) {
-                restanteEl.textContent = formatarMoeda(0);
+            if (pagamentosFechados) {
+                restanteEl.textContent = formatarValorMonetario(0);
                 restanteEl.classList.add("text-success");
 
                 if (labelRestanteEl) {
-                    labelRestanteEl.textContent = "Pagamento fechado";
+                    labelRestanteEl.textContent = "Pagamento concluído";
                 }
-            } else if (diferenca > 0) {
-                restanteEl.textContent = formatarMoeda(diferenca);
+            } else if (totalInformado < totalVenda) {
+                restanteEl.textContent = formatarValorMonetario(totalVenda - totalInformado);
+                restanteEl.classList.add("text-warning");
+
+                if (labelRestanteEl) {
+                    labelRestanteEl.textContent = "Saldo restante";
+                }
+            } else if (totalInformado > totalVenda) {
+                restanteEl.textContent = formatarValorMonetario(totalInformado - totalVenda);
                 restanteEl.classList.add("text-danger");
 
                 if (labelRestanteEl) {
-                    labelRestanteEl.textContent = "Falta informar";
-                }
-            } else {
-                restanteEl.textContent = formatarMoeda(Math.abs(diferenca));
-                restanteEl.classList.add("text-danger");
-
-                if (labelRestanteEl) {
-                    labelRestanteEl.textContent = "Valor informado a mais";
+                    labelRestanteEl.textContent = "Valor excedente";
                 }
             }
         }
+
+        atualizarEstadoFinalizacao(formasSelecionadas);
     }
 
     function obterFormasPagamentoSelecionadas() {

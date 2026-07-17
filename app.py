@@ -84,6 +84,30 @@ def date_br(valor):
     except Exception as erro:
         print(f"Erro ao formatar data: {erro}")
         return valor
+
+
+@app.template_filter("moeda_br")
+def moeda_br(valor):
+    try:
+        numero = float(valor or 0)
+    except (TypeError, ValueError):
+        numero = 0
+
+    formatado = f"{numero:,.2f}"
+    formatado = formatado.replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"R$ {formatado}"
+
+
+@app.template_filter("numero_br")
+def numero_br(valor, casas=1):
+    try:
+        numero = float(valor or 0)
+        casas_decimais = max(0, min(int(casas), 4))
+    except (TypeError, ValueError):
+        numero = 0
+        casas_decimais = 1
+
+    return f"{numero:.{casas_decimais}f}".replace(".", ",")
     
 @app.template_global("whatsapp_link")
 def whatsapp_link(telefone, mensagem):
@@ -3875,14 +3899,12 @@ def vendas():
         return redirect(url_for("login"))
 
     conn = get_db_connection()
+    caixa_aberto = obter_caixa_aberto(conn)
 
-    if request.method == "GET":
-        caixa_aberto = obter_caixa_aberto(conn)
-
-        if not caixa_aberto:
-            conn.close()
-            flash("Abra o caixa antes de registrar vendas.")
-            return redirect(url_for("caixa"))
+    if request.method == "POST" and not caixa_aberto:
+        conn.close()
+        flash("Abra o caixa antes de registrar uma venda.")
+        return redirect(url_for("vendas"))
 
     if request.method == "POST":
         cliente_id = request.form.get("cliente_id")
@@ -4269,6 +4291,8 @@ def vendas():
         page=page,
         total_paginas=total_paginas,
         total_registros=total_registros,
+        caixa_aberto=caixa_aberto,
+        pdv_bloqueado=not caixa_aberto,
         usuario=usuario_logado()
     )
 
@@ -5236,6 +5260,51 @@ def relatorios():
     if not data_fim:
         data_fim = hoje
 
+    try:
+        data_inicio_obj = date.fromisoformat(data_inicio)
+        data_fim_obj = date.fromisoformat(data_fim)
+    except (TypeError, ValueError):
+        data_inicio_obj = date.today()
+        data_fim_obj = date.today()
+
+    if data_inicio_obj > data_fim_obj:
+        data_inicio_obj, data_fim_obj = data_fim_obj, data_inicio_obj
+
+    data_inicio = data_inicio_obj.isoformat()
+    data_fim = data_fim_obj.isoformat()
+
+    quantidade_dias_periodo = (data_fim_obj - data_inicio_obj).days + 1
+    data_fim_anterior_obj = data_inicio_obj - timedelta(days=1)
+    data_inicio_anterior_obj = data_fim_anterior_obj - timedelta(days=quantidade_dias_periodo - 1)
+
+    atalhos_periodo = [
+        {
+            "label": "Hoje",
+            "inicio": date.today().isoformat(),
+            "fim": date.today().isoformat(),
+        },
+        {
+            "label": "7 dias",
+            "inicio": (date.today() - timedelta(days=6)).isoformat(),
+            "fim": date.today().isoformat(),
+        },
+        {
+            "label": "30 dias",
+            "inicio": (date.today() - timedelta(days=29)).isoformat(),
+            "fim": date.today().isoformat(),
+        },
+        {
+            "label": "Este mês",
+            "inicio": date.today().replace(day=1).isoformat(),
+            "fim": date.today().isoformat(),
+        },
+    ]
+
+    periodo_anterior_label = (
+        f"{data_inicio_anterior_obj.strftime('%d/%m/%Y')} a "
+        f"{data_fim_anterior_obj.strftime('%d/%m/%Y')}"
+    )
+
     page = int(request.args.get("page", 1))
     per_page = 10
 
@@ -5260,7 +5329,14 @@ def relatorios():
         params.append(cliente_id)
 
     if forma_pagamento:
-        where_clauses.append("v.forma_pagamento = ?")
+        where_clauses.append("""
+            EXISTS (
+                SELECT 1
+                FROM venda_pagamentos vp_filtro
+                WHERE vp_filtro.venda_id = v.id
+                  AND vp_filtro.forma_pagamento = ?
+            )
+        """)
         params.append(forma_pagamento)
 
     where_sql = " AND ".join(where_clauses)
@@ -5294,7 +5370,12 @@ def relatorios():
             v.custo_total,
             v.lucro_total,
             v.desconto_total,
-            v.status
+            v.status,
+            (
+                SELECT GROUP_CONCAT(pagamento.forma_pagamento, ' + ')
+                FROM venda_pagamentos pagamento
+                WHERE pagamento.venda_id = v.id
+            ) AS pagamentos_descricao
         FROM vendas v
         LEFT JOIN clientes c ON c.id = v.cliente_id
         WHERE {where_sql}
@@ -5313,14 +5394,43 @@ def relatorios():
         WHERE {where_sql}
     """, params).fetchone()
 
-    formas_pagamento = conn.execute(f"""
+    params_periodo_anterior = [
+        data_inicio_anterior_obj.isoformat(),
+        data_fim_anterior_obj.isoformat(),
+        *params[2:],
+    ]
+
+    resumo_periodo_anterior = conn.execute(f"""
         SELECT
-            v.forma_pagamento,
-            COUNT(*) AS quantidade,
-            COALESCE(SUM(v.valor_total), 0) AS total
+            COUNT(*) AS quantidade_vendas,
+            COALESCE(SUM(v.valor_total), 0) AS total_vendido,
+            COALESCE(SUM(v.custo_total), 0) AS total_custo,
+            COALESCE(SUM(v.lucro_total), 0) AS total_lucro,
+            COALESCE(SUM(v.desconto_total), 0) AS total_desconto
         FROM vendas v
         WHERE {where_sql}
-        GROUP BY v.forma_pagamento
+    """, params_periodo_anterior).fetchone()
+
+    serie_diaria_rows = conn.execute(f"""
+        SELECT
+            date(v.data_venda) AS dia,
+            COALESCE(SUM(v.valor_total), 0) AS total_vendido,
+            COALESCE(SUM(v.lucro_total), 0) AS total_lucro
+        FROM vendas v
+        WHERE {where_sql}
+        GROUP BY date(v.data_venda)
+        ORDER BY date(v.data_venda)
+    """, params).fetchall()
+
+    formas_pagamento_rows = conn.execute(f"""
+        SELECT
+            vp.forma_pagamento,
+            COUNT(DISTINCT vp.venda_id) AS quantidade,
+            COALESCE(SUM(vp.valor), 0) AS total
+        FROM venda_pagamentos vp
+        INNER JOIN vendas v ON v.id = vp.venda_id
+        WHERE {where_sql}
+        GROUP BY vp.forma_pagamento
         ORDER BY total DESC
     """, params).fetchall()
 
@@ -5369,7 +5479,14 @@ def relatorios():
         params_canceladas.append(cliente_id)
 
     if forma_pagamento:
-        where_canceladas_clauses.append("v.forma_pagamento = ?")
+        where_canceladas_clauses.append("""
+            EXISTS (
+                SELECT 1
+                FROM venda_pagamentos vp_filtro
+                WHERE vp_filtro.venda_id = v.id
+                  AND vp_filtro.forma_pagamento = ?
+            )
+        """)
         params_canceladas.append(forma_pagamento)
 
     where_canceladas_sql = " AND ".join(where_canceladas_clauses)
@@ -5420,7 +5537,7 @@ def relatorios():
 
     formas_pagamento_opcoes = conn.execute("""
         SELECT DISTINCT forma_pagamento
-        FROM vendas
+        FROM venda_pagamentos
         WHERE forma_pagamento IS NOT NULL
           AND forma_pagamento != ''
         ORDER BY forma_pagamento ASC
@@ -5432,6 +5549,179 @@ def relatorios():
 
     ticket_medio = total_vendido / quantidade_vendas if quantidade_vendas > 0 else 0
     margem_media = (total_lucro / total_vendido * 100) if total_vendido > 0 else 0
+
+    quantidade_vendas_anterior = resumo_periodo_anterior["quantidade_vendas"] or 0
+    total_vendido_anterior = resumo_periodo_anterior["total_vendido"] or 0
+    total_lucro_anterior = resumo_periodo_anterior["total_lucro"] or 0
+    ticket_medio_anterior = (
+        total_vendido_anterior / quantidade_vendas_anterior
+        if quantidade_vendas_anterior > 0
+        else 0
+    )
+    margem_media_anterior = (
+        total_lucro_anterior / total_vendido_anterior * 100
+        if total_vendido_anterior > 0
+        else 0
+    )
+
+    def calcular_variacao_percentual(valor_atual, valor_anterior):
+        valor_atual = float(valor_atual or 0)
+        valor_anterior = float(valor_anterior or 0)
+
+        if abs(valor_anterior) <= 0.009:
+            return None if abs(valor_atual) <= 0.009 else 100.0
+
+        return round(((valor_atual - valor_anterior) / abs(valor_anterior)) * 100, 1)
+
+    variacoes = {
+        "quantidade_vendas": calcular_variacao_percentual(
+            quantidade_vendas,
+            quantidade_vendas_anterior,
+        ),
+        "total_vendido": calcular_variacao_percentual(
+            total_vendido,
+            total_vendido_anterior,
+        ),
+        "total_lucro": calcular_variacao_percentual(
+            total_lucro,
+            total_lucro_anterior,
+        ),
+        "ticket_medio": calcular_variacao_percentual(
+            ticket_medio,
+            ticket_medio_anterior,
+        ),
+        "margem_media": round(margem_media - margem_media_anterior, 1),
+    }
+
+    dados_diarios = {
+        date.fromisoformat(row["dia"]): {
+            "total_vendido": float(row["total_vendido"] or 0),
+            "total_lucro": float(row["total_lucro"] or 0),
+        }
+        for row in serie_diaria_rows
+        if row["dia"]
+    }
+
+    limite_colunas_grafico = 16
+    tamanho_bloco = max(
+        1,
+        (quantidade_dias_periodo + limite_colunas_grafico - 1)
+        // limite_colunas_grafico,
+    )
+    serie_temporal = []
+
+    for deslocamento in range(0, quantidade_dias_periodo, tamanho_bloco):
+        inicio_bloco = data_inicio_obj + timedelta(days=deslocamento)
+        fim_bloco = min(
+            inicio_bloco + timedelta(days=tamanho_bloco - 1),
+            data_fim_obj,
+        )
+        cursor_dia = inicio_bloco
+        total_bloco = 0
+        lucro_bloco = 0
+
+        while cursor_dia <= fim_bloco:
+            valores_dia = dados_diarios.get(cursor_dia, {})
+            total_bloco += valores_dia.get("total_vendido", 0)
+            lucro_bloco += valores_dia.get("total_lucro", 0)
+            cursor_dia += timedelta(days=1)
+
+        if inicio_bloco == fim_bloco:
+            label_bloco = inicio_bloco.strftime("%d/%m")
+        else:
+            label_bloco = (
+                f"{inicio_bloco.strftime('%d/%m')}–"
+                f"{fim_bloco.strftime('%d/%m')}"
+            )
+
+        serie_temporal.append({
+            "label": label_bloco,
+            "total_vendido": total_bloco,
+            "total_lucro": lucro_bloco,
+        })
+
+    maior_valor_serie = max(
+        [
+            max(item["total_vendido"], item["total_lucro"], 0)
+            for item in serie_temporal
+        ]
+        or [0]
+    )
+
+    for item in serie_temporal:
+        if maior_valor_serie > 0:
+            percentual_total = item["total_vendido"] / maior_valor_serie * 100
+            percentual_lucro = max(item["total_lucro"], 0) / maior_valor_serie * 100
+            item["altura_total"] = max(4, round(percentual_total, 2)) if item["total_vendido"] > 0 else 0
+            item["altura_lucro"] = max(4, round(percentual_lucro, 2)) if item["total_lucro"] > 0 else 0
+        else:
+            item["altura_total"] = 0
+            item["altura_lucro"] = 0
+
+    total_formas_pagamento = sum(
+        float(item["total"] or 0)
+        for item in formas_pagamento_rows
+    )
+    formas_pagamento = []
+
+    for item in formas_pagamento_rows:
+        valor_forma = float(item["total"] or 0)
+        formas_pagamento.append({
+            "forma_pagamento": item["forma_pagamento"],
+            "quantidade": item["quantidade"],
+            "total": valor_forma,
+            "percentual": (
+                round(valor_forma / total_formas_pagamento * 100, 1)
+                if total_formas_pagamento > 0
+                else 0
+            ),
+        })
+
+    maior_total_produto = max(
+        [float(item["total_vendido"] or 0) for item in produtos_mais_vendidos]
+        or [0]
+    )
+    produtos_ranking = [
+        {
+            **dict(item),
+            "percentual": (
+                round(float(item["total_vendido"] or 0) / maior_total_produto * 100, 1)
+                if maior_total_produto > 0
+                else 0
+            ),
+        }
+        for item in produtos_mais_vendidos
+    ]
+
+    maior_total_cliente = max(
+        [float(item["total_comprado"] or 0) for item in clientes_mais_compraram]
+        or [0]
+    )
+    clientes_ranking = [
+        {
+            **dict(item),
+            "percentual": (
+                round(float(item["total_comprado"] or 0) / maior_total_cliente * 100, 1)
+                if maior_total_cliente > 0
+                else 0
+            ),
+        }
+        for item in clientes_mais_compraram
+    ]
+
+    periodo_label = (
+        data_inicio_obj.strftime("%d/%m/%Y")
+        if data_inicio_obj == data_fim_obj
+        else (
+            f"{data_inicio_obj.strftime('%d/%m/%Y')} a "
+            f"{data_fim_obj.strftime('%d/%m/%Y')}"
+        )
+    )
+    filtros_ativos = sum(bool(valor) for valor in (
+        vendedor_id,
+        cliente_id,
+        forma_pagamento,
+    ))
 
     conn.close()
 
@@ -5454,6 +5744,14 @@ def relatorios():
         forma_pagamento=forma_pagamento,
         ticket_medio=ticket_medio,
         margem_media=margem_media,
+        variacoes=variacoes,
+        serie_temporal=serie_temporal,
+        produtos_ranking=produtos_ranking,
+        clientes_ranking=clientes_ranking,
+        atalhos_periodo=atalhos_periodo,
+        periodo_label=periodo_label,
+        periodo_anterior_label=periodo_anterior_label,
+        filtros_ativos=filtros_ativos,
         page=page,
         total_paginas=total_paginas,
         total_registros=total_registros,
@@ -5595,7 +5893,14 @@ def exportar_relatorio():
         params.append(cliente_id)
 
     if forma_pagamento:
-        where_clauses.append("v.forma_pagamento = ?")
+        where_clauses.append("""
+            EXISTS (
+                SELECT 1
+                FROM venda_pagamentos vp_filtro
+                WHERE vp_filtro.venda_id = v.id
+                  AND vp_filtro.forma_pagamento = ?
+            )
+        """)
         params.append(forma_pagamento)
 
     where_sql = " AND ".join(where_clauses)
@@ -5614,7 +5919,12 @@ def exportar_relatorio():
             v.valor_total,
             v.custo_total,
             v.lucro_total,
-            v.status
+            v.status,
+            (
+                SELECT GROUP_CONCAT(pagamento.forma_pagamento, ' + ')
+                FROM venda_pagamentos pagamento
+                WHERE pagamento.venda_id = v.id
+            ) AS pagamentos_descricao
         FROM vendas v
         LEFT JOIN clientes c ON c.id = v.cliente_id
         WHERE {where_sql}
@@ -5648,7 +5958,7 @@ def exportar_relatorio():
             venda["cliente_nome"],
             venda["cliente_telefone"],
             venda["vendedor"],
-            venda["forma_pagamento"],
+            venda["pagamentos_descricao"] or venda["forma_pagamento"],
             venda["desconto_total"],
             venda["valor_total"],
             venda["custo_total"],
@@ -5656,10 +5966,10 @@ def exportar_relatorio():
             venda["status"]
         ])
 
-    os.makedirs("exports", exist_ok=True)
-
     nome_arquivo = f"relatorio_vendas_{data_inicio}_a_{data_fim}.xlsx"
-    caminho_arquivo = os.path.join("exports", nome_arquivo)
+    diretorio_exportacoes = os.path.join(BASE_DIR, "exports")
+    os.makedirs(diretorio_exportacoes, exist_ok=True)
+    caminho_arquivo = os.path.join(diretorio_exportacoes, nome_arquivo)
 
     wb.save(caminho_arquivo)
 

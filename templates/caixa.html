@@ -26,25 +26,7 @@
             <section class="panel">
                 <h2>Abrir caixa</h2>
 
-                <form method="POST" class="form-grid">
-                    <input type="hidden" name="acao" value="abrir">
-
-                    <div class="form-group">
-                        <label>Valor inicial</label>
-                        <input type="text" name="valor_inicial" placeholder="Ex: 100,00" required>
-                    </div>
-
-                    <div class="form-group full">
-                        <label>Observações</label>
-                        <textarea name="observacoes_abertura" rows="3" placeholder="Ex: caixa iniciado com troco"></textarea>
-                    </div>
-
-                    <div class="edit-actions-row">
-                        <button type="submit" class="icon-action-button ui-command-action ui-icon-wallet">
-                            Abrir caixa
-                        </button>
-                    </div>
-                </form>
+                {% include 'partials/abrir_caixa_form.html' %}
             </section>
         {% else %}
             <section class="cards-grid">

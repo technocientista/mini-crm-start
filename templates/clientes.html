@@ -60,7 +60,11 @@
                         <span>Importar clientes</span>
                     </button>
 
-                    <a href="{{ url_for('baixar_modelo_clientes') }}" class="command-button">
+                    <button
+                        type="button"
+                        class="command-button"
+                        onclick="window.location.href='{{ url_for('baixar_modelo_clientes') }}'"
+                    >
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M7.75 3.75h6.5l4 4v12.5H7.75a2 2 0 0 1-2-2V5.75a2 2 0 0 1 2-2Z"/>
                             <path d="M14.25 3.75v4h4"/>
@@ -68,7 +72,7 @@
                             <path d="m9.5 14.25 2.5 2.5 2.5-2.5"/>
                         </svg>
                         <span>Baixar modelo</span>
-                    </a>
+                    </button>
                 </div>
 
                 <form method="GET" action="{{ url_for('clientes') }}" class="clients-filter-bar">
