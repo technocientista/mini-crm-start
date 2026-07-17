@@ -5,18 +5,22 @@
 >
     <input type="hidden" name="acao" value="abrir">
 
-    <div class="form-group">
+    <div class="form-group full cash-open-value-group">
         <label for="valor_inicial_caixa">Valor inicial</label>
-        <input
-            type="text"
-            id="valor_inicial_caixa"
-            name="valor_inicial"
-            placeholder="Ex: 100,00"
-            inputmode="decimal"
-            autocomplete="off"
-            autofocus
-            required
-        >
+        <div class="cash-money-field">
+            <span>R$</span>
+            <input
+                type="text"
+                id="valor_inicial_caixa"
+                name="valor_inicial"
+                placeholder="0,00"
+                inputmode="decimal"
+                autocomplete="off"
+                autofocus
+                required
+            >
+        </div>
+        <small class="field-help">Informe o valor disponível para troco.</small>
     </div>
 
     <div class="form-group full">
@@ -25,7 +29,7 @@
             id="observacoes_abertura_caixa"
             name="observacoes_abertura"
             rows="3"
-            placeholder="Ex: caixa iniciado com troco"
+            placeholder="Ex.: caixa iniciado com fundo de troco conferido"
         ></textarea>
     </div>
 

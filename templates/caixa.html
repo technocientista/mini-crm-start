@@ -3,238 +3,418 @@
 <head>
     <meta charset="UTF-8">
     <title>Caixa - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
-<div class="app-layout">
+<body class="ui-refreshed cash-page">
+    <div class="app-layout">
+        {% include 'partials/sidebar.html' %}
 
-    {% include 'partials/sidebar.html' %}
+        <main class="main-content">
+            <header class="topbar cash-page-topbar">
+                <div>
+                    <h1>Caixa</h1>
+                    <p>Controle abertura, movimentações, conferência e fechamento do caixa.</p>
+                </div>
 
-    <main class="main-content">
-        <header class="topbar">
-            <h1>Caixa</h1>
-            <p>Abertura, movimentação e fechamento de caixa.</p>
-        </header>
+                <div class="cash-page-actions">
+                    <a href="{{ url_for('relatorio_caixas') }}" class="ui-command-action ui-icon-chart">
+                        Relatório de caixas
+                    </a>
+                    {% if caixa_aberto %}
+                        <a href="{{ url_for('vendas') }}" class="ui-command-action ui-icon-cart">
+                            Abrir PDV
+                        </a>
+                    {% endif %}
+                </div>
+            </header>
 
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div class="success-alert">{{ messages[0] }}</div>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="success-alert">{{ messages[0] }}</div>
+                {% endif %}
+            {% endwith %}
+
+            {% if not caixa_aberto %}
+                <section class="cash-closed-layout">
+                    <article class="cash-closed-intro">
+                        <span class="cash-closed-icon" aria-hidden="true"></span>
+                        <span class="cash-session-status cash-session-status--closed">Caixa fechado</span>
+                        <h2>Inicie uma nova sessão de caixa</h2>
+                        <p>
+                            Informe o fundo de troco para liberar o PDV e registrar as vendas
+                            desta operação.
+                        </p>
+
+                        <ul class="cash-opening-checklist">
+                            <li><span aria-hidden="true">1</span>Confira o dinheiro disponível para troco.</li>
+                            <li><span aria-hidden="true">2</span>Registre uma observação quando necessário.</li>
+                            <li><span aria-hidden="true">3</span>Todas as vendas ficarão vinculadas a esta sessão.</li>
+                        </ul>
+                    </article>
+
+                    <article class="panel cash-open-panel">
+                        <header class="cash-panel-heading">
+                            <div>
+                                <span class="cash-eyebrow">Nova sessão</span>
+                                <h2>Abrir caixa</h2>
+                                <p>O caixa será vinculado ao usuário atualmente conectado.</p>
+                            </div>
+                            <span class="cash-step-badge">Etapa única</span>
+                        </header>
+
+                        {% include 'partials/abrir_caixa_form.html' %}
+                    </article>
+                </section>
+            {% else %}
+                <section class="cash-session-banner">
+                    <div class="cash-session-identity">
+                        <span class="cash-session-icon" aria-hidden="true"></span>
+                        <div>
+                            <span class="cash-session-status cash-session-status--open">Caixa em operação</span>
+                            <h2>Caixa #{{ caixa_aberto.id }}</h2>
+                            <p>
+                                Aberto por {{ caixa_aberto.usuario_abertura_nome or usuario.nome }}
+                                em {{ caixa_aberto.data_abertura|datetime_br }}
+                            </p>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('vendas') }}" class="ui-command-action ui-icon-cart">
+                        Registrar venda
+                    </a>
+                </section>
+
+                <section class="cash-overview-grid" aria-label="Resumo da sessão atual">
+                    <article class="cash-overview-card cash-overview-card--session">
+                        <span>Sessão atual</span>
+                        <strong>#{{ caixa_aberto.id }}</strong>
+                        <small>Operação em andamento</small>
+                    </article>
+                    <article class="cash-overview-card">
+                        <span>Fundo de caixa</span>
+                        <strong>{{ caixa_aberto.valor_inicial|moeda_br }}</strong>
+                        <small>Valor informado na abertura</small>
+                    </article>
+                    <article class="cash-overview-card cash-overview-card--sales">
+                        <span>Vendas registradas</span>
+                        <strong>{{ resumo_caixa.total_vendas|moeda_br }}</strong>
+                        <small>{{ vendas_caixa|length }} venda{% if vendas_caixa|length != 1 %}s{% endif %} exibida{% if vendas_caixa|length != 1 %}s{% endif %}</small>
+                    </article>
+                    <article class="cash-overview-card cash-overview-card--expected">
+                        <span>Dinheiro esperado</span>
+                        <strong>{{ resumo_caixa.valor_esperado|moeda_br }}</strong>
+                        <small>Fundo + dinheiro + entradas − saídas</small>
+                    </article>
+                </section>
+
+                <section class="cash-workspace-grid">
+                    <article class="panel cash-summary-panel">
+                        <header class="cash-panel-heading">
+                            <div>
+                                <span class="cash-eyebrow">Conferência em tempo real</span>
+                                <h2>Composição do caixa</h2>
+                                <p>Valores recebidos e movimentações da sessão atual.</p>
+                            </div>
+                        </header>
+
+                        <div class="cash-summary-list">
+                            <div class="cash-summary-row">
+                                <span class="cash-summary-icon cash-summary-icon--money" aria-hidden="true"></span>
+                                <div><strong>Dinheiro</strong><small>Recebido nas vendas</small></div>
+                                <b>{{ resumo_caixa.total_dinheiro|moeda_br }}</b>
+                            </div>
+                            <div class="cash-summary-row">
+                                <span class="cash-summary-icon cash-summary-icon--pix" aria-hidden="true"></span>
+                                <div><strong>Pix</strong><small>Pagamentos instantâneos</small></div>
+                                <b>{{ resumo_caixa.total_pix|moeda_br }}</b>
+                            </div>
+                            <div class="cash-summary-row">
+                                <span class="cash-summary-icon cash-summary-icon--card" aria-hidden="true"></span>
+                                <div><strong>Cartão</strong><small>Crédito e débito</small></div>
+                                <b>{{ resumo_caixa.total_cartao|moeda_br }}</b>
+                            </div>
+                            <div class="cash-summary-row">
+                                <span class="cash-summary-icon cash-summary-icon--other" aria-hidden="true"></span>
+                                <div><strong>Outras formas</strong><small>Demais recebimentos</small></div>
+                                <b>{{ resumo_caixa.total_outros|moeda_br }}</b>
+                            </div>
+                            <div class="cash-summary-row cash-summary-row--entry">
+                                <span class="cash-summary-icon cash-summary-icon--entry" aria-hidden="true"></span>
+                                <div><strong>Entradas manuais</strong><small>Reforços registrados</small></div>
+                                <b>+ {{ resumo_caixa.entradas_manuais|moeda_br }}</b>
+                            </div>
+                            <div class="cash-summary-row cash-summary-row--exit">
+                                <span class="cash-summary-icon cash-summary-icon--exit" aria-hidden="true"></span>
+                                <div><strong>Saídas manuais</strong><small>Sangrias registradas</small></div>
+                                <b>− {{ resumo_caixa.saidas_manuais|moeda_br }}</b>
+                            </div>
+                        </div>
+
+                        <footer class="cash-summary-total">
+                            <div>
+                                <span>Dinheiro esperado no caixa</span>
+                                <small>Valor físico previsto para conferência</small>
+                            </div>
+                            <strong>{{ resumo_caixa.valor_esperado|moeda_br }}</strong>
+                        </footer>
+                    </article>
+
+                    <div class="cash-operation-stack">
+                        <article class="panel cash-movement-panel">
+                            <header class="cash-panel-heading">
+                                <div>
+                                    <span class="cash-eyebrow">Ajuste operacional</span>
+                                    <h2>Registrar movimentação</h2>
+                                    <p>Controle reforços e sangrias sem alterar as vendas.</p>
+                                </div>
+                            </header>
+
+                            <form method="POST" class="cash-operation-form">
+                                <input type="hidden" name="acao" value="movimentar">
+                                <div class="cash-form-row">
+                                    <div class="form-group">
+                                        <label for="tipo_movimento">Tipo</label>
+                                        <select id="tipo_movimento" name="tipo_movimento" required>
+                                            <option value="ENTRADA">Entrada / reforço</option>
+                                            <option value="SAIDA">Saída / sangria</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="valor_movimento">Valor</label>
+                                        <div class="cash-money-field">
+                                            <span>R$</span>
+                                            <input type="text" id="valor_movimento" name="valor_movimento" placeholder="0,00" inputmode="decimal" autocomplete="off" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="descricao_movimento">Descrição</label>
+                                    <textarea id="descricao_movimento" name="descricao_movimento" rows="3" placeholder="Ex.: sangria para depósito"></textarea>
+                                </div>
+                                <button type="submit" class="ui-command-action ui-icon-swap cash-primary-action">
+                                    Registrar movimentação
+                                </button>
+                            </form>
+                        </article>
+
+                        <article class="panel cash-close-panel">
+                            <header class="cash-panel-heading">
+                                <div>
+                                    <span class="cash-eyebrow">Encerrar operação</span>
+                                    <h2>Fechar caixa</h2>
+                                    <p>Conte somente o dinheiro físico antes de finalizar.</p>
+                                </div>
+                            </header>
+
+                            <form method="POST" class="cash-operation-form" onsubmit="return confirm('Confirma o fechamento deste caixa?');">
+                                <input type="hidden" name="acao" value="fechar">
+                                <div class="form-group">
+                                    <label for="valor_informado">Dinheiro conferido</label>
+                                    <div class="cash-money-field">
+                                        <span>R$</span>
+                                        <input type="text" id="valor_informado" name="valor_informado" placeholder="0,00" inputmode="decimal" autocomplete="off" required>
+                                    </div>
+                                    <small class="field-help">Esperado: {{ resumo_caixa.valor_esperado|moeda_br }}</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="observacoes_fechamento">Observações do fechamento</label>
+                                    <textarea id="observacoes_fechamento" name="observacoes_fechamento" rows="3" placeholder="Registre divergências ou informações importantes"></textarea>
+                                </div>
+                                <button type="submit" class="ui-command-action ui-icon-lock cash-danger-action">
+                                    Fechar caixa
+                                </button>
+                            </form>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="cash-activity-grid">
+                    <article class="panel cash-activity-panel">
+                        <header class="cash-panel-heading">
+                            <div>
+                                <span class="cash-eyebrow">Últimos registros</span>
+                                <h2>Vendas desta sessão</h2>
+                                <p>As 20 vendas mais recentes vinculadas ao caixa.</p>
+                            </div>
+                            <span class="cash-count-badge">{{ vendas_caixa|length }}</span>
+                        </header>
+                        <div class="table-wrapper cash-table-wrapper">
+                            <table class="cash-activity-table">
+                                <thead>
+                                    <tr><th>Venda</th><th>Horário</th><th>Vendedor</th><th>Pagamento</th><th>Total</th><th>Status</th></tr>
+                                </thead>
+                                <tbody>
+                                    {% for venda in vendas_caixa %}
+                                        <tr>
+                                            <td><a href="{{ url_for('venda_detalhe', venda_id=venda.id) }}" class="table-link">#{{ venda.id }}</a></td>
+                                            <td>{{ venda.data_venda|datetime_br }}</td>
+                                            <td>{{ venda.vendedor or "—" }}</td>
+                                            <td>{{ venda.forma_pagamento|replace("_", " ")|title }}</td>
+                                            <td><strong>{{ venda.valor_total|moeda_br }}</strong></td>
+                                            <td>
+                                                {% if venda.status == "CONCLUIDA" %}
+                                                    <span class="status-pill status-ok">Concluída</span>
+                                                {% else %}
+                                                    <span class="status-pill status-danger">Cancelada</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="6">
+                                                <div class="cash-empty-state">
+                                                    <span class="cash-empty-icon cash-empty-icon--sale" aria-hidden="true"></span>
+                                                    <strong>Nenhuma venda nesta sessão</strong>
+                                                    <p>As vendas registradas no PDV aparecerão aqui.</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </article>
+
+                    <article class="panel cash-activity-panel">
+                        <header class="cash-panel-heading">
+                            <div>
+                                <span class="cash-eyebrow">Auditoria operacional</span>
+                                <h2>Movimentações manuais</h2>
+                                <p>Reforços e sangrias registrados nesta sessão.</p>
+                            </div>
+                            <span class="cash-count-badge">{{ movimentacoes|length }}</span>
+                        </header>
+                        <div class="table-wrapper cash-table-wrapper">
+                            <table class="cash-activity-table">
+                                <thead>
+                                    <tr><th>Movimento</th><th>Data</th><th>Descrição</th><th>Responsável</th><th>Valor</th></tr>
+                                </thead>
+                                <tbody>
+                                    {% for movimento in movimentacoes %}
+                                        <tr>
+                                            <td>
+                                                {% if movimento.tipo == "ENTRADA" %}
+                                                    <span class="cash-movement-type cash-movement-type--entry">Entrada</span>
+                                                {% else %}
+                                                    <span class="cash-movement-type cash-movement-type--exit">Saída</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ movimento.created_at|datetime_br }}</td>
+                                            <td>{{ movimento.descricao or "Sem descrição" }}</td>
+                                            <td>{{ movimento.usuario_nome or "—" }}</td>
+                                            <td>
+                                                <strong class="{% if movimento.tipo == 'ENTRADA' %}cash-value-positive{% else %}cash-value-negative{% endif %}">
+                                                    {% if movimento.tipo == "ENTRADA" %}+{% else %}−{% endif %} {{ movimento.valor|moeda_br }}
+                                                </strong>
+                                            </td>
+                                        </tr>
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="5">
+                                                <div class="cash-empty-state">
+                                                    <span class="cash-empty-icon cash-empty-icon--movement" aria-hidden="true"></span>
+                                                    <strong>Nenhuma movimentação manual</strong>
+                                                    <p>Reforços e sangrias aparecerão neste histórico.</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </article>
+                </section>
             {% endif %}
-        {% endwith %}
 
-        {% if not caixa_aberto %}
-            <section class="panel">
-                <h2>Abrir caixa</h2>
+            <section class="panel cash-history-panel">
+                <header class="cash-panel-heading cash-history-heading">
+                    <div>
+                        <span class="cash-eyebrow">Auditoria</span>
+                        <h2>Histórico de caixas</h2>
+                        <p>Consulte sessões abertas e fechadas, responsáveis e divergências.</p>
+                    </div>
+                    <span class="cash-count-badge">{{ historico_caixas|length }} registro{% if historico_caixas|length != 1 %}s{% endif %}</span>
+                </header>
 
-                {% include 'partials/abrir_caixa_form.html' %}
-            </section>
-        {% else %}
-            <section class="cards-grid">
-                <div class="card">
-                    <span>Caixa aberto</span>
-                    <strong>#{{ caixa_aberto.id }}</strong>
-                    <small>{{ caixa_aberto.data_abertura|datetime_br }}</small>
-                </div>
-
-                <div class="card">
-                    <span>Valor inicial</span>
-                    <strong>R$ {{ "%.2f"|format(caixa_aberto.valor_inicial or 0) }}</strong>
-                </div>
-
-                <div class="card">
-                    <span>Vendas no caixa</span>
-                    <strong>R$ {{ "%.2f"|format(resumo_caixa.total_vendas or 0) }}</strong>
-                </div>
-
-                <div class="card">
-                    <span>Dinheiro esperado</span>
-                    <strong>R$ {{ "%.2f"|format(resumo_caixa.valor_esperado or 0) }}</strong>
-                </div>
-            </section>
-
-            <section class="panel margin-top">
-                <h2>Resumo do caixa</h2>
-
-                <div class="table-wrapper">
-                    <table>
+                <div class="table-wrapper cash-history-table-wrapper">
+                    <table class="cash-history-table">
                         <thead>
                             <tr>
-                                <th>Forma</th>
-                                <th>Total</th>
+                                <th>Caixa</th><th>Período</th><th>Responsáveis</th><th>Inicial</th><th>Esperado</th><th>Conferido</th><th>Diferença</th><th>Status</th><th class="cash-actions-column">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>Dinheiro</td>
-                                <td>R$ {{ "%.2f"|format(resumo_caixa.total_dinheiro or 0) }}</td>
-                            </tr>
-                            <tr>
-                                <td>Pix</td>
-                                <td>R$ {{ "%.2f"|format(resumo_caixa.total_pix or 0) }}</td>
-                            </tr>
-                            <tr>
-                                <td>Cartão</td>
-                                <td>R$ {{ "%.2f"|format(resumo_caixa.total_cartao or 0) }}</td>
-                            </tr>
-                            <tr>
-                                <td>Outros</td>
-                                <td>R$ {{ "%.2f"|format(resumo_caixa.total_outros or 0) }}</td>
-                            </tr>
-                            <tr>
-                                <td>Entradas manuais</td>
-                                <td>R$ {{ "%.2f"|format(resumo_caixa.entradas_manuais or 0) }}</td>
-                            </tr>
-                            <tr>
-                                <td>Saídas manuais</td>
-                                <td>R$ {{ "%.2f"|format(resumo_caixa.saidas_manuais or 0) }}</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Dinheiro esperado no caixa</strong></td>
-                                <td><strong>R$ {{ "%.2f"|format(resumo_caixa.valor_esperado or 0) }}</strong></td>
-                            </tr>
+                            {% for item in historico_caixas %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('caixa_detalhe', caixa_id=item.id) }}" class="cash-register-identity">
+                                            <span aria-hidden="true"></span><strong>#{{ item.id }}</strong>
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <div class="cash-table-stack">
+                                            <strong>{{ item.data_abertura|datetime_br }}</strong>
+                                            <small>{% if item.data_fechamento %}Até {{ item.data_fechamento|datetime_br }}{% else %}Em andamento{% endif %}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="cash-table-stack">
+                                            <strong>{{ item.usuario_abertura_nome or "—" }}</strong>
+                                            <small>{% if item.usuario_fechamento_nome %}Fechado por {{ item.usuario_fechamento_nome }}{% else %}Responsável pela abertura{% endif %}</small>
+                                        </div>
+                                    </td>
+                                    <td>{{ item.valor_inicial|moeda_br }}</td>
+                                    {% if item.status == "ABERTO" %}
+                                        <td><span class="cash-pending-value">Em andamento</span></td>
+                                        <td><span class="cash-pending-value">—</span></td>
+                                        <td><span class="cash-pending-value">—</span></td>
+                                    {% else %}
+                                        <td>{{ item.valor_esperado|moeda_br }}</td>
+                                        <td>{{ item.valor_informado|moeda_br }}</td>
+                                        <td>
+                                            {% if (item.diferenca or 0) > 0 %}
+                                                <strong class="cash-value-positive">+ {{ item.diferenca|moeda_br }}</strong>
+                                            {% elif (item.diferenca or 0) < 0 %}
+                                                <strong class="cash-value-negative">{{ item.diferenca|moeda_br }}</strong>
+                                            {% else %}
+                                                <strong class="cash-value-neutral">{{ item.diferenca|moeda_br }}</strong>
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                    <td>
+                                        {% if item.status == "ABERTO" %}
+                                            <span class="status-pill status-ok">Aberto</span>
+                                        {% else %}
+                                            <span class="status-pill status-warning">Fechado</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="table-actions cash-row-actions">
+                                            <a href="{{ url_for('caixa_detalhe', caixa_id=item.id) }}" class="table-outline-button" title="Ver detalhes do caixa" aria-label="Ver detalhes do caixa {{ item.id }}">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.75"/></svg>
+                                            </a>
+                                            <a href="{{ url_for('caixa_imprimir', caixa_id=item.id) }}" class="table-outline-button" target="_blank" rel="noopener" title="Imprimir caixa" aria-label="Imprimir caixa {{ item.id }}">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="9">
+                                        <div class="cash-empty-state cash-empty-state--history">
+                                            <span class="cash-empty-icon cash-empty-icon--history" aria-hidden="true"></span>
+                                            <strong>Nenhum caixa registrado</strong>
+                                            <p>As sessões aparecerão aqui após a primeira abertura.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </section>
-
-            <section class="panel margin-top">
-                <h2>Movimentação manual</h2>
-
-                <form method="POST" class="form-grid">
-                    <input type="hidden" name="acao" value="movimentar">
-
-                    <div class="form-group">
-                        <label>Tipo</label>
-                        <select name="tipo_movimento" required>
-                            <option value="ENTRADA">Entrada / reforço</option>
-                            <option value="SAIDA">Saída / sangria</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Valor</label>
-                        <input type="text" name="valor_movimento" placeholder="Ex: 50,00" required>
-                    </div>
-
-                    <div class="form-group full">
-                        <label>Descrição</label>
-                        <textarea name="descricao_movimento" rows="3" placeholder="Ex: sangria para depósito"></textarea>
-                    </div>
-
-                    <div class="edit-actions-row">
-                        <button type="submit" class="icon-action-button ui-command-action ui-icon-save">
-                            Registrar movimentação
-                        </button>
-                    </div>
-                </form>
-            </section>
-
-            <section class="panel margin-top">
-                <h2>Fechar caixa</h2>
-
-                <form method="POST" class="form-grid">
-                    <input type="hidden" name="acao" value="fechar">
-
-                    <div class="form-group">
-                        <label>Valor em dinheiro conferido</label>
-                        <input type="text" name="valor_informado" placeholder="Ex: 150,00" required>
-                        <small class="field-help">
-                            Informe apenas o dinheiro físico contado no caixa.
-                        </small>
-                    </div>
-
-                    <div class="form-group full">
-                        <label>Observações do fechamento</label>
-                        <textarea name="observacoes_fechamento" rows="3"></textarea>
-                    </div>
-
-                    <div class="edit-actions-row">
-                        <button type="submit" class="icon-action-button danger ui-command-action ui-icon-lock">
-                            Fechar caixa
-                        </button>
-                    </div>
-                </form>
-            </section>
-        {% endif %}
-
-        <section class="panel margin-top">
-            <h2>Histórico de caixas</h2>
-
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Caixa</th>
-                            <th>Abertura</th>
-                            <th>Fechamento</th>
-                            <th>Aberto por</th>
-                            <th>Fechado por</th>
-                            <th>Inicial</th>
-                            <th>Esperado</th>
-                            <th>Informado</th>
-                            <th>Diferença</th>
-                            <th>Status</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in historico_caixas %}
-                            <tr>
-                                <td>#{{ item.id }}</td>
-                                <td>{{ item.data_abertura|datetime_br }}</td>
-                                <td>{{ item.data_fechamento|datetime_br if item.data_fechamento else '-' }}</td>
-                                <td>{{ item.usuario_abertura_nome or '-' }}</td>
-                                <td>{{ item.usuario_fechamento_nome or '-' }}</td>
-                                <td>R$ {{ "%.2f"|format(item.valor_inicial or 0) }}</td>
-                                <td>R$ {{ "%.2f"|format(item.valor_esperado or 0) }}</td>
-                                <td>R$ {{ "%.2f"|format(item.valor_informado or 0) }}</td>
-                                <td>R$ {{ "%.2f"|format(item.diferenca or 0) }}</td>
-                                <td>
-                                    {% if item.status == 'ABERTO' %}
-                                        <span class="status-pill status-ok">Aberto</span>
-                                    {% else %}
-                                        <span class="status-pill status-warning">Fechado</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="table-actions">
-                                        <a 
-                                            href="{{ url_for('caixa_detalhe', caixa_id=item.id) }}" 
-                                            class="small-button"
-                                            title="Ver caixa"
-                                        >
-                                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                <path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-1.8a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"/>
-                                            </svg>
-                                        </a>
-                                        <a 
-                                            href="{{ url_for('caixa_imprimir', caixa_id=item.id) }}" 
-                                            class="small-button"
-                                            target="_blank"
-                                            title="Imprimir caixa"
-                                        >
-                                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                <path d="M6 9V2h12v7"></path>
-                                                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                                                <path d="M6 14h12v8H6z"></path>
-                                            </svg>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% else %}
-                            <tr>
-                                <td colspan="11" class="empty-state">
-                                    Nenhum caixa registrado.
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-    </main>
-</div>
+        </main>
+    </div>
 </body>
 </html>

@@ -3,246 +3,334 @@
 <head>
     <meta charset="UTF-8">
     <title>Relatório de caixas - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
-<div class="app-layout">
+<body class="ui-refreshed cash-report-page">
+    <div class="app-layout">
+        {% include 'partials/sidebar.html' %}
 
-    {% include 'partials/sidebar.html' %}
-
-    <main class="main-content">
-        <header class="topbar">
-            <h1>Relatório de caixas</h1>
-            <p>Analise aberturas, fechamentos e diferenças por período.</p>
-        </header>
-
-        <section class="panel">
-            <h2>Filtros</h2>
-
-            <form method="GET" class="form-grid">
-                <div class="form-group">
-                    <label for="data_inicio">Data inicial</label>
-                    <input 
-                        type="date" 
-                        id="data_inicio" 
-                        name="data_inicio" 
-                        value="{{ data_inicio }}"
-                    >
+        <main class="main-content">
+            <header class="topbar cash-report-topbar">
+                <div>
+                    <h1>Relatório de caixas</h1>
+                    <p>Analise sessões, recebimentos, conferências e divergências por período.</p>
                 </div>
 
-                <div class="form-group">
-                    <label for="data_fim">Data final</label>
-                    <input 
-                        type="date" 
-                        id="data_fim" 
-                        name="data_fim" 
-                        value="{{ data_fim }}"
-                    >
-                </div>
-
-                <div class="form-group">
-                    <label for="usuario_id">Usuário</label>
-                    <select id="usuario_id" name="usuario_id">
-                        <option value="">Todos</option>
-
-                        {% for user in usuarios %}
-                            <option 
-                                value="{{ user.id }}"
-                                {% if usuario_id|string == user.id|string %}selected{% endif %}
-                            >
-                                {{ user.nome }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="status">Status</label>
-                    <select id="status" name="status">
-                        <option value="">Todos</option>
-                        <option value="ABERTO" {% if status == 'ABERTO' %}selected{% endif %}>Aberto</option>
-                        <option value="FECHADO" {% if status == 'FECHADO' %}selected{% endif %}>Fechado</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="somente_diferenca">Diferença</label>
-                    <select id="somente_diferenca" name="somente_diferenca">
-                        <option value="">Todos</option>
-                        <option value="1" {% if somente_diferenca == '1' %}selected{% endif %}>
-                            Somente com diferença
-                        </option>
-                    </select>
-                </div>
-
-                <div class="edit-actions-row">
-                    <button type="submit" class="icon-action-button">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/>
-                        </svg>
-                        <span>Filtrar</span>
-                    </button>
-
-                    <a href="{{ url_for('relatorio_caixas') }}" class="icon-action-button secondary">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M18 6L6 18"></path>
-                            <path d="M6 6l12 12"></path>
-                        </svg>
-                        <span>Limpar</span>
+                <div class="cash-report-topbar-actions">
+                    <a href="{{ url_for('relatorios') }}" class="ui-command-action ui-icon-chart">
+                        Relatórios de vendas
+                    </a>
+                    <a href="{{ url_for('caixa') }}" class="ui-command-action ui-icon-wallet">
+                        Operar caixa
                     </a>
                 </div>
-            </form>
-        </section>
+            </header>
 
-        <section class="cards-grid margin-top">
-            <div class="card">
-                <span>Caixas</span>
-                <strong>{{ resumo.quantidade_caixas or 0 }}</strong>
-            </div>
+            <section class="panel cash-report-filter-panel">
+                <header class="cash-panel-heading">
+                    <div>
+                        <span class="cash-eyebrow">Consulta</span>
+                        <h2>Filtros do relatório</h2>
+                        <p>Refine o período, responsável e situação das sessões.</p>
+                    </div>
+                    <span class="cash-report-period">
+                        {{ data_inicio[8:10] }}/{{ data_inicio[5:7] }}/{{ data_inicio[0:4] }}
+                        a
+                        {{ data_fim[8:10] }}/{{ data_fim[5:7] }}/{{ data_fim[0:4] }}
+                    </span>
+                </header>
 
-            <div class="card">
-                <span>Total vendido</span>
-                <strong>R$ {{ "%.2f"|format(resumo.total_vendas or 0) }}</strong>
-            </div>
+                <form method="GET" action="{{ url_for('relatorio_caixas') }}" class="cash-report-filter-grid">
+                    <label class="cash-report-filter-field">
+                        <span>Data inicial</span>
+                        <input type="date" name="data_inicio" value="{{ data_inicio }}">
+                    </label>
 
-            <div class="card">
-                <span>Dinheiro esperado</span>
-                <strong>R$ {{ "%.2f"|format(resumo.total_esperado or 0) }}</strong>
-            </div>
+                    <label class="cash-report-filter-field">
+                        <span>Data final</span>
+                        <input type="date" name="data_fim" value="{{ data_fim }}">
+                    </label>
 
-            <div class="card">
-                <span>Diferença total</span>
-                <strong>R$ {{ "%.2f"|format(resumo.total_diferenca or 0) }}</strong>
-            </div>
-        </section>
+                    <label class="cash-report-filter-field">
+                        <span>Responsável pela abertura</span>
+                        <select name="usuario_id">
+                            <option value="">Todos os usuários</option>
+                            {% for user in usuarios %}
+                                <option value="{{ user.id }}" {% if usuario_id|string == user.id|string %}selected{% endif %}>
+                                    {{ user.nome }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </label>
 
-        <section class="panel margin-top">
-            <h2>Resumo por forma de pagamento</h2>
+                    <label class="cash-report-filter-field">
+                        <span>Status</span>
+                        <select name="status">
+                            <option value="">Todos</option>
+                            <option value="ABERTO" {% if status == "ABERTO" %}selected{% endif %}>Abertos</option>
+                            <option value="FECHADO" {% if status == "FECHADO" %}selected{% endif %}>Fechados</option>
+                        </select>
+                    </label>
 
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Forma</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
+                    <label class="cash-report-filter-field">
+                        <span>Conferência</span>
+                        <select name="somente_diferenca">
+                            <option value="">Todos os resultados</option>
+                            <option value="1" {% if somente_diferenca == "1" %}selected{% endif %}>Somente com divergência</option>
+                        </select>
+                    </label>
 
-                    <tbody>
-                        <tr>
-                            <td>Dinheiro</td>
-                            <td>R$ {{ "%.2f"|format(resumo.total_dinheiro or 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td>Pix</td>
-                            <td>R$ {{ "%.2f"|format(resumo.total_pix or 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td>Cartão</td>
-                            <td>R$ {{ "%.2f"|format(resumo.total_cartao or 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td>Outros</td>
-                            <td>R$ {{ "%.2f"|format(resumo.total_outros or 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td>Entradas manuais</td>
-                            <td>R$ {{ "%.2f"|format(resumo.total_entradas or 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td>Saídas manuais</td>
-                            <td>R$ {{ "%.2f"|format(resumo.total_saidas or 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Dinheiro informado</strong></td>
-                            <td><strong>R$ {{ "%.2f"|format(resumo.total_informado or 0) }}</strong></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                    <div class="cash-report-filter-actions">
+                        <button type="submit" class="ui-command-action ui-icon-filter">Aplicar filtros</button>
+                        <a href="{{ url_for('relatorio_caixas') }}" class="ui-command-action ui-icon-filter-clear">
+                            Limpar filtros
+                        </a>
+                    </div>
+                </form>
 
-        <section class="panel margin-top">
-            <h2>Caixas encontrados</h2>
+                {% if usuario_id or status or somente_diferenca %}
+                    <div class="cash-report-active-filters">
+                        <span>Filtros aplicados</span>
+                        {% if usuario_id %}
+                            {% for user in usuarios %}
+                                {% if usuario_id|string == user.id|string %}
+                                    <strong>Responsável: {{ user.nome }}</strong>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                        {% if status %}
+                            <strong>Status: {{ status|title }}</strong>
+                        {% endif %}
+                        {% if somente_diferenca == "1" %}
+                            <strong>Somente com divergência</strong>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </section>
 
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Caixa</th>
-                            <th>Abertura</th>
-                            <th>Fechamento</th>
-                            <th>Aberto por</th>
-                            <th>Fechado por</th>
-                            <th>Inicial</th>
-                            <th>Vendas</th>
-                            <th>Esperado</th>
-                            <th>Informado</th>
-                            <th>Diferença</th>
-                            <th>Status</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
+            <section class="cash-overview-grid cash-report-overview" aria-label="Indicadores do período">
+                <article class="cash-overview-card cash-overview-card--session">
+                    <span>Sessões encontradas</span>
+                    <strong>{{ resumo.quantidade_caixas or 0 }}</strong>
+                    <small>
+                        {{ resumo.caixas_abertos or 0 }} aberta{% if (resumo.caixas_abertos or 0) != 1 %}s{% endif %}
+                        · {{ resumo.caixas_fechados or 0 }} fechada{% if (resumo.caixas_fechados or 0) != 1 %}s{% endif %}
+                    </small>
+                </article>
+                <article class="cash-overview-card cash-overview-card--sales">
+                    <span>Vendas consolidadas</span>
+                    <strong>{{ resumo.total_vendas|moeda_br }}</strong>
+                    <small>Recebimentos das sessões fechadas</small>
+                </article>
+                <article class="cash-overview-card cash-overview-card--expected">
+                    <span>Dinheiro esperado</span>
+                    <strong>{{ resumo.total_esperado|moeda_br }}</strong>
+                    <small>Previsão física consolidada</small>
+                </article>
+                <article class="cash-overview-card cash-report-divergence-card">
+                    <span>Diferença líquida</span>
+                    <strong class="{% if (resumo.total_diferenca or 0) > 0.009 %}cash-value-positive{% elif (resumo.total_diferenca or 0) < -0.009 %}cash-value-negative{% endif %}">
+                        {{ resumo.total_diferenca|moeda_br }}
+                    </strong>
+                    <small>{{ resumo.caixas_com_diferenca or 0 }} caixa{% if (resumo.caixas_com_diferenca or 0) != 1 %}s{% endif %} com divergência</small>
+                </article>
+            </section>
 
-                    <tbody>
-                        {% for caixa in caixas %}
+            <section class="cash-report-finance-grid">
+                <article class="panel cash-report-finance-panel">
+                    <header class="cash-panel-heading">
+                        <div>
+                            <span class="cash-eyebrow">Recebimentos</span>
+                            <h2>Composição das vendas</h2>
+                            <p>Distribuição dos pagamentos nas sessões consolidadas.</p>
+                        </div>
+                    </header>
+
+                    <div class="cash-report-breakdown">
+                        <div class="cash-report-breakdown-item">
+                            <span class="cash-summary-icon cash-summary-icon--money" aria-hidden="true"></span>
+                            <div><strong>Dinheiro</strong><small>Recebido em espécie</small></div>
+                            <b>{{ resumo.total_dinheiro|moeda_br }}</b>
+                        </div>
+                        <div class="cash-report-breakdown-item">
+                            <span class="cash-summary-icon cash-summary-icon--pix" aria-hidden="true"></span>
+                            <div><strong>Pix</strong><small>Pagamentos instantâneos</small></div>
+                            <b>{{ resumo.total_pix|moeda_br }}</b>
+                        </div>
+                        <div class="cash-report-breakdown-item">
+                            <span class="cash-summary-icon cash-summary-icon--card" aria-hidden="true"></span>
+                            <div><strong>Cartão</strong><small>Crédito e débito</small></div>
+                            <b>{{ resumo.total_cartao|moeda_br }}</b>
+                        </div>
+                        <div class="cash-report-breakdown-item">
+                            <span class="cash-summary-icon cash-summary-icon--other" aria-hidden="true"></span>
+                            <div><strong>Outras formas</strong><small>Demais recebimentos</small></div>
+                            <b>{{ resumo.total_outros|moeda_br }}</b>
+                        </div>
+                    </div>
+
+                    <footer class="cash-report-panel-total">
+                        <span>Total vendido</span>
+                        <strong>{{ resumo.total_vendas|moeda_br }}</strong>
+                    </footer>
+                </article>
+
+                <article class="panel cash-report-finance-panel">
+                    <header class="cash-panel-heading">
+                        <div>
+                            <span class="cash-eyebrow">Conferência</span>
+                            <h2>Movimentação e fechamento</h2>
+                            <p>Fundo, ajustes manuais e divergências apuradas.</p>
+                        </div>
+                    </header>
+
+                    <div class="cash-report-reconciliation">
+                        <div><span>Fundos de abertura</span><strong>{{ resumo.total_inicial|moeda_br }}</strong></div>
+                        <div><span>Entradas manuais</span><strong class="cash-value-positive">+ {{ resumo.total_entradas|moeda_br }}</strong></div>
+                        <div><span>Saídas manuais</span><strong class="cash-value-negative">− {{ resumo.total_saidas|moeda_br }}</strong></div>
+                        <div><span>Dinheiro esperado</span><strong>{{ resumo.total_esperado|moeda_br }}</strong></div>
+                        <div><span>Dinheiro conferido</span><strong>{{ resumo.total_informado|moeda_br }}</strong></div>
+                    </div>
+
+                    <footer class="cash-report-divergence-summary">
+                        <div>
+                            <span>Sobras apuradas</span>
+                            <strong class="cash-value-positive">+ {{ resumo.total_sobras|moeda_br }}</strong>
+                        </div>
+                        <div>
+                            <span>Faltas apuradas</span>
+                            <strong class="cash-value-negative">− {{ resumo.total_faltas|moeda_br }}</strong>
+                        </div>
+                    </footer>
+                </article>
+            </section>
+
+            <section class="panel cash-report-results-panel">
+                <header class="cash-panel-heading cash-report-results-heading">
+                    <div>
+                        <span class="cash-eyebrow">Detalhamento</span>
+                        <h2>Sessões de caixa</h2>
+                        <p>Compare valores previstos e conferidos em cada fechamento.</p>
+                    </div>
+                    <span class="cash-count-badge">
+                        {{ caixas|length }} resultado{% if caixas|length != 1 %}s{% endif %}
+                    </span>
+                </header>
+
+                <div class="table-wrapper cash-report-table-wrapper">
+                    <table class="cash-report-table">
+                        <thead>
                             <tr>
-                                <td>#{{ caixa.id }}</td>
-                                <td>{{ caixa.data_abertura|datetime_br }}</td>
-                                <td>{{ caixa.data_fechamento|datetime_br if caixa.data_fechamento else '-' }}</td>
-                                <td>{{ caixa.usuario_abertura_nome or '-' }}</td>
-                                <td>{{ caixa.usuario_fechamento_nome or '-' }}</td>
-                                <td>R$ {{ "%.2f"|format(caixa.valor_inicial or 0) }}</td>
-                                <td>R$ {{ "%.2f"|format(caixa.total_vendas or 0) }}</td>
-                                <td>R$ {{ "%.2f"|format(caixa.valor_esperado or 0) }}</td>
-                                <td>R$ {{ "%.2f"|format(caixa.valor_informado or 0) }}</td>
-                                <td>R$ {{ "%.2f"|format(caixa.diferenca or 0) }}</td>
-                                <td>
-                                    {% if caixa.status == 'ABERTO' %}
-                                        <span class="status-pill status-warning">Aberto</span>
+                                <th>Caixa</th>
+                                <th>Período</th>
+                                <th>Responsáveis</th>
+                                <th>Inicial</th>
+                                <th>Vendas</th>
+                                <th>Esperado</th>
+                                <th>Conferido</th>
+                                <th>Diferença</th>
+                                <th>Status</th>
+                                <th class="cash-actions-column">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for caixa in caixas %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('caixa_detalhe', caixa_id=caixa.id) }}" class="cash-register-identity">
+                                            <span aria-hidden="true"></span>
+                                            <strong>#{{ caixa.id }}</strong>
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <div class="cash-table-stack">
+                                            <strong>{{ caixa.data_abertura|datetime_br }}</strong>
+                                            <small>
+                                                {% if caixa.data_fechamento %}
+                                                    Até {{ caixa.data_fechamento|datetime_br }}
+                                                {% else %}
+                                                    Em andamento
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="cash-table-stack">
+                                            <strong>{{ caixa.usuario_abertura_nome or "—" }}</strong>
+                                            <small>
+                                                {% if caixa.usuario_fechamento_nome %}
+                                                    Fechado por {{ caixa.usuario_fechamento_nome }}
+                                                {% else %}
+                                                    Responsável pela abertura
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    </td>
+                                    <td>{{ caixa.valor_inicial|moeda_br }}</td>
+                                    {% if caixa.status == "ABERTO" %}
+                                        <td><span class="cash-pending-value">Em andamento</span></td>
+                                        <td><span class="cash-pending-value">Em andamento</span></td>
+                                        <td><span class="cash-pending-value">—</span></td>
+                                        <td><span class="cash-pending-value">—</span></td>
                                     {% else %}
-                                        <span class="status-pill status-ok">Fechado</span>
+                                        <td><strong>{{ caixa.total_vendas|moeda_br }}</strong></td>
+                                        <td>{{ caixa.valor_esperado|moeda_br }}</td>
+                                        <td>{{ caixa.valor_informado|moeda_br }}</td>
+                                        <td>
+                                            {% if (caixa.diferenca or 0) > 0.009 %}
+                                                <strong class="cash-value-positive">+ {{ caixa.diferenca|moeda_br }}</strong>
+                                            {% elif (caixa.diferenca or 0) < -0.009 %}
+                                                <strong class="cash-value-negative">{{ caixa.diferenca|moeda_br }}</strong>
+                                            {% else %}
+                                                <strong class="cash-value-neutral">{{ caixa.diferenca|moeda_br }}</strong>
+                                            {% endif %}
+                                        </td>
                                     {% endif %}
-                                </td>
-                                <td>
-                                    <div class="table-actions">
-                                        <a 
-                                            href="{{ url_for('caixa_detalhe', caixa_id=caixa.id) }}" 
-                                            class="small-button"
-                                            title="Ver caixa"
-                                        >
-                                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                <path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-1.8a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4z"/>
-                                            </svg>
-                                        </a>
-
-                                        <a 
-                                            href="{{ url_for('caixa_imprimir', caixa_id=caixa.id) }}" 
-                                            class="small-button"
-                                            target="_blank"
-                                            title="Imprimir caixa"
-                                        >
-                                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                <path d="M6 9V2h12v7"></path>
-                                                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                                                <path d="M6 14h12v8H6z"></path>
-                                            </svg>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% else %}
-                            <tr>
-                                <td colspan="12" class="empty-state">
-                                    Nenhum caixa encontrado no período.
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </main>
-</div>
+                                    <td>
+                                        {% if caixa.status == "ABERTO" %}
+                                            <span class="status-pill status-ok">Aberto</span>
+                                        {% else %}
+                                            <span class="status-pill status-warning">Fechado</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="table-actions cash-row-actions">
+                                            <a href="{{ url_for('caixa_detalhe', caixa_id=caixa.id) }}" class="table-outline-button" title="Ver detalhes" aria-label="Ver detalhes do caixa {{ caixa.id }}">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/>
+                                                    <circle cx="12" cy="12" r="2.75"/>
+                                                </svg>
+                                            </a>
+                                            <a href="{{ url_for('caixa_imprimir', caixa_id=caixa.id) }}" class="table-outline-button" target="_blank" rel="noopener" title="Imprimir caixa" aria-label="Imprimir caixa {{ caixa.id }}">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="M6 9V3h12v6"/>
+                                                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                                                    <path d="M6 14h12v7H6z"/>
+                                                </svg>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="10">
+                                        <div class="cash-report-empty-state">
+                                            <span class="cash-empty-icon cash-empty-icon--history" aria-hidden="true"></span>
+                                            <strong>Nenhum caixa corresponde aos filtros</strong>
+                                            <p>Altere o período ou remova os filtros para consultar outras sessões.</p>
+                                            <a href="{{ url_for('relatorio_caixas') }}" class="ui-command-action ui-icon-filter-clear">
+                                                Limpar filtros
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
 </body>
 </html>

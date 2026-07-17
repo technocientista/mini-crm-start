@@ -5932,6 +5932,11 @@ def relatorio_caixas():
     resumo = conn.execute(f"""
         SELECT
             COUNT(*) AS quantidade_caixas,
+            COALESCE(SUM(CASE WHEN c.status = 'ABERTO' THEN 1 ELSE 0 END), 0) AS caixas_abertos,
+            COALESCE(SUM(CASE WHEN c.status = 'FECHADO' THEN 1 ELSE 0 END), 0) AS caixas_fechados,
+            COALESCE(SUM(
+                CASE WHEN ABS(COALESCE(c.diferenca, 0)) > 0.009 THEN 1 ELSE 0 END
+            ), 0) AS caixas_com_diferenca,
             COALESCE(SUM(c.valor_inicial), 0) AS total_inicial,
             COALESCE(SUM(c.total_vendas), 0) AS total_vendas,
             COALESCE(SUM(c.total_dinheiro), 0) AS total_dinheiro,
@@ -5942,7 +5947,13 @@ def relatorio_caixas():
             COALESCE(SUM(c.saidas_manuais), 0) AS total_saidas,
             COALESCE(SUM(c.valor_esperado), 0) AS total_esperado,
             COALESCE(SUM(c.valor_informado), 0) AS total_informado,
-            COALESCE(SUM(c.diferenca), 0) AS total_diferenca
+            COALESCE(SUM(c.diferenca), 0) AS total_diferenca,
+            COALESCE(SUM(
+                CASE WHEN COALESCE(c.diferenca, 0) > 0.009 THEN c.diferenca ELSE 0 END
+            ), 0) AS total_sobras,
+            COALESCE(SUM(
+                CASE WHEN COALESCE(c.diferenca, 0) < -0.009 THEN ABS(c.diferenca) ELSE 0 END
+            ), 0) AS total_faltas
         FROM caixas c
         WHERE {where_sql}
     """, params).fetchone()
