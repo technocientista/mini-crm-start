@@ -2554,6 +2554,43 @@ def produtos():
 
     where_sql = " AND ".join(where_clauses)
 
+    resumo_produtos = conn.execute("""
+        SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN ativo = 1 THEN 1 ELSE 0 END) AS ativos,
+            SUM(
+                CASE
+                    WHEN ativo = 1
+                    THEN estoque_atual
+                    ELSE 0
+                END
+            ) AS unidades_estoque,
+            SUM(
+                CASE
+                    WHEN ativo = 1
+                     AND estoque_atual > 0
+                     AND estoque_atual <= estoque_minimo
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS estoque_baixo,
+            SUM(
+                CASE
+                    WHEN ativo = 1 AND estoque_atual = 0
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS sem_estoque,
+            SUM(
+                CASE
+                    WHEN ativo = 1
+                    THEN estoque_atual * preco_custo
+                    ELSE 0
+                END
+            ) AS valor_estoque
+        FROM produtos
+    """).fetchone()
+
     total_registros = conn.execute(f"""
         SELECT COUNT(*) AS total
         FROM produtos
@@ -2598,6 +2635,7 @@ def produtos():
         page=page,
         total_paginas=total_paginas,
         total_registros=total_registros,
+        resumo_produtos=resumo_produtos,
         usuario=usuario_logado()
     )
 
