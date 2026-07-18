@@ -8681,6 +8681,14 @@ body {
     max-width: none;
 }
 
+.abrir-caixa-form .cash-open-value-group .field-help {
+    position: static;
+    display: block;
+    margin-top: 7px;
+    margin-bottom: 0;
+    line-height: 1.35;
+}
+
 .cash-money-field {
     display: flex;
     align-items: stretch;
