@@ -26,17 +26,25 @@ a {
 }
 
 .thermal-receipt {
-    width: 80mm;
+    width: 72mm;
     max-width: 100%;
     margin: 0 auto;
-    padding: 5mm 4mm;
+    padding: 4mm 2.5mm;
     overflow: hidden;
     background: #ffffff;
     color: #000000;
-    font-family: "Courier New", Courier, monospace;
-    font-size: 11px;
-    line-height: 1.35;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1.38;
+    text-rendering: geometricPrecision;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
     box-shadow: 0 16px 45px rgba(15, 23, 42, .16);
+}
+
+.thermal-receipt strong {
+    font-weight: 800;
 }
 
 .receipt-store-header,
@@ -50,14 +58,16 @@ a {
 
 .receipt-store-header > strong {
     max-width: 100%;
-    font-size: 16px;
+    font-size: 17px;
+    font-weight: 900;
     line-height: 1.2;
     text-transform: uppercase;
 }
 
 .receipt-store-header > span {
-    margin-top: 2px;
-    font-size: 9px;
+    margin-top: 3px;
+    font-size: 10px;
+    font-weight: 600;
     overflow-wrap: anywhere;
 }
 
@@ -73,13 +83,15 @@ a {
 }
 
 .receipt-document-title > strong {
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: 900;
     letter-spacing: .04em;
 }
 
 .receipt-document-title > span {
-    margin-top: 2px;
-    font-size: 8px;
+    margin-top: 3px;
+    font-size: 9.5px;
+    font-weight: 700;
 }
 
 .receipt-cancelled {
@@ -106,10 +118,15 @@ a {
     gap: 8px;
 }
 
+.receipt-meta > div {
+    min-height: 17px;
+}
+
 .receipt-meta span,
 .receipt-totals span,
 .receipt-payments span {
     flex: 0 0 auto;
+    font-weight: 600;
 }
 
 .receipt-meta strong,
@@ -125,7 +142,8 @@ a {
 .receipt-payments h2,
 .receipt-notes h2 {
     margin: 0;
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: 900;
     letter-spacing: .04em;
 }
 
@@ -137,7 +155,8 @@ a {
 }
 
 .receipt-client > span {
-    font-size: 9px;
+    font-size: 10px;
+    font-weight: 600;
 }
 
 .receipt-section-heading {
@@ -149,7 +168,8 @@ a {
 }
 
 .receipt-section-heading > span {
-    font-size: 8px;
+    font-size: 9.5px;
+    font-weight: 700;
 }
 
 .receipt-item {
@@ -157,7 +177,7 @@ a {
 }
 
 .receipt-item + .receipt-item {
-    border-top: 1px dotted #777777;
+    border-top: 1px dotted #000000;
 }
 
 .receipt-item > strong,
@@ -167,13 +187,16 @@ a {
 }
 
 .receipt-item > strong {
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.35;
     text-transform: uppercase;
 }
 
 .receipt-item > small {
-    margin-top: 2px;
-    font-size: 8px;
+    margin-top: 3px;
+    font-size: 9.5px;
+    font-weight: 600;
 }
 
 .receipt-item > div {
@@ -182,6 +205,7 @@ a {
     justify-content: space-between;
     gap: 8px;
     margin-top: 4px;
+    font-size: 10.5px;
 }
 
 .receipt-item > div > strong {
@@ -190,7 +214,8 @@ a {
 
 .receipt-empty {
     padding: 12px 0;
-    font-size: 9px;
+    font-size: 10px;
+    font-weight: 600;
     text-align: center;
 }
 
@@ -222,29 +247,34 @@ a {
 .receipt-payments .receipt-change {
     margin-top: 3px;
     padding-top: 5px;
-    border-top: 1px dotted #777777;
+    border-top: 1px dotted #000000;
     font-weight: 900;
 }
 
 .receipt-notes p {
     margin: 4px 0 0;
-    font-size: 9px;
+    font-size: 10px;
+    font-weight: 600;
     overflow-wrap: anywhere;
 }
 
 .receipt-footer > strong {
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: 900;
     overflow-wrap: anywhere;
 }
 
 .receipt-footer > span {
     margin-top: 8px;
-    font-size: 8px;
+    font-size: 9.5px;
+    font-weight: 600;
+    line-height: 1.4;
 }
 
 .receipt-footer > small {
     margin-top: 9px;
-    font-size: 8px;
+    font-size: 9px;
+    font-weight: 700;
     letter-spacing: .12em;
 }
 
@@ -377,16 +407,18 @@ a {
     .receipt-auto-mode .receipt-shell,
     .receipt-shell {
         position: static;
-        width: 80mm;
-        margin: 0;
+        width: 72mm;
+        margin: 0 auto;
         pointer-events: auto;
     }
 
     .thermal-receipt {
-        width: 80mm;
-        max-width: 80mm;
+        width: 72mm;
+        max-width: 72mm;
         margin: 0;
-        padding: 3.5mm 3mm;
+        padding: 2.5mm 2mm;
+        color: #000000 !important;
+        font-weight: 600;
         box-shadow: none;
     }
 }
