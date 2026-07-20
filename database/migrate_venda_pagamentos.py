@@ -19,10 +19,16 @@ def migrar():
             venda_id INTEGER NOT NULL,
             forma_pagamento TEXT NOT NULL,
             valor REAL NOT NULL DEFAULT 0,
+            valor_recebido REAL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (venda_id) REFERENCES vendas(id)
         )
     """)
+
+    if not coluna_existe(cursor, "venda_pagamentos", "valor_recebido"):
+        cursor.execute(
+            "ALTER TABLE venda_pagamentos ADD COLUMN valor_recebido REAL"
+        )
 
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_venda_pagamentos_venda_id

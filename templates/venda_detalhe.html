@@ -4,216 +4,260 @@
     <meta charset="UTF-8">
     <title>Venda #{{ venda.id }} - Start CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed">
-
+<body class="ui-refreshed sale-detail-page">
     <div class="app-layout">
-
         {% include 'partials/sidebar.html' %}
 
         <main class="main-content">
-            <header class="topbar">
+            <header class="topbar sale-detail-topbar">
                 <div>
-                    <h1>Venda #{{ venda.id }}</h1>
-                    <p>Detalhes internos da venda.</p>
+                    <div class="sale-detail-title-line">
+                        <h1>Venda #{{ venda.id }}</h1>
+                        {% if venda.status == 'CANCELADA' %}
+                            <span class="modern-status modern-status--danger">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="8.25"/>
+                                    <path d="m9.25 9.25 5.5 5.5M14.75 9.25l-5.5 5.5"/>
+                                </svg>
+                                <span>Cancelada</span>
+                            </span>
+                        {% else %}
+                            <span class="modern-status modern-status--success">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="8.25"/>
+                                    <path d="m8.4 12.1 2.25 2.25 4.95-5.05"/>
+                                </svg>
+                                <span>Concluída</span>
+                            </span>
+                        {% endif %}
+                    </div>
+                    <p>Informações comerciais, financeiras e operacionais da venda.</p>
+                </div>
+
+                <div class="sale-detail-topbar-actions">
+                    <a href="{{ url_for('vendas') }}" class="ui-command-action ui-icon-back">
+                        Voltar para vendas
+                    </a>
+                    <a
+                        href="{{ url_for('venda_recibo', venda_id=venda.id) }}"
+                        class="ui-command-action ui-icon-print"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        Recibo
+                    </a>
+                    <a
+                        href="{{ url_for('venda_recibo_termico', venda_id=venda.id) }}"
+                        class="ui-command-action ui-icon-print"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        Cupom fiscal
+                    </a>
+                    {% if venda.status != 'CANCELADA' %}
+                        <button
+                            type="button"
+                            class="ui-command-action ui-icon-block sale-detail-cancel-action"
+                            onclick="abrirModalCancelamento()"
+                        >
+                            Cancelar venda
+                        </button>
+                    {% endif %}
                 </div>
             </header>
 
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
-                    <div class="success-alert">
-                        {{ messages[0] }}
-                    </div>
+                    <div class="success-alert">{{ messages[0] }}</div>
                 {% endif %}
             {% endwith %}
 
-            <section class="panel margin-top">
-                <div class="resumo-venda-header">
-                    <h2>Resumo da venda</h2>
-
-                    <div class="resumo-venda-acoes-inline">
-
-                        <a 
-                            href="{{ url_for('vendas') }}" 
-                            class="icon-action-button secondary"
-                            title="Voltar para vendas"
-                        >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M15 18l-6-6 6-6"></path>
-                                <path d="M9 12h12"></path>
-                            </svg>
-                            <span>Voltar</span>
-                        </a>
-                        
-                        <a 
-                            href="{{ url_for('venda_recibo', venda_id=venda.id) }}" 
-                            class="icon-action-button" 
-                            target="_blank"
-                            title="Abrir recibo"
-                        >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M6 2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"></path>
-                                <path d="M14 2v6h6"></path>
-                                <path d="M8 13h8"></path>
-                                <path d="M8 17h8"></path>
-                            </svg>
-                            <span>Recibo</span>
-                        </a>
-
-                        <a 
-                            href="{{ url_for('venda_recibo_termico', venda_id=venda.id) }}" 
-                            class="icon-action-button" 
-                            target="_blank"
-                            title="Cupom térmico"
-                        >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M6 3h12v18l-2-1.2L14 21l-2-1.2L10 21l-2-1.2L6 21V3z"></path>
-                                <path d="M9 8h6"></path>
-                                <path d="M9 12h6"></path>
-                                <path d="M9 16h4"></path>
-                            </svg>
-                            <span>Cupom fiscal</span>
-                        </a>
-
-                        {% if venda.status != 'CANCELADA' %}
-                            <button 
-                                type="button" 
-                                class="icon-action-button danger" 
-                                onclick="abrirModalCancelamento()"
-                                title="Cancelar venda"
-                            >
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <circle cx="12" cy="12" r="9"></circle>
-                                    <path d="M8 8l8 8"></path>
-                                    <path d="M16 8l-8 8"></path>
-                                </svg>
-                                <span>Cancelar venda</span>
-                            </button>
-                        {% endif %}
+            {% if venda.status == 'CANCELADA' %}
+                <section class="sale-detail-cancellation-alert" aria-label="Informações do cancelamento">
+                    <span class="sale-detail-cancellation-icon" aria-hidden="true"></span>
+                    <div>
+                        <strong>Venda cancelada</strong>
+                        <p>{{ venda.motivo_cancelamento or 'Motivo não informado.' }}</p>
+                        <small>
+                            Cancelada por {{ venda.cancelado_por or 'usuário não identificado' }}
+                            {% if venda.data_cancelamento %}
+                                em {{ venda.data_cancelamento|datetime_br }}
+                            {% endif %}
+                        </small>
                     </div>
-                </div>
+                </section>
+            {% endif %}
 
-                <div class="resumo-venda-conteudo">
-                    <p><strong>Data:</strong> {{ venda.data_venda|datetime_br }}</p>
+            <section class="sale-detail-overview-grid">
+                <article class="panel sale-detail-info-card">
+                    <div class="sale-detail-section-heading">
+                        <div>
+                            <h2>Dados da venda</h2>
+                            <p>Identificação do atendimento e informações do cliente.</p>
+                        </div>
+                        <span class="sale-detail-id">#{{ venda.id }}</span>
+                    </div>
 
-                    <p>
-                        <strong>Cliente:</strong>
-                        {% if venda.cliente_id %}
-                            <a href="{{ url_for('cliente_detalhe', cliente_id=venda.cliente_id) }}" class="table-link">
-                                {{ venda.cliente_nome }}
-                            </a>
-                        {% else %}
-                            {{ venda.cliente_nome }}
-                        {% endif %}
-                    </p>
-
-                    <p><strong>Telefone:</strong> {{ venda.cliente_telefone }}</p>
-                    <p><strong>Endereço:</strong> {{ venda.cliente_endereco }}</p>
-                    <p><strong>Vendedor:</strong> {{ venda.vendedor }}</p>
-                    <p>
-                        <div class="resumo-venda-linha">
-                            <span>Pagamentos</span>
+                    <div class="sale-detail-info-grid">
+                        <div>
+                            <span>Data e hora</span>
+                            <strong>{{ venda.data_venda|datetime_br }}</strong>
+                        </div>
+                        <div>
+                            <span>Vendedor responsável</span>
+                            <strong>{{ venda.vendedor or 'Não informado' }}</strong>
+                        </div>
+                        <div>
+                            <span>Cliente</span>
                             <strong>
-                                {% if pagamentos %}
-                                    {% for pagamento in pagamentos %}
-                                        {{ pagamento.forma_pagamento }}: R$ {{ "%.2f"|format(pagamento.valor or 0) }}{% if not loop.last %}<br>{% endif %}
-                                    {% endfor %}
+                                {% if venda.cliente_id %}
+                                    <a href="{{ url_for('cliente_detalhe', cliente_id=venda.cliente_id) }}" class="table-link">
+                                        {{ venda.cliente_nome }}
+                                    </a>
                                 {% else %}
-                                    {{ venda.forma_pagamento }}
+                                    {{ venda.cliente_nome }}
                                 {% endif %}
                             </strong>
                         </div>
-                    </p>
-                    <p><strong>Observações:</strong> {{ venda.observacoes or '-' }}</p>
-
-                    {% if venda.status == 'CANCELADA' %}
-                        <div class="cancel-info">
-                            <h3>Informações do cancelamento</h3>
-
-                            <p><strong>Cancelado por:</strong> {{ venda.cancelado_por or '-' }}</p>
-                            <p><strong>Data do cancelamento:</strong> {{ venda.data_cancelamento|datetime_br if venda.data_cancelamento else '-' }}</p>
-                            <p><strong>Motivo:</strong> {{ venda.motivo_cancelamento or '-' }}</p>
+                        <div>
+                            <span>Telefone</span>
+                            <strong>{{ venda.cliente_telefone or '-' }}</strong>
                         </div>
-                    {% endif %}
-                </div>
+                        <div class="full">
+                            <span>Endereço</span>
+                            <strong>{{ venda.cliente_endereco or '-' }}</strong>
+                        </div>
+                        <div class="full">
+                            <span>Observações</span>
+                            <strong>{{ venda.observacoes or 'Nenhuma observação registrada.' }}</strong>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="panel sale-detail-financial-card">
+                    <div class="sale-detail-section-heading">
+                        <div>
+                            <h2>Resumo financeiro</h2>
+                            <p>Valores e formas de pagamento.</p>
+                        </div>
+                    </div>
+
+                    <div class="sale-detail-financial-rows">
+                        <div>
+                            <span>Subtotal</span>
+                            <strong>{{ ((venda.valor_total or 0) + (venda.desconto_total or 0))|moeda_br }}</strong>
+                        </div>
+                        <div>
+                            <span>Desconto</span>
+                            <strong>{{ venda.desconto_total|moeda_br }}</strong>
+                        </div>
+                        <div class="total">
+                            <span>Total final</span>
+                            <strong>{{ venda.valor_total|moeda_br }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="sale-detail-payments">
+                        <span>Forma de pagamento</span>
+                        <div>
+                            {% if pagamentos %}
+                                {% for pagamento in pagamentos %}
+                                    <div class="sale-detail-payment-row">
+                                        <strong>{{ pagamento.forma_pagamento|title }}</strong>
+                                        <span>{{ (pagamento.valor or 0)|moeda_br }}</span>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="sale-detail-payment-row">
+                                    <strong>{{ venda.forma_pagamento|title }}</strong>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </article>
             </section>
 
-            <section class="cards-grid margin-top">
-                <div class="card">
-                    <span>Status</span>
-
-                    {% if venda.status == 'CANCELADA' %}
-                        <strong class="small-card-text">Cancelada</strong>
-                    {% else %}
-                        <strong class="small-card-text">Concluída</strong>
-                    {% endif %}
-                </div>
-
-                <div class="card">
-                    <span>Desconto</span>
-                    <strong>R$ {{ "%.2f"|format(venda.desconto_total) }}</strong>
-                </div>
-
-                <div class="card">
+            <section class="sale-detail-kpi-grid" aria-label="Indicadores da venda">
+                <article class="sale-detail-kpi-card featured">
                     <span>Total da venda</span>
-                    <strong>R$ {{ "%.2f"|format(venda.valor_total) }}</strong>
-                </div>
-
+                    <strong>{{ venda.valor_total|moeda_br }}</strong>
+                    <small>Valor final recebido</small>
+                </article>
+                <article class="sale-detail-kpi-card">
+                    <span>Desconto aplicado</span>
+                    <strong>{{ venda.desconto_total|moeda_br }}</strong>
+                    <small>Redução sobre o subtotal</small>
+                </article>
+                <article class="sale-detail-kpi-card">
+                    <span>Itens vendidos</span>
+                    <strong>{{ itens|length }}</strong>
+                    <small>Produtos nesta venda</small>
+                </article>
                 {% if usuario.perfil == 'ADMIN' %}
-                    <div class="card">
+                    <article class="sale-detail-kpi-card profit">
                         <span>Lucro da venda</span>
-                        <strong>R$ {{ "%.2f"|format(venda.lucro_total) }}</strong>
-                    </div>
+                        <strong>{{ venda.lucro_total|moeda_br }}</strong>
+                        <small>Resultado após o custo</small>
+                    </article>
                 {% else %}
-                    <div class="card">
-                        <span>Itens vendidos</span>
-                        <strong>{{ itens|length }}</strong>
-                    </div>
+                    <article class="sale-detail-kpi-card">
+                        <span>Status</span>
+                        <strong class="textual">{{ 'Cancelada' if venda.status == 'CANCELADA' else 'Concluída' }}</strong>
+                        <small>Situação atual da venda</small>
+                    </article>
                 {% endif %}
             </section>
 
-            <section class="panel margin-top">
-                <h2>Itens vendidos</h2>
+            <section class="panel sale-detail-table-card">
+                <div class="sale-detail-section-heading">
+                    <div>
+                        <h2>Itens vendidos</h2>
+                        <p>Produtos, quantidades e valores registrados na venda.</p>
+                    </div>
+                    <span class="sale-detail-count">
+                        {{ itens|length }} item{% if itens|length != 1 %}s{% endif %}
+                    </span>
+                </div>
 
                 <div class="table-wrapper">
-                    <table>
+                    <table class="sale-detail-table">
                         <thead>
                             <tr>
                                 <th>Produto</th>
                                 <th>SKU</th>
                                 <th>Categoria</th>
-                                <th>Qtd</th>
-                                <th>Unitário</th>
-                                <th>Subtotal</th>
-
+                                <th class="numeric">Qtd.</th>
+                                <th class="numeric">Unitário</th>
+                                <th class="numeric">Subtotal</th>
                                 {% if usuario.perfil == 'ADMIN' %}
-                                    <th>Custo unit.</th>
-                                    <th>Lucro item</th>
+                                    <th class="numeric">Custo unit.</th>
+                                    <th class="numeric">Lucro item</th>
                                 {% endif %}
                             </tr>
                         </thead>
-
                         <tbody>
                             {% for item in itens %}
                                 <tr>
-                                    <td>{{ item.produto_nome }}</td>
-                                    <td>{{ item.sku }}</td>
-                                    <td>{{ item.categoria }}</td>
-                                    <td>{{ item.quantidade }}</td>
-                                    <td>R$ {{ "%.2f"|format(item.preco_unitario) }}</td>
-                                    <td>R$ {{ "%.2f"|format(item.subtotal) }}</td>
-
+                                    <td><strong>{{ item.produto_nome }}</strong></td>
+                                    <td>{{ item.sku or '-' }}</td>
+                                    <td>{{ item.categoria or 'Sem categoria' }}</td>
+                                    <td class="numeric">{{ item.quantidade }}</td>
+                                    <td class="numeric">{{ item.preco_unitario|moeda_br }}</td>
+                                    <td class="numeric"><strong>{{ item.subtotal|moeda_br }}</strong></td>
                                     {% if usuario.perfil == 'ADMIN' %}
-                                        <td>R$ {{ "%.2f"|format(item.preco_custo_unitario) }}</td>
-                                        <td>R$ {{ "%.2f"|format(item.lucro_item) }}</td>
+                                        <td class="numeric">{{ item.preco_custo_unitario|moeda_br }}</td>
+                                        <td class="numeric">{{ item.lucro_item|moeda_br }}</td>
                                     {% endif %}
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td colspan="8" class="empty-state">
-                                        Nenhum item encontrado.
+                                    <td colspan="{{ 8 if usuario.perfil == 'ADMIN' else 6 }}">
+                                        <div class="sale-detail-empty">
+                                            <strong>Nenhum item encontrado</strong>
+                                            <span>Não existem produtos vinculados a esta venda.</span>
+                                        </div>
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -223,66 +267,81 @@
             </section>
 
             {% if usuario.perfil == 'ADMIN' %}
-                <section class="panel margin-top">
-                    <h2>Totais internos</h2>
+                <section class="panel sale-detail-internal-card">
+                    <div class="sale-detail-section-heading">
+                        <div>
+                            <h2>Resultado interno</h2>
+                            <p>Custos e rentabilidade disponíveis apenas para administradores.</p>
+                        </div>
+                        <span class="sale-detail-admin-badge">Visão administrativa</span>
+                    </div>
 
-                    <div class="table-wrapper">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Total vendido</th>
-                                    <th>Custo total</th>
-                                    <th>Lucro total</th>
-                                    <th>Desconto</th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                <tr>
-                                    <td>R$ {{ "%.2f"|format(venda.valor_total) }}</td>
-                                    <td>R$ {{ "%.2f"|format(venda.custo_total) }}</td>
-                                    <td>R$ {{ "%.2f"|format(venda.lucro_total) }}</td>
-                                    <td>R$ {{ "%.2f"|format(venda.desconto_total) }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div class="sale-detail-internal-grid">
+                        <div>
+                            <span>Total vendido</span>
+                            <strong>{{ venda.valor_total|moeda_br }}</strong>
+                        </div>
+                        <div>
+                            <span>Custo total</span>
+                            <strong>{{ venda.custo_total|moeda_br }}</strong>
+                        </div>
+                        <div class="profit">
+                            <span>Lucro total</span>
+                            <strong>{{ venda.lucro_total|moeda_br }}</strong>
+                        </div>
+                        <div>
+                            <span>Desconto</span>
+                            <strong>{{ venda.desconto_total|moeda_br }}</strong>
+                        </div>
                     </div>
                 </section>
 
-                <section class="panel margin-top">
-                    <h2>Movimentações de estoque</h2>
+                <section class="panel sale-detail-table-card">
+                    <div class="sale-detail-section-heading">
+                        <div>
+                            <h2>Movimentações de estoque</h2>
+                            <p>Rastreabilidade das baixas e estornos associados à venda.</p>
+                        </div>
+                        <span class="sale-detail-count">
+                            {{ movimentacoes|length }} registro{% if movimentacoes|length != 1 %}s{% endif %}
+                        </span>
+                    </div>
 
                     <div class="table-wrapper">
-                        <table>
+                        <table class="sale-detail-table sale-detail-stock-table">
                             <thead>
                                 <tr>
                                     <th>Data</th>
                                     <th>Produto</th>
                                     <th>SKU</th>
                                     <th>Tipo</th>
-                                    <th>Quantidade</th>
-                                    <th>Estoque anterior</th>
-                                    <th>Estoque atual</th>
+                                    <th class="numeric">Qtd.</th>
+                                    <th class="numeric">Anterior</th>
+                                    <th class="numeric">Atual</th>
                                     <th>Observações</th>
                                 </tr>
                             </thead>
-
                             <tbody>
                                 {% for mov in movimentacoes %}
                                     <tr>
                                         <td>{{ mov.created_at|datetime_br }}</td>
-                                        <td>{{ mov.produto_nome }}</td>
-                                        <td>{{ mov.produto_sku }}</td>
-                                        <td>{{ mov.tipo }}</td>
-                                        <td>{{ mov.quantidade }}</td>
-                                        <td>{{ mov.estoque_anterior }}</td>
-                                        <td>{{ mov.estoque_atual }}</td>
+                                        <td><strong>{{ mov.produto_nome }}</strong></td>
+                                        <td>{{ mov.produto_sku or '-' }}</td>
+                                        <td>
+                                            <span class="sale-detail-movement-type">{{ mov.tipo|title }}</span>
+                                        </td>
+                                        <td class="numeric">{{ mov.quantidade }}</td>
+                                        <td class="numeric">{{ mov.estoque_anterior }}</td>
+                                        <td class="numeric">{{ mov.estoque_atual }}</td>
                                         <td>{{ mov.observacoes or '-' }}</td>
                                     </tr>
                                 {% else %}
                                     <tr>
-                                        <td colspan="8" class="empty-state">
-                                            Nenhuma movimentação encontrada para esta venda.
+                                        <td colspan="8">
+                                            <div class="sale-detail-empty">
+                                                <strong>Nenhuma movimentação encontrada</strong>
+                                                <span>Não há registros de estoque associados a esta venda.</span>
+                                            </div>
                                         </td>
                                     </tr>
                                 {% endfor %}
@@ -291,43 +350,50 @@
                     </div>
                 </section>
             {% endif %}
-
         </main>
-
     </div>
 
     <div id="modalCancelamentoVenda" class="modal-overlay">
-        <div class="modal-card">
+        <div class="modal-card sale-detail-cancel-modal">
             <div class="modal-header">
-                <h2>Cancelar venda</h2>
-
-                <button type="button" class="modal-close" onclick="fecharModalCancelamento()">
+                <div>
+                    <h2>Cancelar venda</h2>
+                    <p>Esta ação devolverá os produtos ao estoque.</p>
+                </div>
+                <button
+                    type="button"
+                    class="modal-close"
+                    onclick="fecharModalCancelamento()"
+                    aria-label="Fechar"
+                >
                     ×
                 </button>
             </div>
 
-            <p class="muted-text">
-                Informe o motivo do cancelamento. O estoque dos produtos será devolvido automaticamente.
-            </p>
-
             <form method="POST" action="{{ url_for('cancelar_venda', venda_id=venda.id) }}">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
                 <div class="form-group">
                     <label for="motivo_cancelamento">Motivo do cancelamento</label>
-                    <textarea 
-                        id="motivo_cancelamento" 
-                        name="motivo_cancelamento" 
+                    <textarea
+                        id="motivo_cancelamento"
+                        name="motivo_cancelamento"
                         rows="4"
                         required
-                        placeholder="Ex: cliente desistiu da compra, venda lançada incorretamente, troca de produto..."
+                        placeholder="Ex.: cliente desistiu da compra ou venda lançada incorretamente"
                     ></textarea>
+                    <small class="field-help">O motivo ficará registrado no histórico da venda.</small>
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" class="button-secondary ui-command-action ui-icon-back" onclick="fecharModalCancelamento()">
+                    <button
+                        type="button"
+                        class="button-secondary ui-command-action ui-icon-back"
+                        onclick="fecharModalCancelamento()"
+                    >
                         Voltar
                     </button>
-
-                    <button type="submit" class="danger-button ui-command-action ui-icon-check">
+                    <button type="submit" class="danger-button ui-command-action ui-icon-block">
                         Confirmar cancelamento
                     </button>
                 </div>
@@ -336,6 +402,5 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
-
 </body>
 </html>

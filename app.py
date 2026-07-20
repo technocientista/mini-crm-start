@@ -4,6 +4,7 @@ from datetime import datetime, date, timedelta, timezone
 from openpyxl import Workbook, load_workbook
 from functools import wraps
 from werkzeug.utils import secure_filename
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import sqlite3
 import os
 import json
@@ -11,6 +12,7 @@ import csv
 import io
 import unicodedata
 import shutil
+import secrets
 from urllib.parse import quote
 
 app = Flask(__name__)
@@ -474,6 +476,58 @@ def converter_float(valor):
         return float(valor)
     except ValueError:
         return 0.0
+
+
+def converter_centavos(valor):
+    if valor is None or str(valor).strip() == "":
+        return 0
+
+    texto = str(valor).strip()
+    texto = texto.replace("R$", "").replace(" ", "")
+
+    if "," in texto:
+        texto = texto.replace(".", "").replace(",", ".")
+
+    try:
+        decimal = Decimal(texto).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except (InvalidOperation, ValueError):
+        raise ValueError("Valor monetário inválido.")
+
+    if not decimal.is_finite():
+        raise ValueError("Valor monetário inválido.")
+
+    return int(decimal * 100)
+
+
+def centavos_para_float(valor_centavos):
+    return float(Decimal(int(valor_centavos)) / Decimal(100))
+
+
+def obter_csrf_token():
+    token = session.get("_csrf_token")
+
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["_csrf_token"] = token
+
+    return token
+
+
+def csrf_valido():
+    token_sessao = session.get("_csrf_token")
+    token_requisicao = (
+        request.form.get("_csrf_token")
+        or request.headers.get("X-CSRF-Token")
+    )
+
+    return bool(
+        token_sessao
+        and token_requisicao
+        and secrets.compare_digest(token_sessao, token_requisicao)
+    )
+
+
+app.jinja_env.globals["csrf_token"] = obter_csrf_token
 
 
 def converter_int(valor):
@@ -1967,7 +2021,7 @@ def cliente_detalhe(cliente_id):
             p.sku,
             p.categoria,
             SUM(vi.quantidade) AS quantidade_total,
-            SUM(vi.subtotal) AS total_gasto
+            SUM(vi.subtotal - COALESCE(vi.desconto, 0)) AS total_gasto
         FROM venda_itens vi
         INNER JOIN vendas v ON v.id = vi.venda_id
         INNER JOIN produtos p ON p.id = vi.produto_id
@@ -1981,7 +2035,7 @@ def cliente_detalhe(cliente_id):
         SELECT
             p.categoria,
             SUM(vi.quantidade) AS quantidade_total,
-            SUM(vi.subtotal) AS total_gasto
+            SUM(vi.subtotal - COALESCE(vi.desconto, 0)) AS total_gasto
         FROM venda_itens vi
         INNER JOIN vendas v ON v.id = vi.venda_id
         INNER JOIN produtos p ON p.id = vi.produto_id
@@ -3986,65 +4040,115 @@ def vendas():
 
     conn = get_db_connection()
     caixa_aberto = obter_caixa_aberto(conn)
+    resposta_ajax = request.form.get("resposta_json") == "1"
 
-    if request.method == "POST" and not caixa_aberto:
+    def finalizar_com_erro(mensagem, status=400):
+        try:
+            conn.rollback()
+        except sqlite3.Error:
+            pass
+
         conn.close()
-        flash("Abra o caixa antes de registrar uma venda.")
+
+        if resposta_ajax:
+            return jsonify({
+                "sucesso": False,
+                "mensagem": mensagem
+            }), status
+
+        flash(mensagem)
         return redirect(url_for("vendas"))
 
-    if request.method == "POST":
-        cliente_id = request.form.get("cliente_id")
-        vendedor_id = request.form.get("vendedor_id")
-        forma_pagamento = request.form.get("forma_pagamento")
-        desconto_total = float(request.form.get("desconto_total") or 0)
-        observacoes = request.form.get("observacoes")
-        itens_json = request.form.get("itens_json")
-        valor_final = converter_float(
-            request.form.get("valor_final") or request.form.get("valor_final_input")
+    def finalizar_com_sucesso(venda_id, duplicada=False):
+        recibo_url = url_for(
+            "venda_recibo_termico",
+            venda_id=venda_id,
+            auto=1
         )
 
-        pagamento_dividido = request.form.get("pagamento_dividido") == "1"
+        if resposta_ajax:
+            conn.close()
+            return jsonify({
+                "sucesso": True,
+                "venda_id": venda_id,
+                "recibo_url": recibo_url,
+                "duplicada": duplicada
+            })
 
+        conn.close()
+        return redirect(recibo_url)
+
+    if request.method == "POST" and not caixa_aberto:
+        return finalizar_com_erro(
+            "Abra o caixa antes de registrar uma venda.",
+            409
+        )
+
+    if request.method == "POST":
+        if not csrf_valido():
+            return finalizar_com_erro(
+                "A sessão da venda expirou. Atualize o PDV e tente novamente."
+            )
+
+        token_operacao = request.form.get("token_operacao", "").strip()
+
+        if not token_operacao:
+            return finalizar_com_erro(
+                "Não foi possível identificar esta operação. Atualize o PDV."
+            )
+
+        cliente_id = request.form.get("cliente_id")
+        vendedor_id = request.form.get("vendedor_id")
+        forma_pagamento = request.form.get("forma_pagamento", "").strip().upper()
+
+        try:
+            desconto_total = centavos_para_float(
+                converter_centavos(request.form.get("desconto_total"))
+            )
+        except ValueError:
+            return finalizar_com_erro("Informe um desconto válido.")
+
+        if desconto_total < 0:
+            return finalizar_com_erro("O desconto não pode ser negativo.")
+
+        observacoes = request.form.get("observacoes")
+        itens_json = request.form.get("itens_json")
+
+        pagamento_dividido = request.form.get("pagamento_dividido") == "1"
         pagamentos = []
+        valores_pagamento = {}
 
         if pagamento_dividido:
-            valor_pix = converter_float(request.form.get("valor_pix"))
-            valor_dinheiro = converter_float(request.form.get("valor_dinheiro"))
-            valor_cartao = converter_float(request.form.get("valor_cartao"))
-            valor_outros = converter_float(request.form.get("valor_outros"))
-
-            if valor_pix > 0:
-                pagamentos.append(("PIX", valor_pix))
-
-            if valor_dinheiro > 0:
-                pagamentos.append(("DINHEIRO", valor_dinheiro))
-
-            if valor_cartao > 0:
-                pagamentos.append(("CARTAO", valor_cartao))
-
-            if valor_outros > 0:
-                pagamentos.append(("OUTROS", valor_outros))
-
-            total_pagamentos = sum(valor for _, valor in pagamentos)
-
-            if abs(total_pagamentos - valor_final) > 0.009:
-                conn.close()
-                flash("O total dos pagamentos precisa ser igual ao valor final da venda.")
-                return redirect(url_for("vendas"))
+            try:
+                valores_pagamento = {
+                    "PIX": centavos_para_float(
+                        converter_centavos(request.form.get("valor_pix"))
+                    ),
+                    "DINHEIRO": centavos_para_float(
+                        converter_centavos(request.form.get("valor_dinheiro"))
+                    ),
+                    "CARTAO": centavos_para_float(
+                        converter_centavos(request.form.get("valor_cartao"))
+                    )
+                }
+            except ValueError:
+                return finalizar_com_erro(
+                    "Informe valores de pagamento válidos."
+                )
 
             forma_pagamento = "MULTIPLO"
 
         else:
-            forma_pagamento = request.form.get("forma_pagamento", "").strip()
+            if forma_pagamento not in {"PIX", "DINHEIRO", "CARTAO"}:
+                return finalizar_com_erro(
+                    "Selecione uma forma de pagamento válida."
+                )
 
-            if not forma_pagamento:
-                conn.close()
-                flash("Informe a forma de pagamento.")
-                return redirect(url_for("vendas"))
-
-            pagamentos.append((forma_pagamento, valor_final))
-
-        cliente_id = int(cliente_id) if cliente_id else None
+        try:
+            cliente_id = int(cliente_id) if cliente_id else None
+            vendedor_id = int(vendedor_id) if vendedor_id else None
+        except (TypeError, ValueError):
+            return finalizar_com_erro("Cliente ou vendedor inválido.")
 
         if cliente_id:
             cliente = conn.execute("""
@@ -4054,19 +4158,17 @@ def vendas():
             """, (cliente_id,)).fetchone()
 
             if not cliente:
-                flash("Cliente selecionado não encontrado ou inativo.")
-                conn.close()
-                return redirect(url_for("vendas"))
+                return finalizar_com_erro(
+                    "Cliente selecionado não encontrado ou inativo."
+                )
 
         if not vendedor_id:
-            flash("Selecione o vendedor responsável pela venda.")
-            conn.close()
-            return redirect(url_for("vendas"))
+            return finalizar_com_erro(
+                "Selecione o vendedor responsável pela venda."
+            )
 
         if not forma_pagamento:
-            flash("Selecione a forma de pagamento.")
-            conn.close()
-            return redirect(url_for("vendas"))
+            return finalizar_com_erro("Selecione a forma de pagamento.")
         
         vendedor_usuario = conn.execute("""
             SELECT id, nome
@@ -4077,25 +4179,61 @@ def vendas():
         """, (vendedor_id,)).fetchone()
 
         if not vendedor_usuario:
-            flash("Vendedor não encontrado ou inativo.")
-            conn.close()
-            return redirect(url_for("vendas"))
+            return finalizar_com_erro("Vendedor não encontrado ou inativo.")
 
         vendedor = vendedor_usuario["nome"]
 
         try:
-            itens = json.loads(itens_json) if itens_json else []
+            itens_recebidos = json.loads(itens_json) if itens_json else []
         except json.JSONDecodeError:
-            flash("Erro ao ler os itens da venda.")
-            conn.close()
-            return redirect(url_for("vendas"))
+            return finalizar_com_erro("Erro ao ler os itens da venda.")
 
-        if not itens:
-            flash("Adicione pelo menos um produto à venda.")
-            conn.close()
-            return redirect(url_for("vendas"))
+        if not isinstance(itens_recebidos, list) or not itens_recebidos:
+            return finalizar_com_erro(
+                "Adicione pelo menos um produto à venda."
+            )
+
+        quantidades_por_produto = {}
+
+        try:
+            for item in itens_recebidos:
+                produto_id = int(item.get("produto_id"))
+                quantidade = int(item.get("quantidade") or 0)
+
+                if produto_id <= 0 or quantidade <= 0:
+                    raise ValueError
+
+                quantidades_por_produto[produto_id] = (
+                    quantidades_por_produto.get(produto_id, 0)
+                    + quantidade
+                )
+        except (AttributeError, TypeError, ValueError):
+            return finalizar_com_erro(
+                "A lista de produtos contém um item inválido."
+            )
+
+        itens = [
+            {
+                "produto_id": produto_id,
+                "quantidade": quantidade
+            }
+            for produto_id, quantidade in quantidades_por_produto.items()
+        ]
 
         cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+
+        venda_existente = cursor.execute("""
+            SELECT id
+            FROM vendas
+            WHERE token_operacao = ?
+            LIMIT 1
+        """, (token_operacao,)).fetchone()
+
+        if venda_existente:
+            venda_id = venda_existente["id"]
+            conn.rollback()
+            return finalizar_com_sucesso(venda_id, duplicada=True)
 
         produtos_validados = []
         subtotal_bruto = 0
@@ -4106,9 +4244,9 @@ def vendas():
             quantidade = int(item.get("quantidade") or 0)
 
             if quantidade <= 0:
-                flash("A quantidade dos produtos deve ser maior que zero.")
-                conn.close()
-                return redirect(url_for("vendas"))
+                return finalizar_com_erro(
+                    "A quantidade dos produtos deve ser maior que zero."
+                )
 
             produto = conn.execute("""
                 SELECT id, nome, preco_custo, preco_venda, estoque_atual
@@ -4117,23 +4255,27 @@ def vendas():
             """, (produto_id,)).fetchone()
 
             if not produto:
-                flash("Um dos produtos não foi encontrado.")
-                conn.close()
-                return redirect(url_for("vendas"))
+                return finalizar_com_erro(
+                    "Um dos produtos não foi encontrado."
+                )
 
             if quantidade > produto["estoque_atual"]:
-                flash(f"Estoque insuficiente para o produto: {produto['nome']}.")
-                conn.close()
-                return redirect(url_for("vendas"))
+                return finalizar_com_erro(
+                    f"Estoque insuficiente para o produto: {produto['nome']}."
+                )
 
-            preco_unitario = float(produto["preco_venda"])
-            preco_custo_unitario = float(produto["preco_custo"])
+            preco_unitario = centavos_para_float(
+                converter_centavos(produto["preco_venda"])
+            )
+            preco_custo_unitario = centavos_para_float(
+                converter_centavos(produto["preco_custo"])
+            )
 
-            subtotal_item = preco_unitario * quantidade
-            custo_item = preco_custo_unitario * quantidade
+            subtotal_item = round(preco_unitario * quantidade, 2)
+            custo_item = round(preco_custo_unitario * quantidade, 2)
 
-            subtotal_bruto += subtotal_item
-            custo_total += custo_item
+            subtotal_bruto = round(subtotal_bruto + subtotal_item, 2)
+            custo_total = round(custo_total + custo_item, 2)
 
             produtos_validados.append({
                 "produto": produto,
@@ -4144,20 +4286,85 @@ def vendas():
                 "custo_item": custo_item
             })
 
-        valor_total = subtotal_bruto - desconto_total
-        lucro_total = valor_total - custo_total
+        valor_total = round(subtotal_bruto - desconto_total, 2)
+        lucro_total = round(valor_total - custo_total, 2)
 
         if valor_total < 0:
-            flash("O desconto não pode ser maior que o valor da venda.")
-            conn.close()
-            return redirect(url_for("vendas"))
+            return finalizar_com_erro(
+                "O desconto não pode ser maior que o valor da venda."
+            )
+
+        if pagamento_dividido:
+            if any(valor < 0 for valor in valores_pagamento.values()):
+                return finalizar_com_erro(
+                    "Os valores de pagamento não podem ser negativos."
+                )
+
+            pagamentos = [
+                (
+                    forma,
+                    valor,
+                    valor if forma == "DINHEIRO" else None
+                )
+                for forma, valor in valores_pagamento.items()
+                if valor > 0
+            ]
+
+            if len(pagamentos) < 2:
+                return finalizar_com_erro(
+                    "Informe um valor maior que zero em cada forma selecionada."
+                )
+
+            total_pagamentos = round(
+                sum(valor for _, valor, _ in pagamentos),
+                2
+            )
+            diferenca_pagamentos = round(valor_total - total_pagamentos, 2)
+
+            if diferenca_pagamentos > 0:
+                return finalizar_com_erro(
+                    f"Falta informar {moeda_br(diferenca_pagamentos)} "
+                    "para concluir a venda."
+                )
+
+            if diferenca_pagamentos < 0:
+                return finalizar_com_erro(
+                    "O valor informado ultrapassa o total da venda em "
+                    f"{moeda_br(abs(diferenca_pagamentos))}."
+                )
+        else:
+            valor_recebido = None
+
+            if forma_pagamento == "DINHEIRO":
+                try:
+                    valor_recebido = centavos_para_float(converter_centavos(
+                        request.form.get("valor_recebido_dinheiro")
+                        or valor_total
+                    ))
+                except ValueError:
+                    return finalizar_com_erro(
+                        "Informe um valor recebido válido."
+                    )
+
+                if valor_recebido < valor_total:
+                    return finalizar_com_erro(
+                        f"Falta informar {moeda_br(valor_total - valor_recebido)} "
+                        "no valor recebido."
+                    )
+
+            pagamentos = [(
+                forma_pagamento,
+                valor_total,
+                valor_recebido
+            )]
                 
         caixa_aberto = obter_caixa_aberto(conn)
 
         if not caixa_aberto:
-            flash("Abra o caixa antes de registrar uma venda.")
-            conn.close()
-            return redirect(url_for("vendas"))
+            return finalizar_com_erro(
+                "Abra o caixa antes de registrar uma venda.",
+                409
+            )
 
         cursor.execute("""
             INSERT INTO vendas (
@@ -4170,8 +4377,9 @@ def vendas():
             custo_total,
             lucro_total,
             observacoes,
-            caixa_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            caixa_id,
+            token_operacao
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             cliente_id,
             vendedor,
@@ -4182,32 +4390,56 @@ def vendas():
             custo_total,
             lucro_total,
             observacoes,
-            caixa_aberto["id"]
+            caixa_aberto["id"],
+            token_operacao
         ))
 
         venda_id = cursor.lastrowid
 
-        for forma, valor in pagamentos:
+        for forma, valor, valor_recebido in pagamentos:
             cursor.execute("""
                 INSERT INTO venda_pagamentos (
                     venda_id,
                     forma_pagamento,
-                    valor
-                ) VALUES (?, ?, ?)
+                    valor,
+                    valor_recebido
+                ) VALUES (?, ?, ?, ?)
             """, (
                 venda_id,
                 forma,
-                valor
+                valor,
+                valor_recebido
             ))
 
-        for item in produtos_validados:
+        desconto_restante = desconto_total
+
+        for indice, item in enumerate(produtos_validados):
             produto = item["produto"]
             quantidade = item["quantidade"]
             preco_unitario = item["preco_unitario"]
             preco_custo_unitario = item["preco_custo_unitario"]
             subtotal_item = item["subtotal_item"]
             custo_item = item["custo_item"]
-            lucro_item = subtotal_item - custo_item
+
+            if indice == len(produtos_validados) - 1:
+                desconto_item = round(desconto_restante, 2)
+            elif subtotal_bruto > 0:
+                desconto_item = round(
+                    desconto_total * (subtotal_item / subtotal_bruto),
+                    2
+                )
+                desconto_item = min(desconto_item, desconto_restante)
+            else:
+                desconto_item = 0
+
+            desconto_restante = round(
+                desconto_restante - desconto_item,
+                2
+            )
+            lucro_item = round(
+                subtotal_item - desconto_item - custo_item,
+                2
+            )
 
             cursor.execute("""
                 INSERT INTO venda_itens (
@@ -4226,7 +4458,7 @@ def vendas():
                 quantidade,
                 preco_unitario,
                 preco_custo_unitario,
-                0,
+                desconto_item,
                 subtotal_item,
                 lucro_item
             ))
@@ -4236,12 +4468,23 @@ def vendas():
 
             cursor.execute("""
                 UPDATE produtos
-                SET estoque_atual = ?, updated_at = CURRENT_TIMESTAMP
+                SET estoque_atual = estoque_atual - ?,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
+                  AND ativo = 1
+                  AND estoque_atual >= ?
             """, (
-                estoque_atual,
-                produto["id"]
+                quantidade,
+                produto["id"],
+                quantidade
             ))
+
+            if cursor.rowcount != 1:
+                return finalizar_com_erro(
+                    f"O estoque de {produto['nome']} foi alterado. "
+                    "Revise a quantidade e tente novamente.",
+                    409
+                )
 
             cursor.execute("""
                 INSERT INTO movimentacoes_estoque (
@@ -4272,13 +4515,7 @@ def vendas():
             venda_id,
             f"Venda #{venda_id} criada para o cliente {cliente_log}, vendedor {vendedor}, total R$ {valor_total:.2f}."
         )
-        conn.close()
-
-        return redirect(url_for(
-            "venda_recibo_termico",
-            venda_id=venda_id,
-            auto=1
-        ))
+        return finalizar_com_sucesso(venda_id)
 
     vendedores = conn.execute("""
         SELECT id, nome, email
@@ -4293,11 +4530,8 @@ def vendas():
     data_inicio = request.args.get("data_inicio", "").strip()
     data_fim = request.args.get("data_fim", "").strip()
 
-    page = int(request.args.get("page", 1))
+    page = normalizar_pagina(request.args.get("page", 1))
     per_page = 10
-
-    if page < 1:
-        page = 1
 
     offset = (page - 1) * per_page
 
@@ -4383,6 +4617,7 @@ def vendas():
         total_registros=total_registros,
         caixa_aberto=caixa_aberto,
         pdv_bloqueado=not caixa_aberto,
+        token_operacao=secrets.token_urlsafe(24),
         usuario=usuario_logado()
     )
 
@@ -4438,6 +4673,12 @@ def api_buscar_clientes():
 @app.route("/api/clientes/criar", methods=["POST"])
 @login_required
 def api_criar_cliente():
+    if not csrf_valido():
+        return jsonify({
+            "sucesso": False,
+            "mensagem": "A sessão expirou. Atualize o PDV e tente novamente."
+        }), 400
+
     dados = request.get_json() or {}
 
     nome = (dados.get("nome") or "").strip()
@@ -4620,6 +4861,12 @@ def api_buscar_produtos():
 @app.route("/api/produtos/criar", methods=["POST"])
 @login_required
 def api_criar_produto():
+    if not csrf_valido():
+        return jsonify({
+            "sucesso": False,
+            "mensagem": "A sessão expirou. Atualize o PDV e tente novamente."
+        }), 400
+
     dados = request.get_json() or {}
 
     nome = (dados.get("nome") or "").strip()
@@ -4647,6 +4894,12 @@ def api_criar_produto():
         return jsonify({
             "sucesso": False,
             "mensagem": "Informe um preço de venda maior que zero."
+        }), 400
+
+    if preco_custo < 0 or estoque_atual < 0 or estoque_minimo < 0:
+        return jsonify({
+            "sucesso": False,
+            "mensagem": "Custo e estoques não podem ser negativos."
         }), 400
 
     conn = get_db_connection()
@@ -4830,7 +5083,8 @@ def venda_detalhe(venda_id):
     pagamentos = conn.execute("""
         SELECT
             forma_pagamento,
-            valor
+            valor,
+            valor_recebido
         FROM venda_pagamentos
         WHERE venda_id = ?
         ORDER BY id
@@ -4959,7 +5213,8 @@ def venda_recibo_termico(venda_id):
     pagamentos = conn.execute("""
         SELECT
             forma_pagamento,
-            valor
+            valor,
+            valor_recebido
         FROM venda_pagamentos
         WHERE venda_id = ?
         ORDER BY id ASC
@@ -4979,8 +5234,15 @@ def venda_recibo_termico(venda_id):
 
     total_itens = sum(float(item["subtotal"] or 0) for item in itens)
     quantidade_itens = sum(int(item["quantidade"] or 0) for item in itens)
-    total_pagamentos = sum(float(pagamento["valor"] or 0) for pagamento in pagamentos)
-    troco = max(total_pagamentos - float(venda["valor_total"] or 0), 0)
+    total_recebido = sum(
+        float(
+            pagamento["valor_recebido"]
+            if pagamento["valor_recebido"] is not None
+            else pagamento["valor"] or 0
+        )
+        for pagamento in pagamentos
+    )
+    troco = max(total_recebido - float(venda["valor_total"] or 0), 0)
     auto_impressao = request.args.get("auto") == "1"
 
     conn.close()
@@ -5001,6 +5263,10 @@ def venda_recibo_termico(venda_id):
 @app.route("/vendas/<int:venda_id>/cancelar", methods=["POST"])
 @admin_required
 def cancelar_venda(venda_id):
+    if not csrf_valido():
+        flash("A sessão expirou. Atualize a página e tente novamente.")
+        return redirect(url_for("venda_detalhe", venda_id=venda_id))
+
     motivo_cancelamento = request.form.get("motivo_cancelamento", "").strip()
 
     if not motivo_cancelamento:
@@ -5008,16 +5274,19 @@ def cancelar_venda(venda_id):
         return redirect(url_for("venda_detalhe", venda_id=venda_id))
 
     conn = get_db_connection()
+    conn.execute("BEGIN IMMEDIATE")
 
     venda = conn.execute("""
         SELECT
-            id,
-            status,
-            caixa_id,
-            valor_total,
-            forma_pagamento
-        FROM vendas
-        WHERE id = ?
+            v.id,
+            v.status,
+            v.caixa_id,
+            v.valor_total,
+            v.forma_pagamento,
+            c.status AS caixa_status
+        FROM vendas v
+        LEFT JOIN caixas c ON c.id = v.caixa_id
+        WHERE v.id = ?
     """, (venda_id,)).fetchone()
 
     if not venda:
@@ -5028,6 +5297,14 @@ def cancelar_venda(venda_id):
     if venda["status"] == "CANCELADA":
         conn.close()
         flash("Esta venda já está cancelada.")
+        return redirect(url_for("venda_detalhe", venda_id=venda_id))
+
+    if venda["caixa_status"] == "FECHADO":
+        conn.close()
+        flash(
+            "Esta venda pertence a um caixa fechado. "
+            "Use um processo de estorno administrativo para preservar a conferência."
+        )
         return redirect(url_for("venda_detalhe", venda_id=venda_id))
 
     itens = conn.execute("""
@@ -5550,7 +5827,7 @@ def relatorios():
             p.nome AS produto_nome,
             p.sku,
             SUM(vi.quantidade) AS quantidade_total,
-            SUM(vi.subtotal) AS total_vendido
+            SUM(vi.subtotal - COALESCE(vi.desconto, 0)) AS total_vendido
         FROM venda_itens vi
         INNER JOIN produtos p ON p.id = vi.produto_id
         INNER JOIN vendas v ON v.id = vi.venda_id

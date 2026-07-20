@@ -5,8 +5,8 @@
     let produtoSelecionado = null;
     let produtoBuscaTimer = null;
     let atualizandoResumo = false;
-    let vendaProntaParaEnviar = false;
-    let valorFinalEditadoManual = false;
+    let finalizacaoEmAndamento = false;
+    let temporizadorFinalizacao = null;
 
     const produtoBuscaInput = document.getElementById("produto_busca");
     const produtoIdInput = document.getElementById("produto_id");
@@ -17,7 +17,6 @@
     const clienteBuscaInput = document.getElementById("cliente_busca");
     const clienteIdInput = document.getElementById("cliente_id");
     const clienteResultados = document.getElementById("cliente_resultados");
-    const clienteSelecionadoInfo = document.getElementById("cliente_selecionado_info");
 
     const descontoTipoInput = document.getElementById("desconto_tipo");
     const descontoInput = document.getElementById("desconto_input");
@@ -29,6 +28,7 @@
     const itensContador = document.getElementById("itens_contador");
     const preview = document.getElementById("preview-venda");
     const itensJsonInput = document.getElementById("itens_json");
+    const csrfToken = document.querySelector("meta[name='csrf-token']")?.content || "";
 
     function mostrarToast(mensagem, tipo = "info", titulo = "") {
         const container = document.getElementById("toastContainer");
@@ -54,17 +54,29 @@
 
         const toast = document.createElement("div");
         toast.className = `crm-toast ${tipo}`;
+        const icone = document.createElement("div");
+        icone.className = "crm-toast-icon";
+        icone.textContent = icones[tipo] || "i";
 
-        toast.innerHTML = `
-            <div class="crm-toast-icon">${icones[tipo] || "i"}</div>
+        const conteudo = document.createElement("div");
+        conteudo.className = "crm-toast-content";
 
-            <div class="crm-toast-content">
-                <div class="crm-toast-title">${titulo || titulos[tipo] || "Informação"}</div>
-                <div class="crm-toast-message">${mensagem}</div>
-            </div>
+        const tituloEl = document.createElement("div");
+        tituloEl.className = "crm-toast-title";
+        tituloEl.textContent = titulo || titulos[tipo] || "Informação";
 
-            <button type="button" class="crm-toast-close" aria-label="Fechar">×</button>
-        `;
+        const mensagemEl = document.createElement("div");
+        mensagemEl.className = "crm-toast-message";
+        mensagemEl.textContent = String(mensagem || "");
+
+        const fechar = document.createElement("button");
+        fechar.type = "button";
+        fechar.className = "crm-toast-close";
+        fechar.setAttribute("aria-label", "Fechar");
+        fechar.textContent = "×";
+
+        conteudo.append(tituloEl, mensagemEl);
+        toast.append(icone, conteudo, fechar);
 
         const fecharToast = function () {
             toast.classList.add("hide");
@@ -74,7 +86,7 @@
             }, 220);
         };
 
-        toast.querySelector(".crm-toast-close").addEventListener("click", fecharToast);
+        fechar.addEventListener("click", fecharToast);
 
         container.appendChild(toast);
 
@@ -86,6 +98,12 @@
             style: "currency",
             currency: "BRL"
         });
+    }
+
+    function escaparHtml(valor) {
+        const elemento = document.createElement("div");
+        elemento.textContent = String(valor ?? "");
+        return elemento.innerHTML;
     }
 
     function formatarValorMonetario(valor) {
@@ -277,8 +295,8 @@
             const tr = document.createElement("tr");
 
             tr.innerHTML = `
-                <td class="pdv-product-name">${item.nome}</td>
-                <td class="pdv-product-sku">${item.sku || "-"}</td>
+                <td class="pdv-product-name">${escaparHtml(item.nome)}</td>
+                <td class="pdv-product-sku">${escaparHtml(item.sku || "-")}</td>
                 <td>
                     <div class="quantity-control">
                         <button type="button" class="quantity-button" onclick="diminuirQuantidade(${item.produto_id})" title="Diminuir quantidade">-</button>
@@ -325,27 +343,10 @@
 
         descontoValor = Math.max(0, Math.min(descontoValor, subtotal));
 
-        let total = subtotal - descontoValor;
-
-        /*
-            Se o usuário editou manualmente o Valor final,
-            o sistema respeita esse valor e calcula o desconto automaticamente.
-        */
-        if (valorFinalEditadoManual) {
-            const valorFinalManual = converterCampoMoedaParaNumero(valorFinalInput.value);
-
-            if (valorFinalManual >= 0 && valorFinalManual <= subtotal) {
-                total = valorFinalManual;
-                descontoValor = subtotal - valorFinalManual;
-            }
-        } else {
-            valorFinalInput.value = formatarCampoMoeda(total);
-        }
+        const total = subtotal - descontoValor;
 
         descontoTotalInput.value = descontoValor.toFixed(2);
-
-        valorFinalInput.removeAttribute("readonly");
-        valorFinalInput.classList.remove("readonly-input");
+        valorFinalInput.value = formatarCampoMoeda(total);
 
         preview.textContent = formatarMoeda(total);
         
@@ -371,8 +372,8 @@
     }
 
     window.prepararVenda = function () {
-        if (vendaProntaParaEnviar) {
-            return true;
+        if (finalizacaoEmAndamento) {
+            return false;
         }
 
         if (itensVenda.length === 0) {
@@ -457,24 +458,131 @@
         const vendedorSelecionado = document.getElementById("vendedor_id")?.value || "";
 
         if (!vendedorSelecionado) {
-            abrirModalVendedor();
+            mostrarToast(
+                "Selecione o vendedor responsável pela venda.",
+                "warning",
+                "Vendedor obrigatório"
+            );
+            document.getElementById("vendedor_id")?.focus();
             return false;
+        }
+
+        if (
+            formasSelecionadas.length === 1
+            && formasSelecionadas[0] === "DINHEIRO"
+        ) {
+            const totalVenda = converterCampoMoedaParaNumero(valorFinalInput.value);
+            const valorRecebido = converterDinheiroParaNumero(
+                document.getElementById("valor_recebido_dinheiro")?.value
+            );
+
+            if (valorRecebido < totalVenda) {
+                mostrarToast(
+                    `Falta informar ${formatarMoeda(totalVenda - valorRecebido)} no valor recebido.`,
+                    "warning",
+                    "Valor recebido insuficiente"
+                );
+                document.getElementById("valor_recebido_dinheiro")?.focus();
+                return false;
+            }
         }
 
         preencherItensJson();
 
         const formVenda = document.getElementById("formVenda");
 
-        if (formVenda) {
-            formVenda.setAttribute("target", "_blank");
+        if (!formVenda) {
+            return false;
+        }
+
+        finalizacaoEmAndamento = true;
+        finalizarVendaButton.disabled = true;
+        finalizarVendaButton.setAttribute("aria-disabled", "true");
+        finalizarVendaButton.dataset.textoOriginal = finalizarVendaButton.textContent.trim();
+        finalizarVendaButton.textContent = "Finalizando...";
+
+        clearTimeout(temporizadorFinalizacao);
+        temporizadorFinalizacao = setTimeout(function () {
+            if (!finalizacaoEmAndamento) {
+                return;
+            }
+
+            finalizacaoEmAndamento = false;
+            finalizarVendaButton.disabled = false;
+            finalizarVendaButton.setAttribute("aria-disabled", "false");
+            finalizarVendaButton.textContent =
+                finalizarVendaButton.dataset.textoOriginal || "Finalizar venda";
+
+            mostrarToast(
+                "A confirmação demorou mais que o esperado. Tente novamente.",
+                "warning",
+                "Confirmação pendente"
+            );
+        }, 15000);
+
+        const janelaRecibo = window.open("", "_blank");
+        enviarVendaAssincrona(formVenda, janelaRecibo);
+        return false;
+    };
+
+    async function enviarVendaAssincrona(formVenda, janelaRecibo) {
+        try {
+            const resposta = await fetch(formVenda.action, {
+                method: "POST",
+                body: new FormData(formVenda),
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json"
+                }
+            });
+            const resultado = await resposta.json();
+
+            if (!resposta.ok || !resultado.sucesso) {
+                throw new Error(
+                    resultado.mensagem
+                    || "Não foi possível finalizar a venda."
+                );
+            }
+
+            clearTimeout(temporizadorFinalizacao);
+            finalizacaoEmAndamento = false;
+
+            if (janelaRecibo && !janelaRecibo.closed) {
+                janelaRecibo.location.href = resultado.recibo_url;
+            } else {
+                window.location.href = resultado.recibo_url;
+                return;
+            }
+
+            mostrarToast(
+                `Venda #${resultado.venda_id} registrada com sucesso.`,
+                "success",
+                "Venda finalizada"
+            );
 
             setTimeout(function () {
                 window.location.href = "/vendas";
             }, 800);
-        }
+        } catch (erro) {
+            clearTimeout(temporizadorFinalizacao);
+            finalizacaoEmAndamento = false;
 
-        return true;
-    };
+            if (janelaRecibo && !janelaRecibo.closed) {
+                janelaRecibo.close();
+            }
+
+            finalizarVendaButton.disabled = false;
+            finalizarVendaButton.setAttribute("aria-disabled", "false");
+            finalizarVendaButton.textContent =
+                finalizarVendaButton.dataset.textoOriginal || "Finalizar venda";
+
+            mostrarToast(
+                erro.message || "Não foi possível finalizar a venda.",
+                "error",
+                "Venda não finalizada"
+            );
+        }
+    }
 
     function preencherItensJson() {
         itensJsonInput.value = JSON.stringify(itensVenda.map(item => ({
@@ -482,64 +590,6 @@
             quantidade: item.quantidade
         })));
     }
-
-    window.abrirModalVendedor = function () {
-        const modal = document.getElementById("modalVendedor");
-        const selectModal = document.getElementById("modal_vendedor_id");
-
-        if (selectModal) {
-            selectModal.value = "";
-        }
-        abrirModalPorId("modalVendedor");
-    };
-
-    window.fecharModalVendedor = function () {
-        const selectModal = document.getElementById("modal_vendedor_id");
-
-        if (selectModal) {
-            selectModal.value = "";
-        }
-        fecharModalPorId("modalVendedor");
-    };
-
-    window.confirmarVendedorEVender = function () {
-        const selectModal = document.getElementById("modal_vendedor_id");
-        const vendedorSelecionado = selectModal ? selectModal.value : "";
-
-        if (!vendedorSelecionado) {
-            mostrarToast(
-                "Selecione o vendedor responsável pela venda.",
-                "warning",
-                "Venda sem vendedor"
-            );
-            return;
-        }
-
-        const formVenda = document.getElementById("formVenda");
-
-        document.getElementById("vendedor_id").value = vendedorSelecionado;
-
-        preencherItensJson();
-
-        vendaProntaParaEnviar = true;
-
-        if (formVenda) {
-            formVenda.setAttribute("target", "_blank");
-            formVenda.submit();
-        }
-
-        fecharModalVendedor();
-
-        mostrarToast(
-            "Venda enviada. O recibo térmico será aberto em uma nova aba.",
-            "success",
-            "Venda finalizada"
-        );
-
-        setTimeout(function () {
-            window.location.href = "/vendas";
-        }, 800);
-    };
 
     function buscarProdutos(termo) {
         if (termo.length < 3) {
@@ -598,8 +648,8 @@
             item.type = "button";
             item.className = "autocomplete-item";
             item.innerHTML = `
-                <strong>${produto.nome}</strong>
-                <span>SKU: ${produto.sku || "-"} | Estoque: ${produto.estoque_atual} | ${formatarMoeda(Number(produto.preco_venda || 0))}</span>
+                <strong>${escaparHtml(produto.nome)}</strong>
+                <span>SKU: ${escaparHtml(produto.sku || "-")} | Estoque: ${Number(produto.estoque_atual || 0)} | ${formatarMoeda(Number(produto.preco_venda || 0))}</span>
             `;
             
             
@@ -619,6 +669,7 @@
         produtoIdInput.value = produtoSelecionado.id;
         produtoBuscaInput.value = produtoSelecionado.nome;
         produtoSelecionadoInfo.textContent = `Selecionado: ${produtoSelecionado.nome} | SKU: ${produtoSelecionado.sku || "-"} | Estoque: ${produtoSelecionado.estoque_atual} | ${formatarMoeda(produtoSelecionado.preco_venda)}`;
+        produtoSelecionadoInfo.hidden = false;
         produtoResultados.innerHTML = "";
         produtoResultados.classList.remove("show");
     }
@@ -627,7 +678,8 @@
         produtoSelecionado = null;
         produtoIdInput.value = "";
         produtoBuscaInput.value = "";
-        produtoSelecionadoInfo.textContent = "Nenhum produto selecionado.";
+        produtoSelecionadoInfo.textContent = "";
+        produtoSelecionadoInfo.hidden = true;
         produtoResultados.innerHTML = "";
         produtoResultados.classList.remove("show");
     }
@@ -778,8 +830,8 @@
             item.type = "button";
             item.className = "autocomplete-item";
             item.innerHTML = `
-                <strong>${cliente.nome}</strong>
-                <span>Telefone: ${cliente.telefone || "-"} | Endereço: ${cliente.endereco_completo || "-"}</span>
+                <strong>${escaparHtml(cliente.nome)}</strong>
+                <span>Telefone: ${escaparHtml(cliente.telefone || "-")} | Endereço: ${escaparHtml(cliente.endereco_completo || "-")}</span>
             `;
             item.addEventListener("click", () => selecionarCliente(cliente));
             clienteResultados.appendChild(item);
@@ -788,11 +840,14 @@
         clienteResultados.classList.add("show");
     }
 
+    function formatarClienteNoCampo(cliente) {
+        return `${cliente.nome} | Telefone: ${cliente.telefone || "-"}`;
+    }
+
     function selecionarCliente(cliente) {
         clienteSelecionado = cliente;
         clienteIdInput.value = cliente.id;
-        clienteBuscaInput.value = cliente.nome;
-        clienteSelecionadoInfo.textContent = `Selecionado: ${cliente.nome} | Telefone: ${cliente.telefone || "-"}`;
+        clienteBuscaInput.value = formatarClienteNoCampo(cliente);
         clienteResultados.innerHTML = "";
         clienteResultados.classList.remove("show");
     }
@@ -822,18 +877,7 @@
             return;
         }
 
-        clienteSelecionado = cliente;
-        clienteIdInput.value = cliente.id;
-        clienteBuscaInput.value = cliente.nome;
-
-        let texto = `Cliente selecionado: ${cliente.nome}`;
-        if (cliente.telefone) {
-            texto += ` - ${cliente.telefone}`;
-        }
-
-        clienteSelecionadoInfo.textContent = texto;
-        clienteResultados.innerHTML = "";
-        clienteResultados.classList.remove("show");
+        selecionarCliente(cliente);
     }
 
     window.abrirModalNovoProdutoVenda = function () {
@@ -874,51 +918,6 @@
         selecionarProduto(produto);
     }
 
-    function atualizarDescontoPeloValorFinal() {
-        if (atualizandoResumo) {
-            return;
-        }
-
-        valorFinalEditadoManual = true;
-
-        const subtotal = calcularSubtotalVenda();
-        const valorFinal = converterCampoMoedaParaNumero(valorFinalInput.value);
-
-        if (subtotal <= 0) {
-            descontoInput.value = 0;
-            descontoTotalInput.value = 0;
-            atualizarResumo();
-            return;
-        }
-
-        if (valorFinal < 0) {
-            valorFinalInput.value = "0.00";
-            return;
-        }
-
-        if (valorFinal > subtotal) {
-            valorFinalInput.value = subtotal.toFixed(2);
-            descontoInput.value = 0;
-            descontoTotalInput.value = 0;
-            valorFinalEditadoManual = false;
-            atualizarResumo();
-            return;
-        }
-
-        const descontoValor = subtotal - valorFinal;
-
-        descontoTotalInput.value = descontoValor.toFixed(2);
-
-        if (descontoTipoInput.value === "percentual") {
-            const percentual = subtotal > 0 ? (descontoValor / subtotal) * 100 : 0;
-            descontoInput.value = percentual.toFixed(2);
-        } else {
-            descontoInput.value = descontoValor.toFixed(2);
-        }
-
-        atualizarResumo();
-    }
-
     function configurarFormularioNovoProduto() {
         const form = document.getElementById("formNovoProdutoVenda");
         if (!form) {
@@ -948,7 +947,10 @@
             try {
                 const resposta = await fetch("/api/produtos/criar", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-Token": csrfToken
+                    },
                     body: JSON.stringify(dados)
                 });
 
@@ -1007,7 +1009,10 @@
             try {
                 const resposta = await fetch("/api/clientes/criar", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-Token": csrfToken
+                    },
                     body: JSON.stringify(dados)
                 });
 
@@ -1062,19 +1067,27 @@
         const totalVenda = converterCampoMoedaParaNumero(valorFinalInput?.value);
         const subtotal = calcularSubtotalVenda();
         const desconto = Number(descontoTotalInput?.value || 0);
-        const dadosBasicosValidos =
+        const vendedorSelecionado = document.getElementById("vendedor_id")?.value;
+        const podeTentarFinalizar =
             itensVenda.length > 0 &&
-            formasSelecionadas.length > 0 &&
             totalVenda >= 0 &&
-            desconto <= subtotal;
+            desconto <= subtotal &&
+            !finalizacaoEmAndamento;
 
-        finalizarVendaButton.disabled = !dadosBasicosValidos;
-        finalizarVendaButton.setAttribute("aria-disabled", dadosBasicosValidos ? "false" : "true");
+        finalizarVendaButton.disabled = !podeTentarFinalizar;
+        finalizarVendaButton.setAttribute(
+            "aria-disabled",
+            podeTentarFinalizar ? "false" : "true"
+        );
 
-        if (!dadosBasicosValidos && formasSelecionadas.length === 0) {
+        if (!podeTentarFinalizar) {
+            finalizarVendaButton.title = itensVenda.length === 0
+                ? "Adicione pelo menos um produto"
+                : "Confira os dados da venda";
+        } else if (formasSelecionadas.length === 0) {
             finalizarVendaButton.title = "Selecione uma forma de pagamento";
-        } else if (!dadosBasicosValidos) {
-            finalizarVendaButton.title = "Confira os dados da venda";
+        } else if (!vendedorSelecionado) {
+            finalizarVendaButton.title = "Selecione o vendedor responsável";
         } else if (formasSelecionadas.length > 1) {
             const totalInformado = calcularTotalPagamentosSelecionados(formasSelecionadas);
             const pagamentoFechado = Math.abs(totalVenda - totalInformado) <= 0.009;
@@ -1088,6 +1101,7 @@
 
     function atualizarResumoPagamentos() {
         const formasSelecionadas = obterFormasPagamentoSelecionadas();
+        atualizarTrocoDinheiro(formasSelecionadas);
 
         if (formasSelecionadas.length <= 1) {
             atualizarEstadoFinalizacao(formasSelecionadas);
@@ -1137,6 +1151,39 @@
         atualizarEstadoFinalizacao(formasSelecionadas);
     }
 
+    function atualizarTrocoDinheiro(formasSelecionadas) {
+        const campoRecebido = document.getElementById("valor_recebido_dinheiro");
+        const trocoEl = document.getElementById("troco_dinheiro");
+
+        if (!campoRecebido || !trocoEl) {
+            return;
+        }
+
+        const dinheiroUnico = (
+            formasSelecionadas.length === 1
+            && formasSelecionadas[0] === "DINHEIRO"
+        );
+
+        if (!dinheiroUnico) {
+            trocoEl.textContent = formatarValorMonetario(0);
+            trocoEl.classList.remove("text-danger", "text-success");
+            return;
+        }
+
+        const totalVenda = converterCampoMoedaParaNumero(valorFinalInput?.value);
+        const valorRecebido = converterDinheiroParaNumero(campoRecebido.value);
+        const diferenca = valorRecebido - totalVenda;
+
+        trocoEl.classList.remove("text-danger", "text-success");
+        trocoEl.textContent = formatarValorMonetario(Math.abs(diferenca));
+
+        if (diferenca >= -0.009) {
+            trocoEl.classList.add("text-success");
+        } else {
+            trocoEl.classList.add("text-danger");
+        }
+    }
+
     function obterFormasPagamentoSelecionadas() {
         return Array.from(document.querySelectorAll(".payment-method-check:checked"))
             .map(function (input) {
@@ -1150,8 +1197,14 @@
         const pagamentoDivididoInput = document.getElementById("pagamento_dividido");
         const formaPagamentoInput = document.getElementById("forma_pagamento");
         const areaDividida = document.getElementById("pagamento_dividido_area");
+        const areaDinheiro = document.getElementById("pagamento_dinheiro_area");
+        const campoRecebido = document.getElementById("valor_recebido_dinheiro");
 
         const ehPagamentoDividido = formasSelecionadas.length > 1;
+        const dinheiroUnico = (
+            formasSelecionadas.length === 1
+            && formasSelecionadas[0] === "DINHEIRO"
+        );
 
         if (pagamentoDivididoInput) {
             pagamentoDivididoInput.value = ehPagamentoDividido ? "1" : "0";
@@ -1163,6 +1216,20 @@
 
         if (areaDividida) {
             areaDividida.style.display = ehPagamentoDividido ? "block" : "none";
+        }
+
+        if (areaDinheiro) {
+            areaDinheiro.style.display = dinheiroUnico ? "grid" : "none";
+        }
+
+        if (campoRecebido) {
+            if (dinheiroUnico && !campoRecebido.value.trim()) {
+                campoRecebido.value = formatarCampoMoeda(
+                    converterCampoMoedaParaNumero(valorFinalInput?.value)
+                );
+            } else if (!dinheiroUnico) {
+                campoRecebido.value = "";
+            }
         }
 
         document.querySelectorAll(".payment-value-field").forEach(function (campo) {
@@ -1186,7 +1253,7 @@
         input.addEventListener("change", atualizarFormaPagamentoVisual);
     });
 
-    ["valor_pix", "valor_dinheiro", "valor_cartao", "valor_final_input"].forEach(function(id) {
+    ["valor_pix", "valor_dinheiro", "valor_cartao", "valor_recebido_dinheiro"].forEach(function(id) {
         const campo = document.getElementById(id);
 
         if (campo) {
@@ -1211,7 +1278,8 @@
             const termo = produtoBuscaInput.value.trim();
             produtoSelecionado = null;
             produtoIdInput.value = "";
-            produtoSelecionadoInfo.textContent = "Nenhum produto selecionado.";
+            produtoSelecionadoInfo.textContent = "";
+            produtoSelecionadoInfo.hidden = true;
 
             clearTimeout(produtoBuscaTimer);
             produtoBuscaTimer = setTimeout(() => buscarProdutos(termo), 300);
@@ -1221,7 +1289,6 @@
             const termo = clienteBuscaInput.value.trim();
             clienteSelecionado = null;
             clienteIdInput.value = "";
-            clienteSelecionadoInfo.textContent = "Nenhum cliente selecionado. A venda será registrada sem identificação.";
 
             clearTimeout(clienteBuscaTimer);
             clienteBuscaTimer = setTimeout(() => buscarClientes(termo), 300);
@@ -1287,52 +1354,34 @@
         });
 
         if (descontoInput) {
-            descontoInput.addEventListener("input", function () {
-                valorFinalEditadoManual = false;
-                atualizarResumo();
-            });
+            descontoInput.addEventListener("input", atualizarResumo);
         }
 
         if (descontoTipoInput) {
-            descontoTipoInput.addEventListener("change", function () {
-                valorFinalEditadoManual = false;
-                atualizarResumo();
-            });
+            descontoTipoInput.addEventListener("change", atualizarResumo);
         }
-        if (valorFinalInput) {
-            valorFinalInput.addEventListener("focus", function () {
-                valorFinalInput.select();
-            });
+    }
 
-            valorFinalInput.addEventListener("input", function () {
-                valorFinalEditadoManual = true;
-                atualizarDescontoPeloValorFinal();
-            });
+    function configurarVendedorResponsavel() {
+        const vendedorInput = document.getElementById("vendedor_id");
 
-            valorFinalInput.addEventListener("blur", function () {
-                const subtotal = calcularSubtotalVenda();
-                let valor = converterCampoMoedaParaNumero(valorFinalInput.value);
-
-                if (valor < 0) {
-                    valor = 0;
-                }
-
-                if (valor > subtotal) {
-                    valor = subtotal;
-                }
-
-                valorFinalInput.value = formatarCampoMoeda(valor);
-
-                valorFinalEditadoManual = true;
-                atualizarDescontoPeloValorFinal();
-            });
+        if (!vendedorInput) {
+            return;
         }
+
+        vendedorInput.value = "";
+        window.localStorage.removeItem("pdv_vendedor_id");
+
+        vendedorInput.addEventListener("change", function () {
+            atualizarEstadoFinalizacao(obterFormasPagamentoSelecionadas());
+        });
     }
 
     document.addEventListener("DOMContentLoaded", function () {
         configurarEventos();
         configurarFormularioNovoProduto();
         configurarFormularioNovoCliente();
+        configurarVendedorResponsavel();
         atualizarResumo();
     });
 
@@ -1352,6 +1401,29 @@
         }
     };
 
+    window.abrirModalCancelarVenda = function (vendaId) {
+        const modal = document.getElementById("modalCancelarVenda");
+        const form = document.getElementById("formCancelarVenda");
+        const motivo = document.getElementById("motivo_cancelamento_lista");
+
+        if (!modal || !form) {
+            return;
+        }
+
+        form.action = `/vendas/${Number(vendaId)}/cancelar`;
+
+        if (motivo) {
+            motivo.value = "";
+        }
+
+        modal.classList.add("show");
+        setTimeout(() => motivo?.focus(), 100);
+    };
+
+    window.fecharModalCancelarVenda = function () {
+        document.getElementById("modalCancelarVenda")?.classList.remove("show");
+    };
+
     document.addEventListener("DOMContentLoaded", function () {
         if (window.location.hash === "#lista-vendas") {
             abrirModalVendasCadastradas();
@@ -1366,7 +1438,7 @@
 
         if (saindoDaEtapaProdutos && itensVenda.length === 0) {
             mostrarToast(
-                "Adicione pelo menos um produto antes de avançar para Cliente ou Pagamento.",
+                "Adicione pelo menos um produto antes de avançar para a finalização.",
                 "warning",
                 "Produto obrigatório"
             );

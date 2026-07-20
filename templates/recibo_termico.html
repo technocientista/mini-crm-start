@@ -135,6 +135,12 @@
                             <span>{{ pagamento.forma_pagamento|replace("_", " ")|title }}</span>
                             <strong>{{ pagamento.valor|moeda_br }}</strong>
                         </div>
+                        {% if pagamento.valor_recebido is not none and pagamento.valor_recebido > pagamento.valor %}
+                            <div>
+                                <span>Valor recebido</span>
+                                <strong>{{ pagamento.valor_recebido|moeda_br }}</strong>
+                            </div>
+                        {% endif %}
                     {% endfor %}
                 {% else %}
                     <div>

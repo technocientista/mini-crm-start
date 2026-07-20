@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <title>Vendas - Start CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="ui-refreshed{% if pdv_bloqueado %} pdv-bloqueado{% endif %}">
+<body class="ui-refreshed vendas-page{% if pdv_bloqueado %} pdv-bloqueado{% endif %}">
 
     <div
         class="app-layout"
@@ -49,97 +50,47 @@
                 <h2>Nova venda</h2>
 
                 <form method="POST" action="{{ url_for('vendas') }}" class="form-grid" id="formVenda" onsubmit="return prepararVenda()">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="token_operacao" value="{{ token_operacao }}">
+                    <input type="hidden" name="resposta_json" value="1">
 
                     <div class="pdv-path full">
                         <button type="button" class="pdv-path-step active" data-step-button="produtos" onclick="irParaEtapaPDV('produtos')">
                             <span>1</span>
-                            Produtos
-                        </button>
-
-                        <button type="button" class="pdv-path-step" data-step-button="cliente" onclick="irParaEtapaPDV('cliente')">
-                            <span>2</span>
-                            Cliente
+                            Itens da venda
                         </button>
 
                         <button type="button" class="pdv-path-step" data-step-button="pagamento" onclick="irParaEtapaPDV('pagamento')">
-                            <span>3</span>
-                            Pagamento
+                            <span>2</span>
+                            Finalização
                         </button>
                     </div>
 
 
 
-                    <div class="pdv-step-content full" data-step-content="cliente">
-                        <div class="client-step-layout">
-                            <section class="pdv-entry-card client-selection-card">
-                                <div class="pdv-section-heading">
-                                    <div>
-                                        <strong>Cliente da venda</strong>
-                                        <small>Busque pelo nome ou telefone para vincular à venda.</small>
-                                    </div>
-                                    <span class="pdv-optional-badge">Opcional</span>
-                                </div>
-
-                                <div class="form-group client-search-group">
-                                    <label for="cliente_busca">Buscar cliente</label>
-
-                                    <input
-                                        type="text"
-                                        id="cliente_busca"
-                                        placeholder="Digite pelo menos 3 caracteres..."
-                                        autocomplete="off"
-                                    >
-
-                                    <input type="hidden" id="cliente_id" name="cliente_id">
-
-                                    <small id="cliente_selecionado_info" class="field-help cliente-field-help">
-                                        Nenhum cliente selecionado. A venda será registrada sem identificação.
-                                    </small>
-
-                                    <div id="cliente_resultados" class="autocomplete-results"></div>
-                                </div>
-                            </section>
-
-                            <section class="pdv-entry-card client-notes-card">
-                                <div class="pdv-section-heading">
-                                    <div>
-                                        <strong>Observações da venda</strong>
-                                        <small>Adicione informações úteis para o atendimento.</small>
-                                    </div>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="observacoes">Observações</label>
-                                    <textarea
-                                        id="observacoes"
-                                        name="observacoes"
-                                        rows="4"
-                                        placeholder="Ex.: preferência do cliente, prazo combinado ou detalhes da entrega"
-                                    ></textarea>
-                                </div>
-                            </section>
-                        </div>
-
-                        <div class="pdv-step-actions client-step-actions">
-                            <button type="button" class="icon-action-button secondary ui-command-action ui-icon-back" onclick="irParaEtapaPDV('produtos')">
-                                Voltar
-                            </button>
-
-                            <button type="button" class="icon-action-button ui-command-action ui-icon-next" onclick="irParaEtapaPDV('pagamento')">
-                                Avançar para Pagamento
-                            </button>
-                        </div>
-                    </div>
-
                     <input type="hidden" id="itens_json" name="itens_json">
-                    <input type="hidden" id="vendedor_id" name="vendedor_id">
 
                     <div class="pdv-step-content active full" data-step-content="produtos">
                         <section class="pdv-entry-card product-entry-card">
                             <div class="pdv-section-heading">
                                 <div>
-                                    <strong>Adicionar produto</strong>
-                                    <small>Busque pelo nome, SKU ou leia o código de barras.</small>
+                                    <div class="pdv-heading-title">
+                                        <strong>Adicionar produto</strong>
+                                        <span
+                                            class="pdv-help-tooltip"
+                                            tabindex="0"
+                                            aria-describedby="ajuda-adicionar-produto"
+                                        >
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <circle cx="12" cy="12" r="9"></circle>
+                                                <path d="M9.75 9a2.35 2.35 0 1 1 3.52 2.03c-.78.47-1.27.91-1.27 1.97"></path>
+                                                <path d="M12 16.75h.01"></path>
+                                            </svg>
+                                            <span id="ajuda-adicionar-produto" class="pdv-help-tooltip-content" role="tooltip">
+                                                Busque pelo nome, SKU ou leia o código de barras.
+                                            </span>
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -156,9 +107,11 @@
 
                                     <input type="hidden" id="produto_id">
 
-                                    <small id="produto_selecionado_info" class="field-help produto-field-help">
-                                        Nenhum produto selecionado.
-                                    </small>
+                                    <small
+                                        id="produto_selecionado_info"
+                                        class="field-help produto-field-help"
+                                        hidden
+                                    ></small>
 
                                     <div id="produto_resultados" class="autocomplete-results"></div>
                                 </div>
@@ -180,8 +133,23 @@
                         <section class="pdv-items-card full">
                             <div class="pdv-items-header">
                                 <div>
-                                    <strong>Itens da venda</strong>
-                                    <small>Revise produtos, quantidades e valores antes de avançar.</small>
+                                    <div class="pdv-heading-title">
+                                        <strong>Itens da venda</strong>
+                                        <span
+                                            class="pdv-help-tooltip"
+                                            tabindex="0"
+                                            aria-describedby="ajuda-itens-venda"
+                                        >
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <circle cx="12" cy="12" r="9"></circle>
+                                                <path d="M9.75 9a2.35 2.35 0 1 1 3.52 2.03c-.78.47-1.27.91-1.27 1.97"></path>
+                                                <path d="M12 16.75h.01"></path>
+                                            </svg>
+                                            <span id="ajuda-itens-venda" class="pdv-help-tooltip-content" role="tooltip">
+                                                Revise produtos, quantidades e valores antes de avançar.
+                                            </span>
+                                        </span>
+                                    </div>
                                 </div>
                                 <span id="itens_contador" class="pdv-items-count">0 itens</span>
                             </div>
@@ -215,8 +183,8 @@
                                 <strong id="preview-venda">R$ 0,00</strong>
                             </div>
 
-                            <button type="button" class="icon-action-button ui-command-action ui-icon-next" onclick="irParaEtapaPDV('cliente')">
-                                Avançar para Cliente
+                            <button type="button" class="icon-action-button ui-command-action ui-icon-next" onclick="irParaEtapaPDV('pagamento')">
+                                Revisar e finalizar
                             </button>
                         </div>
                     </div>
@@ -224,6 +192,76 @@
                     
 
                     <div class="pdv-step-content full" data-step-content="pagamento">
+
+                        <section class="pdv-entry-card finalization-context-card">
+                            <div class="pdv-section-heading">
+                                <div>
+                                    <div class="pdv-heading-title">
+                                        <strong>Dados da venda</strong>
+                                        <span
+                                            class="pdv-help-tooltip"
+                                            tabindex="0"
+                                            aria-describedby="ajuda-dados-venda"
+                                        >
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <circle cx="12" cy="12" r="9"></circle>
+                                                <path d="M9.75 9a2.35 2.35 0 1 1 3.52 2.03c-.78.47-1.27.91-1.27 1.97"></path>
+                                                <path d="M12 16.75h.01"></path>
+                                            </svg>
+                                            <span id="ajuda-dados-venda" class="pdv-help-tooltip-content" role="tooltip">
+                                                Identifique o atendimento e, se desejar, vincule um cliente.
+                                            </span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="finalization-context-grid">
+                                <div class="form-group client-search-group">
+                                    <label for="cliente_busca">
+                                        Cliente
+                                        <span class="field-label-optional">Opcional</span>
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        id="cliente_busca"
+                                        placeholder="Sem cliente selecionado"
+                                        autocomplete="off"
+                                    >
+
+                                    <input type="hidden" id="cliente_id" name="cliente_id">
+
+                                    <div id="cliente_resultados" class="autocomplete-results"></div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="vendedor_id">Vendedor responsável</label>
+                                    <select id="vendedor_id" name="vendedor_id" aria-required="true">
+                                        <option value="">Selecione o vendedor</option>
+                                        {% for vendedor in vendedores %}
+                                            <option value="{{ vendedor.id }}">
+                                                {{ vendedor.nome }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="form-group finalization-notes-field">
+                                    <label for="observacoes">
+                                        Observações
+                                        <span class="field-label-optional">Opcional</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="observacoes"
+                                        name="observacoes"
+                                        maxlength="2000"
+                                        placeholder="Preferência do cliente, prazo ou detalhes da entrega"
+                                    >
+                                </div>
+                            </div>
+                        </section>
 
 
                         <div class="payment-step-layout full">
@@ -257,14 +295,13 @@
                                 <div class="payment-area full">
                                     <input type="hidden" id="pagamento_dividido" name="pagamento_dividido" value="0">
                                     <input type="hidden" id="forma_pagamento" name="forma_pagamento" value="">
-                                    <input type="hidden" id="valor_outros" name="valor_outros" value="0">
 
                                     <label class="payment-main-label">Forma de pagamento</label>
 
                                     <div class="payment-method-options">
                                         <label class="payment-toggle payment-method-option">
-                                            <input 
-                                                type="checkbox" 
+                                            <input
+                                                type="checkbox"
                                                 class="payment-method-check"
                                                 id="pagamento_pix_check"
                                                 value="PIX"
@@ -274,8 +311,8 @@
                                         </label>
 
                                         <label class="payment-toggle payment-method-option">
-                                            <input 
-                                                type="checkbox" 
+                                            <input
+                                                type="checkbox"
                                                 class="payment-method-check"
                                                 id="pagamento_dinheiro_check"
                                                 value="DINHEIRO"
@@ -285,8 +322,8 @@
                                         </label>
 
                                         <label class="payment-toggle payment-method-option">
-                                            <input 
-                                                type="checkbox" 
+                                            <input
+                                                type="checkbox"
                                                 class="payment-method-check"
                                                 id="pagamento_cartao_check"
                                                 value="CARTAO"
@@ -294,6 +331,25 @@
                                             >
                                             <span>Cartão</span>
                                         </label>
+                                    </div>
+
+                                    <div id="pagamento_dinheiro_area" class="single-cash-area" style="display: none;">
+                                        <div class="form-group cash-received-field">
+                                            <label for="valor_recebido_dinheiro">Valor recebido</label>
+                                            <input
+                                                type="text"
+                                                id="valor_recebido_dinheiro"
+                                                name="valor_recebido_dinheiro"
+                                                inputmode="decimal"
+                                                placeholder="0,00"
+                                                autocomplete="off"
+                                            >
+                                        </div>
+
+                                        <div class="cash-change-preview">
+                                            <span>Troco</span>
+                                            <strong id="troco_dinheiro">0,00</strong>
+                                        </div>
                                     </div>
 
                                     <div id="pagamento_dividido_area" class="payment-split-area" style="display: none;">
@@ -332,38 +388,34 @@
                                     </div>
                                 </div>
 
-                                <div class="payment-discount-grid">
-                                    <div class="form-group">
-                                        <label for="desconto_tipo">Tipo de desconto</label>
-                                        <select id="desconto_tipo" name="desconto_tipo">
-                                            <option value="percentual" selected>Porcentagem %</option>
-                                            <option value="valor">Valor R$</option>
-                                        </select>
-                                    </div>
+                                <details class="payment-discount-details">
+                                    <summary>Adicionar desconto</summary>
 
-                                    <div class="form-group">
-                                        <label for="desconto_input">Desconto</label>
-                                        <input 
-                                            type="number" 
-                                            id="desconto_input" 
-                                            step="0.01" 
-                                            min="0" 
-                                            value="0"
-                                        >
-                                        <input type="hidden" id="desconto_total" name="desconto_total" value="0">
-                                    </div>
+                                    <div class="payment-discount-grid">
+                                        <div class="form-group">
+                                            <label for="desconto_tipo">Tipo de desconto</label>
+                                            <select id="desconto_tipo" name="desconto_tipo">
+                                                <option value="percentual">Porcentagem %</option>
+                                                <option value="valor" selected>Valor R$</option>
+                                            </select>
+                                        </div>
 
-                                    <div class="form-group">
-                                        <label for="valor_final_input">Total final</label>
-                                        <input 
-                                            type="text" 
-                                            id="valor_final_input" 
-                                            name="valor_final"
-                                            inputmode="decimal"
-                                            value="0,00"
-                                        >
+                                        <div class="form-group">
+                                            <label for="desconto_input">Desconto</label>
+                                            <input
+                                                type="number"
+                                                id="desconto_input"
+                                                step="0.01"
+                                                min="0"
+                                                value="0"
+                                            >
+                                        </div>
+
                                     </div>
-                                </div>
+                                </details>
+
+                                <input type="hidden" id="valor_final_input" name="valor_final" value="0.00">
+                                <input type="hidden" id="desconto_total" name="desconto_total" value="0">
                             </div>
 
 
@@ -371,7 +423,7 @@
                         </div>
 
                         <div class="pdv-step-actions payment-step-actions">
-                            <button type="button" class="icon-action-button secondary ui-command-action ui-icon-back" onclick="irParaEtapaPDV('cliente')">
+                            <button type="button" class="icon-action-button secondary ui-command-action ui-icon-back" onclick="irParaEtapaPDV('produtos')">
                                 Voltar
                             </button>
 
@@ -418,39 +470,6 @@
             </div>
         </div>
     {% endif %}
-
-    <div id="modalVendedor" class="modal-overlay">
-        <div class="modal-card">
-            <h2>Vendedor responsável</h2>
-
-            <p>
-                Esta venda ainda está sem vendedor responsável.
-                Selecione quem realizou a venda para continuar.
-            </p>
-
-            <div class="form-group">
-                <label for="modal_vendedor_id">Vendedor</label>
-                <select id="modal_vendedor_id">
-                    <option value="">Selecione o vendedor</option>
-                    {% for vendedor in vendedores %}
-                        <option value="{{ vendedor.id }}">
-                            {{ vendedor.nome }} - {{ vendedor.email }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="modal-actions">
-                <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalVendedor()">
-                    Cancelar
-                </button>
-
-                <button type="button" onclick="confirmarVendedorEVender()" class="ui-command-action ui-icon-check">
-                    Finalizar venda
-                </button>
-            </div>
-        </div>
-    </div>
 
     <div id="modalNovoClienteVenda" class="modal-overlay">
         <div class="modal-card modal-large">
@@ -665,7 +684,7 @@
             <section class="panel modal-inner-panel">
                 <h2>Buscar vendas</h2>
 
-                <form method="GET" action="{{ url_for('vendas') }}" class="search-form sales-search-form">
+                <form method="GET" action="{{ url_for('vendas') }}#lista-vendas" class="search-form sales-search-form">
                     <input 
                         type="text" 
                         name="busca" 
@@ -728,8 +747,10 @@
                                 <th>Vendedor</th>
                                 <th>Pagamento</th>
                                 <th>Total</th>
-                                <th>Custo</th>
-                                <th>Lucro</th>
+                                {% if usuario.perfil == 'ADMIN' %}
+                                    <th>Custo</th>
+                                    <th>Lucro</th>
+                                {% endif %}
                                 <th>Status</th>
                                 <th>Ações</th>
                             </tr>
@@ -744,8 +765,10 @@
                                     <td>{{ venda.vendedor or '-' }}</td>
                                     <td>{{ venda.forma_pagamento }}</td>
                                     <td>R$ {{ "%.2f"|format(venda.valor_total) }}</td>
-                                    <td>R$ {{ "%.2f"|format(venda.custo_total) }}</td>
-                                    <td>R$ {{ "%.2f"|format(venda.lucro_total) }}</td>
+                                    {% if usuario.perfil == 'ADMIN' %}
+                                        <td>R$ {{ "%.2f"|format(venda.custo_total) }}</td>
+                                        <td>R$ {{ "%.2f"|format(venda.lucro_total) }}</td>
+                                    {% endif %}
                                     <td>
                                         {% if venda.status == 'CANCELADA' %}
                                             <span class="status-pill status-danger">Cancelada</span>
@@ -788,28 +811,23 @@
                                             </a>
 
                                             {% if usuario.perfil == 'ADMIN' and venda.status != 'CANCELADA' %}
-                                                <form 
-                                                    method="POST" 
-                                                    action="{{ url_for('cancelar_venda', venda_id=venda.id) }}"
-                                                    onsubmit="return confirm('Tem certeza que deseja cancelar esta venda? O estoque será devolvido.');"
+                                                <button
+                                                    type="button"
+                                                    class="small-danger-button"
+                                                    title="Cancelar venda"
+                                                    onclick="abrirModalCancelarVenda({{ venda.id }})"
                                                 >
-                                                    <button 
-                                                        type="submit" 
-                                                        class="small-danger-button"
-                                                        title="Cancelar venda"
-                                                    >
-                                                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                                                            <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 5.29 14L6 6.71A8 8 0 0 1 12 4zm0 16a8 8 0 0 1-5.29-14L18 17.29A8 8 0 0 1 12 20z"/>
-                                                        </svg>
-                                                    </button>
-                                                </form>
+                                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 5.29 14L6 6.71A8 8 0 0 1 12 4zm0 16a8 8 0 0 1-5.29-14L18 17.29A8 8 0 0 1 12 20z"/>
+                                                    </svg>
+                                                </button>
                                             {% endif %}
                                         </div>
                                     </td>
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td colspan="10" class="empty-state">
+                                    <td colspan="{{ 10 if usuario.perfil == 'ADMIN' else 8 }}" class="empty-state">
                                         Nenhuma venda registrada ainda.
                                     </td>
                                 </tr>
@@ -863,6 +881,51 @@
             </section>
         </div>
     </div>
+
+    {% if usuario.perfil == 'ADMIN' %}
+        <div id="modalCancelarVenda" class="modal-overlay">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <div>
+                        <h2>Cancelar venda</h2>
+                        <p class="muted-text">
+                            O estoque será devolvido. Informe o motivo para manter a auditoria.
+                        </p>
+                    </div>
+
+                    <button type="button" class="modal-close" onclick="fecharModalCancelarVenda()">
+                        ×
+                    </button>
+                </div>
+
+                <form id="formCancelarVenda" method="POST">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="form-group">
+                        <label for="motivo_cancelamento_lista">Motivo do cancelamento</label>
+                        <textarea
+                            id="motivo_cancelamento_lista"
+                            name="motivo_cancelamento"
+                            rows="4"
+                            required
+                            maxlength="500"
+                            placeholder="Descreva por que esta venda está sendo cancelada"
+                        ></textarea>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalCancelarVenda()">
+                            Voltar
+                        </button>
+
+                        <button type="submit" class="danger-outline-button ui-command-action ui-icon-close">
+                            Confirmar cancelamento
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
 
     <div id="toastContainer" class="toast-container"></div>
 
