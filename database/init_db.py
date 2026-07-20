@@ -72,6 +72,7 @@ def criar_banco():
             lucro_total REAL NOT NULL DEFAULT 0,
             observacoes TEXT,
             status TEXT NOT NULL DEFAULT 'CONCLUIDA',
+            token_operacao TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (cliente_id) REFERENCES clientes(id)
         )
@@ -100,9 +101,16 @@ def criar_banco():
             venda_id INTEGER NOT NULL,
             forma_pagamento TEXT NOT NULL,
             valor REAL NOT NULL DEFAULT 0,
+            valor_recebido REAL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (venda_id) REFERENCES vendas(id)
         )
+    """)
+
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_vendas_token_operacao
+        ON vendas (token_operacao)
+        WHERE token_operacao IS NOT NULL
     """)
 
     cursor.execute("""
