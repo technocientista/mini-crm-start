@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Crediário de {{ cliente.nome }} - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="ui-refreshed receivable-client-page">
+    <div class="app-layout">
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar receivable-client-topbar">
+                <div>
+                    <h1>Crediário de {{ cliente.nome }}</h1>
+                    <p>Extrato de compras, pagamentos e saldo atual do cliente.</p>
+                </div>
+                <div class="receivable-client-topbar-actions">
+                    <a href="{{ url_for('contas_receber') }}" class="ui-command-action ui-icon-back">
+                        Contas a receber
+                    </a>
+                    <a href="{{ url_for('cliente_detalhe', cliente_id=cliente.id) }}" class="ui-command-action ui-icon-view">
+                        Abrir cliente
+                    </a>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="success-alert">{{ messages[0] }}</div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="receivables-kpi-grid" aria-label="Resumo do cliente">
+                <article class="receivables-kpi-card featured">
+                    <span>Saldo atual</span>
+                    <strong>{{ ((resumo.saldo_centavos or 0) / 100)|moeda_br }}</strong>
+                    <small>Valor ainda não recebido</small>
+                </article>
+                <article class="receivables-kpi-card">
+                    <span>Total lançado</span>
+                    <strong>{{ ((resumo.valor_original_centavos or 0) / 100)|moeda_br }}</strong>
+                    <small>Compras feitas no crediário</small>
+                </article>
+                <article class="receivables-kpi-card success">
+                    <span>Total pago</span>
+                    <strong>{{ (((resumo.valor_original_centavos or 0) - (resumo.saldo_centavos or 0)) / 100)|moeda_br }}</strong>
+                    <small>Pagamentos confirmados</small>
+                </article>
+                <article class="receivables-kpi-card warning">
+                    <span>Contas em aberto</span>
+                    <strong>{{ resumo.contas_abertas or 0 }}</strong>
+                    <small>De {{ resumo.quantidade_contas or 0 }} conta(s)</small>
+                </article>
+            </section>
+
+            <section class="receivable-client-layout">
+                <article class="panel receivable-open-accounts-card">
+                    <div class="receivables-section-heading">
+                        <div>
+                            <h2>Compras no crediário</h2>
+                            <p>Os pagamentos são abatidos das contas mais antigas primeiro.</p>
+                        </div>
+                        <span class="receivables-count">{{ contas|length }} conta{% if contas|length != 1 %}s{% endif %}</span>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="receivables-table">
+                            <thead>
+                                <tr>
+                                    <th>Venda</th>
+                                    <th>Data</th>
+                                    <th>Vendedor</th>
+                                    <th class="numeric">Lançado</th>
+                                    <th class="numeric">Saldo</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for conta in contas %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('venda_detalhe', venda_id=conta.venda_id) }}" class="table-link">
+                                                #{{ conta.venda_id }}
+                                            </a>
+                                        </td>
+                                        <td>{{ conta.data_venda|datetime_br }}</td>
+                                        <td>{{ conta.vendedor or '-' }}</td>
+                                        <td class="numeric">{{ (conta.valor_original_centavos / 100)|moeda_br }}</td>
+                                        <td class="numeric"><strong>{{ (conta.saldo_centavos / 100)|moeda_br }}</strong></td>
+                                        <td>
+                                            {% if conta.status == 'QUITADA' %}
+                                                <span class="modern-status modern-status--success">Quitada</span>
+                                            {% elif conta.status == 'PARCIAL' %}
+                                                <span class="modern-status modern-status--warning">Parcial</span>
+                                            {% else %}
+                                                <span class="modern-status modern-status--danger">Em aberto</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6">
+                                            <div class="receivables-empty">
+                                                <strong>Nenhuma compra no crediário</strong>
+                                                <span>As contas aparecerão após a primeira venda fiada.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+
+                <aside class="panel receivable-payment-card">
+                    <div class="receivables-section-heading">
+                        <div>
+                            <h2>Registrar pagamento</h2>
+                            <p>O valor pode ser diferente a cada recebimento.</p>
+                        </div>
+                    </div>
+
+                    {% if not caixa_aberto %}
+                        <div class="receivable-cash-warning">
+                            <strong>Caixa fechado</strong>
+                            <span>Abra o caixa para receber um pagamento.</span>
+                            <a href="{{ url_for('caixa') }}" class="ui-command-action ui-icon-wallet">Abrir caixa</a>
+                        </div>
+                    {% elif resumo.saldo_centavos <= 0 %}
+                        <div class="receivable-paid-state">
+                            <strong>Cliente sem saldo pendente</strong>
+                            <span>Todas as contas do crediário estão quitadas.</span>
+                        </div>
+                    {% else %}
+                        <form
+                            method="POST"
+                            action="{{ url_for('registrar_recebimento_cliente', cliente_id=cliente.id) }}"
+                            id="receivablePaymentForm"
+                            class="receivable-payment-form"
+                        >
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="token_operacao" value="{{ token_recebimento }}">
+                            <input type="hidden" id="saldo_cliente_centavos" value="{{ resumo.saldo_centavos or 0 }}">
+
+                            <div class="form-group">
+                                <label for="valor_pagamento">Valor do pagamento</label>
+                                <input
+                                    type="text"
+                                    id="valor_pagamento"
+                                    name="valor_pagamento"
+                                    inputmode="decimal"
+                                    placeholder="0,00"
+                                    autocomplete="off"
+                                    required
+                                >
+                                <small class="field-help">Saldo disponível: {{ ((resumo.saldo_centavos or 0) / 100)|moeda_br }}</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="forma_pagamento_crediario">Forma de pagamento</label>
+                                <select id="forma_pagamento_crediario" name="forma_pagamento" required>
+                                    <option value="">Selecione</option>
+                                    <option value="DINHEIRO">Dinheiro</option>
+                                    <option value="PIX">Pix</option>
+                                    <option value="CARTAO">Cartão</option>
+                                </select>
+                            </div>
+
+                            <div id="receivableCashFields" class="receivable-cash-fields" hidden>
+                                <div class="form-group">
+                                    <label for="valor_recebido">Valor entregue em dinheiro</label>
+                                    <input
+                                        type="text"
+                                        id="valor_recebido"
+                                        name="valor_recebido"
+                                        inputmode="decimal"
+                                        placeholder="0,00"
+                                        autocomplete="off"
+                                    >
+                                </div>
+                                <div class="receivable-change-preview">
+                                    <span>Troco</span>
+                                    <strong id="troco_crediario">R$ 0,00</strong>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="observacoes_recebimento">Observações <span class="field-label-optional">Opcional</span></label>
+                                <textarea
+                                    id="observacoes_recebimento"
+                                    name="observacoes"
+                                    rows="3"
+                                    placeholder="Informação relevante sobre o pagamento"
+                                ></textarea>
+                            </div>
+
+                            <button type="submit" class="ui-command-action ui-icon-check">
+                                Confirmar pagamento
+                            </button>
+                        </form>
+                    {% endif %}
+                </aside>
+            </section>
+
+            <section class="panel receivable-history-card">
+                <div class="receivables-section-heading">
+                    <div>
+                        <h2>Histórico de pagamentos</h2>
+                        <p>Recebimentos e vendas abatidas em cada operação.</p>
+                    </div>
+                    <span class="receivables-count">{{ recebimentos|length }} pagamento{% if recebimentos|length != 1 %}s{% endif %}</span>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="receivables-table">
+                        <thead>
+                            <tr>
+                                <th>Recebimento</th>
+                                <th>Data</th>
+                                <th>Forma</th>
+                                <th>Vendas abatidas</th>
+                                <th>Operador</th>
+                                <th class="numeric">Valor</th>
+                                <th>Status</th>
+                                <th class="numeric">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for recebimento in recebimentos %}
+                                <tr>
+                                    <td>#{{ recebimento.id }}</td>
+                                    <td>{{ recebimento.created_at|datetime_br }}</td>
+                                    <td>{{ recebimento.forma_pagamento|title }}</td>
+                                    <td>
+                                        {% for alocacao in alocacoes_por_recebimento.get(recebimento.id, []) %}
+                                            <span class="receivable-allocation-chip">
+                                                Venda #{{ alocacao.venda_id }} · {{ (alocacao.valor_centavos / 100)|moeda_br }}
+                                            </span>
+                                        {% endfor %}
+                                    </td>
+                                    <td>{{ recebimento.usuario_nome or '-' }}</td>
+                                    <td class="numeric"><strong>{{ (recebimento.valor_centavos / 100)|moeda_br }}</strong></td>
+                                    <td>
+                                        {% if recebimento.status == 'CONFIRMADO' %}
+                                            <span class="modern-status modern-status--success">Confirmado</span>
+                                        {% else %}
+                                            <span class="modern-status modern-status--danger">Estornado</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="numeric">
+                                        <div class="receivable-history-actions">
+                                            <a
+                                                href="{{ url_for('recibo_recebimento_cliente', recebimento_id=recebimento.id) }}"
+                                                class="ui-command-action ui-icon-print"
+                                                target="_blank"
+                                                rel="noopener"
+                                            >
+                                                Imprimir
+                                            </a>
+                                            {% if usuario.perfil == 'ADMIN' and recebimento.status == 'CONFIRMADO' %}
+                                                <button
+                                                    type="button"
+                                                    class="ui-command-action ui-icon-block receivable-reversal-action"
+                                                    data-reversal-url="{{ url_for('estornar_recebimento_cliente', recebimento_id=recebimento.id) }}"
+                                                    data-receipt-id="{{ recebimento.id }}"
+                                                >
+                                                    Estornar
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="8">
+                                        <div class="receivables-empty">
+                                            <strong>Nenhum pagamento registrado</strong>
+                                            <span>Os recebimentos aparecerão neste extrato.</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+    {% if usuario.perfil == 'ADMIN' %}
+        <div id="modalEstornoRecebimento" class="modal-overlay" aria-hidden="true">
+            <div class="modal-card receivable-reversal-modal" role="dialog" aria-modal="true" aria-labelledby="tituloEstornoRecebimento">
+                <div class="modal-header">
+                    <div>
+                        <h2 id="tituloEstornoRecebimento">Estornar recebimento</h2>
+                        <p id="descricaoEstornoRecebimento">O saldo das vendas será restaurado.</p>
+                    </div>
+                    <button type="button" class="modal-close" data-close-reversal aria-label="Fechar">×</button>
+                </div>
+                <form method="POST" id="receivableReversalForm">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                    <div class="form-group">
+                        <label for="motivo_estorno">Motivo do estorno</label>
+                        <textarea
+                            id="motivo_estorno"
+                            name="motivo_estorno"
+                            rows="4"
+                            required
+                            placeholder="Ex.: pagamento registrado incorretamente"
+                        ></textarea>
+                        <small class="field-help">O estorno só é permitido enquanto o caixa do recebimento estiver aberto.</small>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="button-secondary ui-command-action ui-icon-close" data-close-reversal>Cancelar</button>
+                        <button type="submit" class="danger-button ui-command-action ui-icon-block">Confirmar estorno</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+    <script src="{{ url_for('static', filename='js/contas_receber.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/crediario_estorno.js') }}" defer></script>
+</body>
+</html>

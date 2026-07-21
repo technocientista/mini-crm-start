@@ -169,10 +169,26 @@
                                         <span>{{ (pagamento.valor or 0)|moeda_br }}</span>
                                     </div>
                                 {% endfor %}
-                            {% else %}
+                            {% elif not venda.conta_receber_id %}
                                 <div class="sale-detail-payment-row">
                                     <strong>{{ venda.forma_pagamento|title }}</strong>
                                 </div>
+                            {% endif %}
+
+                            {% if venda.conta_receber_id %}
+                                <div class="sale-detail-payment-row sale-detail-credit-row">
+                                    <div>
+                                        <strong>Saldo no crediário</strong>
+                                        <small>{{ venda.credito_status|title }}</small>
+                                    </div>
+                                    <span>{{ ((venda.credito_saldo_centavos or 0) / 100)|moeda_br }}</span>
+                                </div>
+                                <a
+                                    href="{{ url_for('conta_receber_cliente', cliente_id=venda.cliente_id) }}"
+                                    class="sale-detail-credit-link"
+                                >
+                                    Abrir extrato do cliente
+                                </a>
                             {% endif %}
                         </div>
                     </div>
@@ -183,7 +199,7 @@
                 <article class="sale-detail-kpi-card featured">
                     <span>Total da venda</span>
                     <strong>{{ venda.valor_total|moeda_br }}</strong>
-                    <small>Valor final recebido</small>
+                    <small>Valor total da operação</small>
                 </article>
                 <article class="sale-detail-kpi-card">
                     <span>Desconto aplicado</span>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="{{ session.get('tema', 'dark') }}">
+<head>
+    <meta charset="UTF-8">
+    <title>Contas a receber - Start CRM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="ui-refreshed receivables-page">
+    <div class="app-layout">
+        {% include 'partials/sidebar.html' %}
+
+        <main class="main-content">
+            <header class="topbar management-topbar">
+                <div>
+                    <h1>Contas a receber</h1>
+                    <p>Acompanhe vendas no crediário, saldos e pagamentos dos clientes.</p>
+                </div>
+                <div class="management-topbar-actions">
+                    <a href="{{ url_for('vendas') }}" class="ui-command-action ui-icon-cart">
+                        Abrir PDV
+                    </a>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="success-alert">{{ messages[0] }}</div>
+                {% endif %}
+            {% endwith %}
+
+            <section class="receivables-kpi-grid" aria-label="Resumo do crediário">
+                <article class="receivables-kpi-card featured">
+                    <span>Saldo em aberto</span>
+                    <strong>{{ ((resumo.saldo_aberto_centavos or 0) / 100)|moeda_br }}</strong>
+                    <small>Total ainda não recebido</small>
+                </article>
+                <article class="receivables-kpi-card">
+                    <span>Clientes com saldo</span>
+                    <strong>{{ resumo.clientes_com_saldo or 0 }}</strong>
+                    <small>Clientes com dívida ativa</small>
+                </article>
+                <article class="receivables-kpi-card warning">
+                    <span>Contas parciais</span>
+                    <strong>{{ resumo.contas_parciais or 0 }}</strong>
+                    <small>Já receberam algum pagamento</small>
+                </article>
+                <article class="receivables-kpi-card success">
+                    <span>Total recebido</span>
+                    <strong>{{ ((total_recebido_centavos or 0) / 100)|moeda_br }}</strong>
+                    <small>Histórico de recebimentos</small>
+                </article>
+            </section>
+
+            <section class="panel receivables-directory-card">
+                <div class="receivables-section-heading">
+                    <div>
+                        <h2>Clientes do crediário</h2>
+                        <p>Consulte o saldo consolidado e abra o extrato individual.</p>
+                    </div>
+                    <span class="receivables-count">
+                        {{ clientes_crediario|length }} resultado{% if clientes_crediario|length != 1 %}s{% endif %}
+                    </span>
+                </div>
+
+                <form method="GET" class="receivables-filters">
+                    <div class="form-group receivables-search-field">
+                        <label for="q">Buscar cliente</label>
+                        <input
+                            type="search"
+                            id="q"
+                            name="q"
+                            value="{{ busca }}"
+                            placeholder="Nome ou telefone"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Situação</label>
+                        <select id="status" name="status">
+                            <option value="abertas" {% if status == 'abertas' %}selected{% endif %}>Em aberto</option>
+                            <option value="quitadas" {% if status == 'quitadas' %}selected{% endif %}>Quitadas</option>
+                            <option value="todas" {% if status == 'todas' %}selected{% endif %}>Todas</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="ui-command-action ui-icon-search">Buscar</button>
+                    <a href="{{ url_for('contas_receber') }}" class="ui-command-action ui-icon-clear">Limpar filtros</a>
+                </form>
+
+                <div class="table-wrapper">
+                    <table class="receivables-table">
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Contato</th>
+                                <th class="numeric">Contas</th>
+                                <th class="numeric">Valor original</th>
+                                <th class="numeric">Saldo atual</th>
+                                <th>Último pagamento</th>
+                                <th class="numeric">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in clientes_crediario %}
+                                <tr>
+                                    <td>
+                                        <div class="receivables-client-cell">
+                                            <span aria-hidden="true">{{ item.cliente_nome[:1]|upper }}</span>
+                                            <div>
+                                                <strong>{{ item.cliente_nome }}</strong>
+                                                <small>Cliente #{{ item.cliente_id }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ item.cliente_telefone or '-' }}</td>
+                                    <td class="numeric">{{ item.quantidade_contas }}</td>
+                                    <td class="numeric">{{ ((item.valor_original_centavos or 0) / 100)|moeda_br }}</td>
+                                    <td class="numeric">
+                                        <strong class="{% if item.saldo_centavos > 0 %}receivables-balance-open{% endif %}">
+                                            {{ ((item.saldo_centavos or 0) / 100)|moeda_br }}
+                                        </strong>
+                                    </td>
+                                    <td>{{ item.ultimo_pagamento|datetime_br if item.ultimo_pagamento else 'Nenhum pagamento' }}</td>
+                                    <td class="numeric">
+                                        <a
+                                            href="{{ url_for('conta_receber_cliente', cliente_id=item.cliente_id) }}"
+                                            class="ui-command-action ui-icon-view"
+                                        >
+                                            Ver extrato
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="7">
+                                        <div class="receivables-empty">
+                                            <strong>Nenhuma conta corresponde aos filtros</strong>
+                                            <span>Altere a busca ou registre uma venda no crediário pelo PDV.</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

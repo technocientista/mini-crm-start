@@ -1,0 +1,152 @@
+@page {
+    size: 80mm auto;
+    margin: 3mm;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #eef1f4;
+    color: #111;
+    font-family: "Courier New", monospace;
+    font-size: 12px;
+}
+
+.credit-receipt {
+    width: 74mm;
+    margin: 18px auto;
+    padding: 4mm;
+    background: #fff;
+}
+
+.credit-receipt header,
+.receipt-title,
+.credit-receipt footer {
+    text-align: center;
+}
+
+.credit-receipt h1 {
+    margin: 0 0 5px;
+    font-size: 17px;
+}
+
+.credit-receipt h2 {
+    margin: 0;
+    font-size: 13px;
+}
+
+.credit-receipt p {
+    margin: 2px 0;
+    line-height: 1.35;
+}
+
+.receipt-divider {
+    margin: 10px 0;
+    border-top: 1px dashed #333;
+}
+
+.receipt-divider.strong {
+    border-top-style: solid;
+    border-top-width: 2px;
+}
+
+.receipt-title span,
+.receipt-info span,
+.receipt-totals span {
+    color: #333;
+}
+
+.receipt-reversed {
+    margin: 9px 0;
+    padding: 8px;
+    border: 2px solid #111;
+    text-align: center;
+}
+
+.receipt-reversed strong,
+.receipt-reversed span {
+    display: block;
+}
+
+.receipt-reversed span {
+    margin-top: 4px;
+    font-size: 10px;
+}
+
+.receipt-info > div,
+.receipt-allocations > div,
+.receipt-totals > div {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 5px 0;
+}
+
+.receipt-info strong,
+.receipt-allocations strong,
+.receipt-totals strong {
+    max-width: 58%;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.receipt-allocations h2,
+.receipt-notes h2 {
+    margin-bottom: 7px;
+}
+
+.receipt-totals .grand-total {
+    padding: 7px 0;
+    font-size: 15px;
+}
+
+.credit-receipt footer strong,
+.credit-receipt footer small {
+    display: block;
+}
+
+.credit-receipt footer small {
+    margin-top: 8px;
+}
+
+.receipt-actions {
+    display: flex;
+    width: 74mm;
+    margin: 0 auto 24px;
+    gap: 8px;
+}
+
+.receipt-actions button,
+.receipt-actions a {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #bbb;
+    border-radius: 7px;
+    background: #fff;
+    color: #111;
+    font: 600 12px Arial, sans-serif;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+@media print {
+    body {
+        width: 80mm;
+        background: #fff;
+    }
+
+    .credit-receipt {
+        width: 74mm;
+        margin: 0;
+        padding: 2mm;
+    }
+
+    .receipt-actions {
+        display: none;
+    }
+}

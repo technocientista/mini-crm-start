@@ -36,6 +36,21 @@ HISTORICO_IMPORTACOES_PRODUTOS_DIR = os.path.join(
     "exports",
     "importacoes_produtos"
 )
+_MIGRACAO_CREDIARIO_APLICADA = False
+
+
+@app.before_request
+def garantir_estrutura_crediario():
+    """Aplica a migração também quando o app é iniciado por um servidor WSGI."""
+    global _MIGRACAO_CREDIARIO_APLICADA
+
+    if _MIGRACAO_CREDIARIO_APLICADA:
+        return
+
+    from database.migrate_crediario import migrar as migrar_crediario
+
+    migrar_crediario(DATABASE)
+    _MIGRACAO_CREDIARIO_APLICADA = True
 
 @app.template_filter("datetime_br")
 def datetime_br(valor):
@@ -166,6 +181,13 @@ def normalizar_forma_pagamento_caixa(forma_pagamento):
 
 
 def calcular_resumo_caixa(conn, caixa_id):
+    total_vendas = conn.execute("""
+        SELECT COALESCE(SUM(valor_total), 0) AS total
+        FROM vendas
+        WHERE caixa_id = ?
+          AND status = 'CONCLUIDA'
+    """, (caixa_id,)).fetchone()["total"] or 0
+
     pagamentos = conn.execute("""
         SELECT
             vp.forma_pagamento,
@@ -195,7 +217,29 @@ def calcular_resumo_caixa(conn, caixa_id):
         else:
             total_outros += total
 
-    total_vendas = total_dinheiro + total_pix + total_cartao + total_outros
+    recebimentos_crediario = conn.execute("""
+        SELECT
+            forma_pagamento,
+            COALESCE(SUM(valor_centavos), 0) AS total_centavos
+        FROM recebimentos_clientes
+        WHERE caixa_id = ?
+          AND status = 'CONFIRMADO'
+        GROUP BY forma_pagamento
+    """, (caixa_id,)).fetchall()
+
+    total_recebimentos_crediario = 0
+    for recebimento in recebimentos_crediario:
+        total = centavos_para_float(recebimento["total_centavos"] or 0)
+        total_recebimentos_crediario += total
+
+        if recebimento["forma_pagamento"] == "DINHEIRO":
+            total_dinheiro += total
+        elif recebimento["forma_pagamento"] == "PIX":
+            total_pix += total
+        elif recebimento["forma_pagamento"] == "CARTAO":
+            total_cartao += total
+        else:
+            total_outros += total
 
     movimentos = conn.execute("""
         SELECT
@@ -227,6 +271,7 @@ def calcular_resumo_caixa(conn, caixa_id):
 
     return {
         "total_vendas": total_vendas,
+        "total_recebimentos_crediario": total_recebimentos_crediario,
         "total_dinheiro": total_dinheiro,
         "total_pix": total_pix,
         "total_cartao": total_cartao,
@@ -1999,6 +2044,7 @@ def cliente_detalhe(cliente_id):
             data_venda,
             vendedor,
             forma_pagamento,
+            condicao_pagamento,
             desconto_total,
             valor_total,
             custo_total,
@@ -2060,6 +2106,39 @@ def cliente_detalhe(cliente_id):
         ORDER BY nome ASC
     """).fetchall()
 
+    crediario_resumo = conn.execute("""
+        SELECT
+            COALESCE(SUM(valor_original_centavos), 0) AS valor_original_centavos,
+            COALESCE(SUM(saldo_centavos), 0) AS saldo_centavos,
+            COUNT(*) AS quantidade_contas,
+            COALESCE(SUM(
+                CASE WHEN saldo_centavos > 0 THEN 1 ELSE 0 END
+            ), 0) AS contas_abertas
+        FROM contas_receber
+        WHERE cliente_id = ?
+          AND status != 'CANCELADA'
+    """, (cliente_id,)).fetchone()
+
+    crediario_contas = conn.execute("""
+        SELECT id, venda_id, valor_original_centavos, saldo_centavos, status, created_at
+        FROM contas_receber
+        WHERE cliente_id = ?
+          AND status != 'CANCELADA'
+        ORDER BY
+            CASE WHEN saldo_centavos > 0 THEN 0 ELSE 1 END,
+            created_at DESC
+        LIMIT 5
+    """, (cliente_id,)).fetchall()
+
+    crediario_recebimentos = conn.execute("""
+        SELECT id, forma_pagamento, valor_centavos, created_at
+        FROM recebimentos_clientes
+        WHERE cliente_id = ?
+          AND status = 'CONFIRMADO'
+        ORDER BY id DESC
+        LIMIT 5
+    """, (cliente_id,)).fetchall()
+
     conn.close()
 
     return render_template(
@@ -2074,6 +2153,9 @@ def cliente_detalhe(cliente_id):
         categorias_preferidas=categorias_preferidas,
         total_categorias=total_categorias,
         modelos_whatsapp=modelos_whatsapp,
+        crediario_resumo=crediario_resumo,
+        crediario_contas=crediario_contas,
+        crediario_recebimentos=crediario_recebimentos,
         usuario=usuario_logado()
     )
 
@@ -2250,6 +2332,533 @@ def cliente_reativar(cliente_id):
 
     flash("Cliente reativado com sucesso.")
     return redirect(url_for("clientes", status="ativos"))
+
+@app.route("/contas-receber")
+@login_required
+def contas_receber():
+    busca = request.args.get("q", "").strip()
+    status = request.args.get("status", "abertas").strip().lower()
+
+    conn = get_db_connection()
+    where = ["1 = 1"]
+    params = []
+
+    if status == "quitadas":
+        where.append("cr.status = 'QUITADA'")
+    elif status == "todas":
+        where.append("cr.status != 'CANCELADA'")
+    else:
+        status = "abertas"
+        where.append("cr.saldo_centavos > 0")
+        where.append("cr.status IN ('ABERTA', 'PARCIAL')")
+
+    if busca:
+        termo = f"%{busca}%"
+        where.append("(c.nome LIKE ? OR c.telefone LIKE ?)")
+        params.extend([termo, termo])
+
+    clientes_crediario = conn.execute(f"""
+        SELECT
+            c.id AS cliente_id,
+            c.nome AS cliente_nome,
+            c.telefone AS cliente_telefone,
+            c.ativo AS cliente_ativo,
+            COUNT(cr.id) AS quantidade_contas,
+            SUM(cr.valor_original_centavos) AS valor_original_centavos,
+            SUM(cr.saldo_centavos) AS saldo_centavos,
+            MAX(cr.updated_at) AS ultima_atualizacao,
+            (
+                SELECT MAX(rc.created_at)
+                FROM recebimentos_clientes rc
+                WHERE rc.cliente_id = c.id
+                  AND rc.status = 'CONFIRMADO'
+            ) AS ultimo_pagamento
+        FROM contas_receber cr
+        INNER JOIN clientes c ON c.id = cr.cliente_id
+        WHERE {' AND '.join(where)}
+        GROUP BY c.id
+        ORDER BY saldo_centavos DESC, c.nome ASC
+    """, params).fetchall()
+
+    resumo = conn.execute("""
+        SELECT
+            COALESCE(SUM(saldo_centavos), 0) AS saldo_aberto_centavos,
+            COUNT(*) AS contas_abertas,
+            COUNT(DISTINCT cliente_id) AS clientes_com_saldo,
+            COALESCE(SUM(
+                CASE WHEN status = 'PARCIAL' THEN 1 ELSE 0 END
+            ), 0) AS contas_parciais
+        FROM contas_receber
+        WHERE saldo_centavos > 0
+          AND status IN ('ABERTA', 'PARCIAL')
+    """).fetchone()
+
+    total_recebido = conn.execute("""
+        SELECT COALESCE(SUM(valor_centavos), 0) AS total_centavos
+        FROM recebimentos_clientes
+        WHERE status = 'CONFIRMADO'
+    """).fetchone()["total_centavos"]
+
+    caixa_aberto = obter_caixa_aberto(conn)
+    conn.close()
+
+    return render_template(
+        "contas_receber.html",
+        clientes_crediario=clientes_crediario,
+        resumo=resumo,
+        total_recebido_centavos=total_recebido,
+        caixa_aberto=caixa_aberto,
+        busca=busca,
+        status=status,
+        usuario=usuario_logado()
+    )
+
+
+@app.route("/contas-receber/clientes/<int:cliente_id>")
+@login_required
+def conta_receber_cliente(cliente_id):
+    conn = get_db_connection()
+    cliente = conn.execute("""
+        SELECT id, nome, telefone, endereco_completo, ativo
+        FROM clientes
+        WHERE id = ?
+    """, (cliente_id,)).fetchone()
+
+    if not cliente:
+        conn.close()
+        flash("Cliente não encontrado.")
+        return redirect(url_for("contas_receber"))
+
+    resumo = conn.execute("""
+        SELECT
+            COALESCE(SUM(valor_original_centavos), 0) AS valor_original_centavos,
+            COALESCE(SUM(saldo_centavos), 0) AS saldo_centavos,
+            COUNT(*) AS quantidade_contas,
+            COALESCE(SUM(
+                CASE WHEN saldo_centavos > 0 THEN 1 ELSE 0 END
+            ), 0) AS contas_abertas
+        FROM contas_receber
+        WHERE cliente_id = ?
+          AND status != 'CANCELADA'
+    """, (cliente_id,)).fetchone()
+
+    contas = conn.execute("""
+        SELECT
+            cr.id,
+            cr.venda_id,
+            cr.valor_original_centavos,
+            cr.saldo_centavos,
+            cr.status,
+            cr.created_at,
+            cr.updated_at,
+            v.data_venda,
+            v.valor_total,
+            v.vendedor
+        FROM contas_receber cr
+        INNER JOIN vendas v ON v.id = cr.venda_id
+        WHERE cr.cliente_id = ?
+          AND cr.status != 'CANCELADA'
+        ORDER BY
+            CASE WHEN cr.saldo_centavos > 0 THEN 0 ELSE 1 END,
+            cr.created_at ASC,
+            cr.id ASC
+    """, (cliente_id,)).fetchall()
+
+    recebimentos = conn.execute("""
+        SELECT
+            id,
+            caixa_id,
+            usuario_nome,
+            forma_pagamento,
+            valor_centavos,
+            valor_recebido_centavos,
+            observacoes,
+            status,
+            created_at
+        FROM recebimentos_clientes
+        WHERE cliente_id = ?
+        ORDER BY id DESC
+    """, (cliente_id,)).fetchall()
+
+    alocacoes = conn.execute("""
+        SELECT
+            ra.recebimento_id,
+            ra.valor_centavos,
+            cr.venda_id
+        FROM recebimento_alocacoes ra
+        INNER JOIN contas_receber cr ON cr.id = ra.conta_receber_id
+        INNER JOIN recebimentos_clientes rc ON rc.id = ra.recebimento_id
+        WHERE rc.cliente_id = ?
+        ORDER BY ra.id ASC
+    """, (cliente_id,)).fetchall()
+
+    alocacoes_por_recebimento = {}
+    for alocacao in alocacoes:
+        alocacoes_por_recebimento.setdefault(
+            alocacao["recebimento_id"], []
+        ).append(alocacao)
+
+    caixa_aberto = obter_caixa_aberto(conn)
+    conn.close()
+
+    return render_template(
+        "conta_receber_cliente.html",
+        cliente=cliente,
+        resumo=resumo,
+        contas=contas,
+        recebimentos=recebimentos,
+        alocacoes_por_recebimento=alocacoes_por_recebimento,
+        caixa_aberto=caixa_aberto,
+        token_recebimento=secrets.token_urlsafe(24),
+        usuario=usuario_logado()
+    )
+
+
+@app.route(
+    "/contas-receber/clientes/<int:cliente_id>/receber",
+    methods=["POST"]
+)
+@login_required
+def registrar_recebimento_cliente(cliente_id):
+    if not csrf_valido():
+        flash("A sessão expirou. Atualize a página e tente novamente.")
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+    token_operacao = request.form.get("token_operacao", "").strip()
+    forma_pagamento = request.form.get("forma_pagamento", "").strip().upper()
+    observacoes = request.form.get("observacoes", "").strip()
+
+    if not token_operacao:
+        flash("Não foi possível identificar o recebimento. Atualize a página.")
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+    if forma_pagamento not in {"DINHEIRO", "PIX", "CARTAO"}:
+        flash("Selecione uma forma de pagamento válida.")
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+    try:
+        valor_centavos = converter_centavos(request.form.get("valor_pagamento"))
+        valor_recebido_centavos = valor_centavos
+
+        if forma_pagamento == "DINHEIRO":
+            valor_recebido_centavos = converter_centavos(
+                request.form.get("valor_recebido")
+                or request.form.get("valor_pagamento")
+            )
+    except ValueError:
+        flash("Informe valores monetários válidos.")
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+    if valor_centavos <= 0:
+        flash("Informe um pagamento maior que zero.")
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+    if valor_recebido_centavos < valor_centavos:
+        flash("O valor recebido em dinheiro não pode ser menor que o pagamento.")
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+    conn = get_db_connection()
+    caixa_aberto = obter_caixa_aberto(conn)
+
+    if not caixa_aberto:
+        conn.close()
+        flash("Abra o caixa antes de registrar um pagamento do crediário.")
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+
+        recebimento_existente = cursor.execute("""
+            SELECT id
+            FROM recebimentos_clientes
+            WHERE token_operacao = ?
+        """, (token_operacao,)).fetchone()
+
+        if recebimento_existente:
+            conn.rollback()
+            conn.close()
+            return redirect(url_for(
+                "recibo_recebimento_cliente",
+                recebimento_id=recebimento_existente["id"]
+            ))
+
+        cliente = cursor.execute("""
+            SELECT id, nome
+            FROM clientes
+            WHERE id = ?
+        """, (cliente_id,)).fetchone()
+
+        if not cliente:
+            raise ValueError("Cliente não encontrado.")
+
+        contas_abertas = cursor.execute("""
+            SELECT id, venda_id, saldo_centavos, valor_original_centavos
+            FROM contas_receber
+            WHERE cliente_id = ?
+              AND saldo_centavos > 0
+              AND status IN ('ABERTA', 'PARCIAL')
+            ORDER BY created_at ASC, id ASC
+        """, (cliente_id,)).fetchall()
+
+        saldo_total = sum(conta["saldo_centavos"] for conta in contas_abertas)
+
+        if valor_centavos > saldo_total:
+            raise ValueError(
+                "O pagamento não pode ser maior que o saldo total do cliente."
+            )
+
+        usuario = usuario_logado()
+        cursor.execute("""
+            INSERT INTO recebimentos_clientes (
+                cliente_id,
+                caixa_id,
+                usuario_id,
+                usuario_nome,
+                forma_pagamento,
+                valor_centavos,
+                valor_recebido_centavos,
+                observacoes,
+                token_operacao,
+                status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMADO')
+        """, (
+            cliente_id,
+            caixa_aberto["id"],
+            usuario["id"],
+            usuario["nome"],
+            forma_pagamento,
+            valor_centavos,
+            valor_recebido_centavos,
+            observacoes,
+            token_operacao
+        ))
+        recebimento_id = cursor.lastrowid
+
+        restante = valor_centavos
+        for conta in contas_abertas:
+            if restante <= 0:
+                break
+
+            valor_alocado = min(restante, conta["saldo_centavos"])
+            novo_saldo = conta["saldo_centavos"] - valor_alocado
+            novo_status = "QUITADA" if novo_saldo == 0 else "PARCIAL"
+
+            cursor.execute("""
+                INSERT INTO recebimento_alocacoes (
+                    recebimento_id,
+                    conta_receber_id,
+                    valor_centavos
+                ) VALUES (?, ?, ?)
+            """, (recebimento_id, conta["id"], valor_alocado))
+
+            cursor.execute("""
+                UPDATE contas_receber
+                SET saldo_centavos = ?,
+                    status = ?,
+                    data_quitacao = CASE
+                        WHEN ? = 0 THEN CURRENT_TIMESTAMP
+                        ELSE NULL
+                    END,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (novo_saldo, novo_status, novo_saldo, conta["id"]))
+            restante -= valor_alocado
+
+        conn.commit()
+        conn.close()
+
+        registrar_log(
+            "CREDIARIO_RECEBIMENTO",
+            "recebimentos_clientes",
+            recebimento_id,
+            f"Recebimento #{recebimento_id} de {moeda_br(centavos_para_float(valor_centavos))} "
+            f"registrado para o cliente #{cliente_id}."
+        )
+
+        return redirect(url_for(
+            "recibo_recebimento_cliente",
+            recebimento_id=recebimento_id,
+            auto=1
+        ))
+
+    except (sqlite3.Error, ValueError) as erro:
+        conn.rollback()
+        conn.close()
+        flash(str(erro) or "Não foi possível registrar o pagamento.")
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+
+@app.route("/contas-receber/recebimentos/<int:recebimento_id>/recibo")
+@login_required
+def recibo_recebimento_cliente(recebimento_id):
+    conn = get_db_connection()
+    recebimento = conn.execute("""
+        SELECT
+            rc.*,
+            c.nome AS cliente_nome,
+            c.telefone AS cliente_telefone,
+            c.endereco_completo AS cliente_endereco
+        FROM recebimentos_clientes rc
+        INNER JOIN clientes c ON c.id = rc.cliente_id
+        WHERE rc.id = ?
+    """, (recebimento_id,)).fetchone()
+
+    if not recebimento:
+        conn.close()
+        flash("Recebimento não encontrado.")
+        return redirect(url_for("contas_receber"))
+
+    alocacoes = conn.execute("""
+        SELECT
+            ra.valor_centavos,
+            cr.venda_id,
+            cr.saldo_centavos
+        FROM recebimento_alocacoes ra
+        INNER JOIN contas_receber cr ON cr.id = ra.conta_receber_id
+        WHERE ra.recebimento_id = ?
+        ORDER BY ra.id ASC
+    """, (recebimento_id,)).fetchall()
+
+    saldo_cliente = conn.execute("""
+        SELECT COALESCE(SUM(saldo_centavos), 0) AS saldo_centavos
+        FROM contas_receber
+        WHERE cliente_id = ?
+          AND status IN ('ABERTA', 'PARCIAL')
+    """, (recebimento["cliente_id"],)).fetchone()["saldo_centavos"]
+
+    config = conn.execute("""
+        SELECT nome_loja, telefone, endereco, cidade, instagram
+        FROM configuracoes_loja
+        WHERE id = 1
+    """).fetchone()
+    conn.close()
+
+    troco_centavos = max(
+        (recebimento["valor_recebido_centavos"] or recebimento["valor_centavos"])
+        - recebimento["valor_centavos"],
+        0
+    )
+
+    return render_template(
+        "recibo_crediario.html",
+        recebimento=recebimento,
+        alocacoes=alocacoes,
+        saldo_cliente_centavos=saldo_cliente,
+        troco_centavos=troco_centavos,
+        config=config,
+        auto_impressao=request.args.get("auto") == "1"
+    )
+
+
+@app.route(
+    "/contas-receber/recebimentos/<int:recebimento_id>/estornar",
+    methods=["POST"]
+)
+@admin_required
+def estornar_recebimento_cliente(recebimento_id):
+    if not csrf_valido():
+        flash("A sessão expirou. Atualize a página e tente novamente.")
+        return redirect(url_for("contas_receber"))
+
+    motivo = request.form.get("motivo_estorno", "").strip()
+    if not motivo:
+        flash("Informe o motivo do estorno.")
+        return redirect(url_for("contas_receber"))
+
+    conn = get_db_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        recebimento = conn.execute("""
+            SELECT
+                rc.id,
+                rc.cliente_id,
+                rc.status,
+                rc.caixa_id,
+                c.status AS caixa_status
+            FROM recebimentos_clientes rc
+            INNER JOIN caixas c ON c.id = rc.caixa_id
+            WHERE rc.id = ?
+        """, (recebimento_id,)).fetchone()
+
+        if not recebimento:
+            raise ValueError("Recebimento não encontrado.")
+
+        if recebimento["status"] != "CONFIRMADO":
+            raise ValueError("Este recebimento já foi estornado.")
+
+        if recebimento["caixa_status"] != "ABERTO":
+            raise ValueError(
+                "O caixa deste recebimento já foi fechado. "
+                "O estorno deve ser tratado administrativamente."
+            )
+
+        alocacoes = conn.execute("""
+            SELECT
+                ra.conta_receber_id,
+                ra.valor_centavos,
+                cr.valor_original_centavos,
+                cr.saldo_centavos
+            FROM recebimento_alocacoes ra
+            INNER JOIN contas_receber cr ON cr.id = ra.conta_receber_id
+            WHERE ra.recebimento_id = ?
+        """, (recebimento_id,)).fetchall()
+
+        for alocacao in alocacoes:
+            novo_saldo = min(
+                alocacao["valor_original_centavos"],
+                alocacao["saldo_centavos"] + alocacao["valor_centavos"]
+            )
+            novo_status = (
+                "ABERTA"
+                if novo_saldo == alocacao["valor_original_centavos"]
+                else "PARCIAL"
+            )
+            conn.execute("""
+                UPDATE contas_receber
+                SET saldo_centavos = ?,
+                    status = ?,
+                    data_quitacao = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (
+                novo_saldo,
+                novo_status,
+                alocacao["conta_receber_id"]
+            ))
+
+        usuario = usuario_logado()
+        conn.execute("""
+            UPDATE recebimentos_clientes
+            SET status = 'ESTORNADO',
+                estornado_at = CURRENT_TIMESTAMP,
+                estornado_por_id = ?,
+                estornado_por_nome = ?,
+                motivo_estorno = ?
+            WHERE id = ?
+        """, (usuario["id"], usuario["nome"], motivo, recebimento_id))
+
+        conn.commit()
+        conn.close()
+
+        registrar_log(
+            "CREDIARIO_RECEBIMENTO_ESTORNADO",
+            "recebimentos_clientes",
+            recebimento_id,
+            f"Recebimento #{recebimento_id} estornado. Motivo: {motivo}"
+        )
+        flash("Recebimento estornado e saldo do cliente restaurado.")
+        return redirect(url_for(
+            "conta_receber_cliente",
+            cliente_id=recebimento["cliente_id"]
+        ))
+
+    except (sqlite3.Error, ValueError) as erro:
+        conn.rollback()
+        conn.close()
+        flash(str(erro) or "Não foi possível estornar o recebimento.")
+        return redirect(url_for("contas_receber"))
+
 
 @app.route("/mensagens-whatsapp", methods=["GET", "POST"])
 @admin_required
@@ -2461,6 +3070,21 @@ def cliente_whatsapp(cliente_id):
         conn.close()
         flash("Cliente não encontrado.")
         return redirect(url_for("clientes"))
+
+    saldo_crediario = conn.execute("""
+        SELECT COALESCE(SUM(saldo_centavos), 0) AS saldo_centavos
+        FROM contas_receber
+        WHERE cliente_id = ?
+          AND saldo_centavos > 0
+          AND status IN ('ABERTA', 'PARCIAL')
+    """, (cliente_id,)).fetchone()["saldo_centavos"]
+
+    if saldo_crediario > 0:
+        conn.close()
+        flash(
+            "Este cliente possui saldo em aberto no crediário e não pode ser inativado."
+        )
+        return redirect(url_for("cliente_detalhe", cliente_id=cliente_id))
 
     modelo = conn.execute("""
         SELECT
@@ -3718,6 +4342,7 @@ def caixa():
                     total_pix = ?,
                     total_cartao = ?,
                     total_outros = ?,
+                    total_recebimentos_crediario = ?,
                     entradas_manuais = ?,
                     saidas_manuais = ?,
                     valor_esperado = ?,
@@ -3734,6 +4359,7 @@ def caixa():
                 resumo["total_pix"],
                 resumo["total_cartao"],
                 resumo["total_outros"],
+                resumo["total_recebimentos_crediario"],
                 resumo["entradas_manuais"],
                 resumo["saidas_manuais"],
                 valor_esperado,
@@ -3866,6 +4492,7 @@ def caixa_detalhe(caixa_id):
             total_pix,
             total_cartao,
             total_outros,
+            total_recebimentos_crediario,
             entradas_manuais,
             saidas_manuais,
             valor_esperado,
@@ -3954,6 +4581,7 @@ def caixa_imprimir(caixa_id):
             total_pix,
             total_cartao,
             total_outros,
+            total_recebimentos_crediario,
             entradas_manuais,
             saidas_manuais,
             valor_esperado,
@@ -4115,6 +4743,7 @@ def vendas():
         itens_json = request.form.get("itens_json")
 
         pagamento_dividido = request.form.get("pagamento_dividido") == "1"
+        venda_crediario = request.form.get("venda_crediario") == "1"
         pagamentos = []
         valores_pagamento = {}
 
@@ -4138,11 +4767,15 @@ def vendas():
 
             forma_pagamento = "MULTIPLO"
 
-        else:
+        elif not venda_crediario:
             if forma_pagamento not in {"PIX", "DINHEIRO", "CARTAO"}:
                 return finalizar_com_erro(
                     "Selecione uma forma de pagamento válida."
                 )
+        elif forma_pagamento != "CREDIARIO":
+            return finalizar_com_erro(
+                "Confira a condição de pagamento do crediário."
+            )
 
         try:
             cliente_id = int(cliente_id) if cliente_id else None
@@ -4161,6 +4794,11 @@ def vendas():
                 return finalizar_com_erro(
                     "Cliente selecionado não encontrado ou inativo."
                 )
+
+        if venda_crediario and not cliente_id:
+            return finalizar_com_erro(
+                "Selecione um cliente para registrar uma venda no crediário."
+            )
 
         if not vendedor_id:
             return finalizar_com_erro(
@@ -4294,7 +4932,43 @@ def vendas():
                 "O desconto não pode ser maior que o valor da venda."
             )
 
-        if pagamento_dividido:
+        saldo_crediario = 0
+        condicao_pagamento = "A_VISTA"
+
+        if venda_crediario:
+            if any(valor < 0 for valor in valores_pagamento.values()):
+                return finalizar_com_erro(
+                    "Os valores de entrada não podem ser negativos."
+                )
+
+            pagamentos = [
+                (
+                    forma,
+                    valor,
+                    valor if forma == "DINHEIRO" else None
+                )
+                for forma, valor in valores_pagamento.items()
+                if valor > 0
+            ]
+
+            total_entrada = round(
+                sum(valor for _, valor, _ in pagamentos),
+                2
+            )
+
+            if total_entrada >= valor_total - 0.009:
+                return finalizar_com_erro(
+                    "Para usar o crediário, deve existir um saldo maior que zero. "
+                    "Se o total já foi pago, desmarque a opção Fiado."
+                )
+
+            saldo_crediario = round(valor_total - total_entrada, 2)
+            condicao_pagamento = (
+                "CREDIARIO" if not pagamentos else "MISTO_CREDIARIO"
+            )
+            forma_pagamento = condicao_pagamento
+
+        elif pagamento_dividido:
             if any(valor < 0 for valor in valores_pagamento.values()):
                 return finalizar_com_erro(
                     "Os valores de pagamento não podem ser negativos."
@@ -4378,8 +5052,9 @@ def vendas():
             lucro_total,
             observacoes,
             caixa_id,
-            token_operacao
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            token_operacao,
+            condicao_pagamento
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             cliente_id,
             vendedor,
@@ -4391,7 +5066,8 @@ def vendas():
             lucro_total,
             observacoes,
             caixa_aberto["id"],
-            token_operacao
+            token_operacao,
+            condicao_pagamento
         ))
 
         venda_id = cursor.lastrowid
@@ -4409,6 +5085,25 @@ def vendas():
                 forma,
                 valor,
                 valor_recebido
+            ))
+
+        if saldo_crediario > 0:
+            saldo_crediario_centavos = converter_centavos(saldo_crediario)
+            cursor.execute("""
+                INSERT INTO contas_receber (
+                    venda_id,
+                    cliente_id,
+                    valor_original_centavos,
+                    saldo_centavos,
+                    status,
+                    observacoes
+                ) VALUES (?, ?, ?, ?, 'ABERTA', ?)
+            """, (
+                venda_id,
+                cliente_id,
+                saldo_crediario_centavos,
+                saldo_crediario_centavos,
+                observacoes
             ))
 
         desconto_restante = desconto_total
@@ -5023,6 +5718,7 @@ def venda_detalhe(venda_id):
             v.vendedor,
             v.vendedor_id,
             v.forma_pagamento,
+            v.condicao_pagamento,
             v.desconto_total,
             v.valor_total,
             v.custo_total,
@@ -5032,12 +5728,17 @@ def venda_detalhe(venda_id):
             v.motivo_cancelamento,
             v.data_cancelamento,
             v.cancelado_por,
+            cr.id AS conta_receber_id,
+            cr.valor_original_centavos AS credito_original_centavos,
+            cr.saldo_centavos AS credito_saldo_centavos,
+            cr.status AS credito_status,
             c.id AS cliente_id,
             COALESCE(c.nome, 'Cliente não identificado') AS cliente_nome,
             COALESCE(c.telefone, '-') AS cliente_telefone,
             COALESCE(c.endereco_completo, '-') AS cliente_endereco
         FROM vendas v
         LEFT JOIN clientes c ON c.id = v.cliente_id
+        LEFT JOIN contas_receber cr ON cr.venda_id = v.id
         WHERE v.id = ?
     """, (venda_id,)).fetchone()
 
@@ -5114,17 +5815,22 @@ def venda_recibo(venda_id):
             v.data_venda,
             v.vendedor,
             v.forma_pagamento,
+            v.condicao_pagamento,
             v.desconto_total,
             v.valor_total,
             v.custo_total,
             v.lucro_total,
             v.observacoes,
             v.status,
+            cr.valor_original_centavos AS credito_original_centavos,
+            cr.saldo_centavos AS credito_saldo_centavos,
+            cr.status AS credito_status,
             COALESCE(c.nome, 'Cliente não identificado') AS cliente_nome,
             COALESCE(c.telefone, '-') AS cliente_telefone,
             COALESCE(c.endereco_completo, '-') AS cliente_endereco
         FROM vendas v
         LEFT JOIN clientes c ON c.id = v.cliente_id
+        LEFT JOIN contas_receber cr ON cr.venda_id = v.id
         WHERE v.id = ?
     """, (venda_id,)).fetchone()
 
@@ -5180,15 +5886,20 @@ def venda_recibo_termico(venda_id):
             v.data_venda,
             v.vendedor,
             v.forma_pagamento,
+            v.condicao_pagamento,
             v.desconto_total,
             v.valor_total,
             v.observacoes,
             v.status,
+            cr.valor_original_centavos AS credito_original_centavos,
+            cr.saldo_centavos AS credito_saldo_centavos,
+            cr.status AS credito_status,
             COALESCE(c.nome, 'Cliente não identificado') AS cliente_nome,
             COALESCE(c.telefone, '-') AS cliente_telefone,
             COALESCE(c.endereco_completo, '-') AS cliente_endereco
         FROM vendas v
         LEFT JOIN clientes c ON c.id = v.cliente_id
+        LEFT JOIN contas_receber cr ON cr.venda_id = v.id
         WHERE v.id = ?
     """, (venda_id,)).fetchone()
 
@@ -5307,6 +6018,24 @@ def cancelar_venda(venda_id):
         )
         return redirect(url_for("venda_detalhe", venda_id=venda_id))
 
+    conta_crediario = conn.execute("""
+        SELECT id, valor_original_centavos, saldo_centavos, status
+        FROM contas_receber
+        WHERE venda_id = ?
+    """, (venda_id,)).fetchone()
+
+    if (
+        conta_crediario
+        and conta_crediario["valor_original_centavos"]
+            > conta_crediario["saldo_centavos"]
+    ):
+        conn.close()
+        flash(
+            "Esta venda possui pagamentos no crediário. "
+            "Estorne os recebimentos antes de cancelar a venda."
+        )
+        return redirect(url_for("venda_detalhe", venda_id=venda_id))
+
     itens = conn.execute("""
         SELECT
             produto_id,
@@ -5371,6 +6100,15 @@ def cancelar_venda(venda_id):
         cancelado_por,
         venda_id
     ))
+
+    if conta_crediario:
+        conn.execute("""
+            UPDATE contas_receber
+            SET saldo_centavos = 0,
+                status = 'CANCELADA',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (conta_crediario["id"],))
 
     if venda["caixa_id"]:
         conn.execute("""
@@ -6195,6 +6933,7 @@ def relatorio_caixas():
             c.total_pix,
             c.total_cartao,
             c.total_outros,
+            c.total_recebimentos_crediario,
             c.entradas_manuais,
             c.saidas_manuais,
             c.valor_esperado,
@@ -6220,6 +6959,7 @@ def relatorio_caixas():
             COALESCE(SUM(c.total_pix), 0) AS total_pix,
             COALESCE(SUM(c.total_cartao), 0) AS total_cartao,
             COALESCE(SUM(c.total_outros), 0) AS total_outros,
+            COALESCE(SUM(c.total_recebimentos_crediario), 0) AS total_recebimentos_crediario,
             COALESCE(SUM(c.entradas_manuais), 0) AS total_entradas,
             COALESCE(SUM(c.saidas_manuais), 0) AS total_saidas,
             COALESCE(SUM(c.valor_esperado), 0) AS total_esperado,
@@ -6381,4 +7121,7 @@ def logout():
 
 
 if __name__ == "__main__":
+    from database.migrate_crediario import migrar as migrar_crediario
+
+    migrar_crediario(DATABASE)
     app.run(host="0.0.0.0", port=5000, debug=False)

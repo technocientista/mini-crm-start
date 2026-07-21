@@ -30,6 +30,12 @@
                     >
                         Editar cliente
                     </a>
+                    <a
+                        href="{{ url_for('conta_receber_cliente', cliente_id=cliente.id) }}"
+                        class="ui-command-action ui-icon-wallet"
+                    >
+                        Crediário
+                    </a>
                 </div>
             </header>
 
@@ -153,6 +159,62 @@
                     <strong>{{ resumo.lucro_gerado|moeda_br }}</strong>
                     <small>Margem acumulada de {{ margem_cliente|numero_br }}%</small>
                 </article>
+            </section>
+
+            <section class="panel client-credit-card">
+                <div class="client-detail-section-heading client-credit-heading">
+                    <div>
+                        <h2>Crediário do cliente</h2>
+                        <p>Saldo, compras fiadas e pagamentos mais recentes.</p>
+                    </div>
+                    <a
+                        href="{{ url_for('conta_receber_cliente', cliente_id=cliente.id) }}"
+                        class="ui-command-action ui-icon-view"
+                    >
+                        Abrir extrato completo
+                    </a>
+                </div>
+
+                <div class="client-credit-summary">
+                    <div class="balance">
+                        <span>Saldo em aberto</span>
+                        <strong>{{ ((crediario_resumo.saldo_centavos or 0) / 100)|moeda_br }}</strong>
+                        <small>{{ crediario_resumo.contas_abertas or 0 }} conta(s) pendente(s)</small>
+                    </div>
+                    <div>
+                        <span>Total lançado</span>
+                        <strong>{{ ((crediario_resumo.valor_original_centavos or 0) / 100)|moeda_br }}</strong>
+                    </div>
+                    <div>
+                        <span>Total pago</span>
+                        <strong>{{ (((crediario_resumo.valor_original_centavos or 0) - (crediario_resumo.saldo_centavos or 0)) / 100)|moeda_br }}</strong>
+                    </div>
+                </div>
+
+                <div class="client-credit-columns">
+                    <div>
+                        <strong>Compras recentes</strong>
+                        {% for conta in crediario_contas %}
+                            <a href="{{ url_for('venda_detalhe', venda_id=conta.venda_id) }}" class="client-credit-entry">
+                                <span>Venda #{{ conta.venda_id }}</span>
+                                <strong>{{ (conta.saldo_centavos / 100)|moeda_br }} em aberto</strong>
+                            </a>
+                        {% else %}
+                            <span class="client-credit-empty">Nenhuma compra no crediário.</span>
+                        {% endfor %}
+                    </div>
+                    <div>
+                        <strong>Últimos pagamentos</strong>
+                        {% for recebimento in crediario_recebimentos %}
+                            <a href="{{ url_for('recibo_recebimento_cliente', recebimento_id=recebimento.id) }}" class="client-credit-entry">
+                                <span>{{ recebimento.created_at|date_br }} · {{ recebimento.forma_pagamento|title }}</span>
+                                <strong>{{ (recebimento.valor_centavos / 100)|moeda_br }}</strong>
+                            </a>
+                        {% else %}
+                            <span class="client-credit-empty">Nenhum pagamento registrado.</span>
+                        {% endfor %}
+                    </div>
+                </div>
             </section>
 
             <section class="client-preferences-grid">
@@ -279,7 +341,15 @@
                                     </td>
                                     <td>{{ venda.data_venda|datetime_br }}</td>
                                     <td>{{ venda.vendedor or "-" }}</td>
-                                    <td>{{ (venda.pagamentos_descricao or venda.forma_pagamento)|title }}</td>
+                                    <td>
+                                        {% if venda.condicao_pagamento == 'CREDIARIO' %}
+                                            Crediário
+                                        {% elif venda.condicao_pagamento == 'MISTO_CREDIARIO' %}
+                                            {{ (venda.pagamentos_descricao or 'Entrada')|title }} + Crediário
+                                        {% else %}
+                                            {{ (venda.pagamentos_descricao or venda.forma_pagamento)|title }}
+                                        {% endif %}
+                                    </td>
                                     <td class="numeric">{{ venda.desconto_total|moeda_br }}</td>
                                     <td class="numeric"><strong>{{ venda.valor_total|moeda_br }}</strong></td>
                                     <td class="numeric">{{ venda.lucro_total|moeda_br }}</td>
