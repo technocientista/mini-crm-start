@@ -193,12 +193,19 @@
 
                 <div class="client-credit-columns">
                     <div>
-                        <strong>Compras recentes</strong>
+                        <strong>Contas recentes</strong>
                         {% for conta in crediario_contas %}
-                            <a href="{{ url_for('venda_detalhe', venda_id=conta.venda_id) }}" class="client-credit-entry">
-                                <span>Venda #{{ conta.venda_id }}</span>
-                                <strong>{{ (conta.saldo_centavos / 100)|moeda_br }} em aberto</strong>
-                            </a>
+                            {% if conta.venda_id %}
+                                <a href="{{ url_for('venda_detalhe', venda_id=conta.venda_id) }}" class="client-credit-entry">
+                                    <span>Venda #{{ conta.venda_id }}</span>
+                                    <strong>{{ (conta.saldo_centavos / 100)|moeda_br }} em aberto</strong>
+                                </a>
+                            {% else %}
+                                <div class="client-credit-entry">
+                                    <span>{{ conta.descricao or 'Saldo anterior' }}</span>
+                                    <strong>{{ (conta.saldo_centavos / 100)|moeda_br }} em aberto</strong>
+                                </div>
+                            {% endif %}
                         {% else %}
                             <span class="client-credit-empty">Nenhuma compra no crediário.</span>
                         {% endfor %}

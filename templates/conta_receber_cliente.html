@@ -18,6 +18,11 @@
                     <p>Extrato de compras, pagamentos e saldo atual do cliente.</p>
                 </div>
                 <div class="receivable-client-topbar-actions">
+                    {% if usuario.perfil == 'ADMIN' %}
+                        <button type="button" class="ui-command-action ui-icon-add" onclick="abrirModalPorId('modalSaldoAnterior')">
+                            Lançar saldo anterior
+                        </button>
+                    {% endif %}
                     <a href="{{ url_for('contas_receber') }}" class="ui-command-action ui-icon-back">
                         Contas a receber
                     </a>
@@ -70,9 +75,9 @@
                         <table class="receivables-table">
                             <thead>
                                 <tr>
-                                    <th>Venda</th>
+                                    <th>Origem</th>
                                     <th>Data</th>
-                                    <th>Vendedor</th>
+                                    <th>Responsável</th>
                                     <th class="numeric">Lançado</th>
                                     <th class="numeric">Saldo</th>
                                     <th>Status</th>
@@ -82,12 +87,25 @@
                                 {% for conta in contas %}
                                     <tr>
                                         <td>
-                                            <a href="{{ url_for('venda_detalhe', venda_id=conta.venda_id) }}" class="table-link">
-                                                #{{ conta.venda_id }}
-                                            </a>
+                                            {% if conta.venda_id %}
+                                                <a href="{{ url_for('venda_detalhe', venda_id=conta.venda_id) }}" class="table-link">
+                                                    Venda #{{ conta.venda_id }}
+                                                </a>
+                                            {% else %}
+                                                <div class="receivable-origin-entry">
+                                                    <strong>Saldo anterior</strong>
+                                                    <small>{{ conta.descricao or 'Lançamento administrativo' }}</small>
+                                                </div>
+                                            {% endif %}
                                         </td>
-                                        <td>{{ conta.data_venda|datetime_br }}</td>
-                                        <td>{{ conta.vendedor or '-' }}</td>
+                                        <td>
+                                            {% if conta.venda_id %}
+                                                {{ conta.data_venda|datetime_br }}
+                                            {% else %}
+                                                {{ conta.data_referencia|date_br }}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ conta.vendedor or conta.criado_por_nome or '-' }}</td>
                                         <td class="numeric">{{ (conta.valor_original_centavos / 100)|moeda_br }}</td>
                                         <td class="numeric"><strong>{{ (conta.saldo_centavos / 100)|moeda_br }}</strong></td>
                                         <td>
@@ -104,8 +122,8 @@
                                     <tr>
                                         <td colspan="6">
                                             <div class="receivables-empty">
-                                                <strong>Nenhuma compra no crediário</strong>
-                                                <span>As contas aparecerão após a primeira venda fiada.</span>
+                                                <strong>Nenhuma conta no crediário</strong>
+                                                <span>Registre uma venda fiada ou lance um saldo anterior.</span>
                                             </div>
                                         </td>
                                     </tr>
@@ -237,7 +255,12 @@
                                     <td>
                                         {% for alocacao in alocacoes_por_recebimento.get(recebimento.id, []) %}
                                             <span class="receivable-allocation-chip">
-                                                Venda #{{ alocacao.venda_id }} · {{ (alocacao.valor_centavos / 100)|moeda_br }}
+                                                {% if alocacao.venda_id %}
+                                                    Venda #{{ alocacao.venda_id }}
+                                                {% else %}
+                                                    {{ alocacao.descricao or ('Saldo anterior #' ~ alocacao.conta_receber_id) }}
+                                                {% endif %}
+                                                · {{ (alocacao.valor_centavos / 100)|moeda_br }}
                                             </span>
                                         {% endfor %}
                                     </td>
@@ -290,6 +313,43 @@
         </main>
     </div>
     {% if usuario.perfil == 'ADMIN' %}
+        <div id="modalSaldoAnterior" class="modal-overlay" aria-hidden="true">
+            <div class="modal-card receivable-opening-balance-modal" role="dialog" aria-modal="true" aria-labelledby="tituloSaldoAnterior">
+                <div class="modal-header">
+                    <div>
+                        <h2 id="tituloSaldoAnterior">Lançar saldo anterior</h2>
+                        <p>Cadastre uma dívida existente sem alterar vendas, estoque ou caixa.</p>
+                    </div>
+                    <button type="button" class="modal-close" onclick="fecharModalPorId('modalSaldoAnterior')" aria-label="Fechar">×</button>
+                </div>
+                <form method="POST" action="{{ url_for('lancar_saldo_anterior', cliente_id=cliente.id) }}" class="receivable-opening-balance-form">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="token_operacao" value="{{ token_saldo_anterior }}">
+                    <div class="receivable-opening-balance-grid">
+                        <div class="form-group">
+                            <label for="valor_saldo_anterior">Valor devido</label>
+                            <input id="valor_saldo_anterior" name="valor_saldo_anterior" type="text" inputmode="decimal" placeholder="0,00" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="data_referencia">Data de referência</label>
+                            <input id="data_referencia" name="data_referencia" type="date" value="{{ data_hoje }}" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="descricao_saldo_anterior">Descrição</label>
+                        <input id="descricao_saldo_anterior" name="descricao" type="text" maxlength="160" value="Saldo anterior" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="observacoes_saldo_anterior">Observações <span class="field-label-optional">Opcional</span></label>
+                        <textarea id="observacoes_saldo_anterior" name="observacoes" rows="3" maxlength="1000" placeholder="Detalhes sobre a origem da dívida"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalPorId('modalSaldoAnterior')">Cancelar</button>
+                        <button type="submit" class="ui-command-action ui-icon-save">Salvar saldo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
         <div id="modalEstornoRecebimento" class="modal-overlay" aria-hidden="true">
             <div class="modal-card receivable-reversal-modal" role="dialog" aria-modal="true" aria-labelledby="tituloEstornoRecebimento">
                 <div class="modal-header">
@@ -320,6 +380,7 @@
             </div>
         </div>
     {% endif %}
+    <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/contas_receber.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/crediario_estorno.js') }}" defer></script>
 </body>

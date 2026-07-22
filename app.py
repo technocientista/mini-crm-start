@@ -85,6 +85,12 @@ def date_br(valor):
     try:
         texto = str(valor).strip()
 
+        if len(texto) == 10:
+            try:
+                return datetime.strptime(texto, "%Y-%m-%d").strftime("%d/%m/%Y")
+            except ValueError:
+                pass
+
         try:
             data_utc = datetime.strptime(texto, "%Y-%m-%d %H:%M:%S")
         except ValueError:
@@ -546,6 +552,26 @@ def converter_centavos(valor):
 
 def centavos_para_float(valor_centavos):
     return float(Decimal(int(valor_centavos)) / Decimal(100))
+
+
+def normalizar_data_referencia(valor, padrao=None):
+    if valor is None or str(valor).strip() == "":
+        return padrao or date.today().isoformat()
+
+    if isinstance(valor, datetime):
+        return valor.date().isoformat()
+
+    if isinstance(valor, date):
+        return valor.isoformat()
+
+    texto = str(valor).strip()
+    for formato in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(texto, formato).date().isoformat()
+        except ValueError:
+            continue
+
+    raise ValueError("Data de referência inválida. Use DD/MM/AAAA.")
 
 
 def obter_csrf_token():
@@ -2120,13 +2146,23 @@ def cliente_detalhe(cliente_id):
     """, (cliente_id,)).fetchone()
 
     crediario_contas = conn.execute("""
-        SELECT id, venda_id, valor_original_centavos, saldo_centavos, status, created_at
+        SELECT
+            id,
+            venda_id,
+            valor_original_centavos,
+            saldo_centavos,
+            status,
+            origem,
+            descricao,
+            data_referencia,
+            created_at
         FROM contas_receber
         WHERE cliente_id = ?
           AND status != 'CANCELADA'
         ORDER BY
             CASE WHEN saldo_centavos > 0 THEN 0 ELSE 1 END,
-            created_at DESC
+            COALESCE(data_referencia, date(created_at)) DESC,
+            id DESC
         LIMIT 5
     """, (cliente_id,)).fetchall()
 
@@ -2410,6 +2446,7 @@ def contas_receber():
         caixa_aberto=caixa_aberto,
         busca=busca,
         status=status,
+        token_importacao_saldos=secrets.token_urlsafe(24),
         usuario=usuario_logado()
     )
 
@@ -2449,13 +2486,18 @@ def conta_receber_cliente(cliente_id):
             cr.valor_original_centavos,
             cr.saldo_centavos,
             cr.status,
+            cr.origem,
+            cr.descricao,
+            cr.data_referencia,
+            cr.observacoes,
+            cr.criado_por_nome,
             cr.created_at,
             cr.updated_at,
             v.data_venda,
             v.valor_total,
             v.vendedor
         FROM contas_receber cr
-        INNER JOIN vendas v ON v.id = cr.venda_id
+        LEFT JOIN vendas v ON v.id = cr.venda_id
         WHERE cr.cliente_id = ?
           AND cr.status != 'CANCELADA'
         ORDER BY
@@ -2484,7 +2526,10 @@ def conta_receber_cliente(cliente_id):
         SELECT
             ra.recebimento_id,
             ra.valor_centavos,
-            cr.venda_id
+            cr.id AS conta_receber_id,
+            cr.venda_id,
+            cr.origem,
+            cr.descricao
         FROM recebimento_alocacoes ra
         INNER JOIN contas_receber cr ON cr.id = ra.conta_receber_id
         INNER JOIN recebimentos_clientes rc ON rc.id = ra.recebimento_id
@@ -2510,8 +2555,294 @@ def conta_receber_cliente(cliente_id):
         alocacoes_por_recebimento=alocacoes_por_recebimento,
         caixa_aberto=caixa_aberto,
         token_recebimento=secrets.token_urlsafe(24),
+        token_saldo_anterior=secrets.token_urlsafe(24),
+        data_hoje=date.today().isoformat(),
         usuario=usuario_logado()
     )
+
+
+@app.route(
+    "/contas-receber/clientes/<int:cliente_id>/saldo-anterior",
+    methods=["POST"]
+)
+@admin_required
+def lancar_saldo_anterior(cliente_id):
+    if not csrf_valido():
+        flash("A sessão expirou. Atualize a página e tente novamente.")
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+    token_operacao = request.form.get("token_operacao", "").strip()
+    descricao = request.form.get("descricao", "").strip()
+    observacoes = request.form.get("observacoes", "").strip()
+
+    if not token_operacao:
+        flash("Não foi possível identificar o lançamento. Atualize a página.")
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+    if not descricao:
+        flash("Informe uma descrição para o saldo anterior.")
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+    try:
+        valor_centavos = converter_centavos(request.form.get("valor_saldo_anterior"))
+        data_referencia = normalizar_data_referencia(
+            request.form.get("data_referencia")
+        )
+    except ValueError as erro:
+        flash(str(erro))
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+    if valor_centavos <= 0:
+        flash("O saldo anterior deve ser maior que zero.")
+        return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        cliente = cursor.execute(
+            "SELECT id, nome FROM clientes WHERE id = ?",
+            (cliente_id,)
+        ).fetchone()
+
+        if not cliente:
+            raise ValueError("Cliente não encontrado.")
+
+        existente = cursor.execute(
+            "SELECT id FROM contas_receber WHERE token_operacao = ?",
+            (token_operacao,)
+        ).fetchone()
+        if existente:
+            conn.rollback()
+            conn.close()
+            flash("Este saldo anterior já foi lançado.")
+            return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+        usuario = usuario_logado()
+        cursor.execute("""
+            INSERT INTO contas_receber (
+                venda_id,
+                cliente_id,
+                valor_original_centavos,
+                saldo_centavos,
+                status,
+                origem,
+                descricao,
+                data_referencia,
+                observacoes,
+                criado_por_id,
+                criado_por_nome,
+                token_operacao
+            ) VALUES (NULL, ?, ?, ?, 'ABERTA', 'SALDO_ANTERIOR', ?, ?, ?, ?, ?, ?)
+        """, (
+            cliente_id,
+            valor_centavos,
+            valor_centavos,
+            descricao[:160],
+            data_referencia,
+            observacoes[:1000] or None,
+            usuario["id"],
+            usuario["nome"],
+            token_operacao,
+        ))
+        conta_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        registrar_log(
+            "CREDIARIO_SALDO_ANTERIOR",
+            "contas_receber",
+            conta_id,
+            f"Saldo anterior de {moeda_br(centavos_para_float(valor_centavos))} "
+            f"lançado para o cliente #{cliente_id}."
+        )
+        flash("Saldo anterior lançado com sucesso.")
+    except (sqlite3.Error, ValueError) as erro:
+        conn.rollback()
+        conn.close()
+        flash(str(erro) or "Não foi possível lançar o saldo anterior.")
+
+    return redirect(url_for("conta_receber_cliente", cliente_id=cliente_id))
+
+
+@app.route("/contas-receber/modelo-saldos-anteriores")
+@admin_required
+def modelo_saldos_anteriores():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Saldos anteriores"
+    ws.append([
+        "Cliente ID",
+        "Telefone",
+        "Valor devido",
+        "Data de referência",
+        "Descrição",
+        "Observações",
+    ])
+    ws.freeze_panes = "A2"
+    larguras = {"A": 14, "B": 20, "C": 18, "D": 22, "E": 34, "F": 42}
+    for coluna, largura in larguras.items():
+        ws.column_dimensions[coluna].width = largura
+
+    arquivo = io.BytesIO()
+    wb.save(arquivo)
+    arquivo.seek(0)
+    return send_file(
+        arquivo,
+        as_attachment=True,
+        download_name="modelo_saldos_anteriores.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@app.route("/contas-receber/importar-saldos-anteriores", methods=["POST"])
+@admin_required
+def importar_saldos_anteriores():
+    if not csrf_valido():
+        flash("A sessão expirou. Atualize a página e tente novamente.")
+        return redirect(url_for("contas_receber"))
+
+    arquivo = request.files.get("arquivo_saldos")
+    token_importacao = request.form.get("token_importacao", "").strip()
+    if not arquivo or not arquivo.filename:
+        flash("Selecione uma planilha CSV ou XLSX.")
+        return redirect(url_for("contas_receber"))
+    if not token_importacao:
+        flash("Não foi possível identificar a importação. Atualize a página.")
+        return redirect(url_for("contas_receber"))
+
+    try:
+        linhas = ler_arquivo_planilha(arquivo)
+    except Exception as erro:
+        flash(f"Não foi possível ler a planilha: {erro}")
+        return redirect(url_for("contas_receber"))
+
+    if not linhas:
+        flash("A planilha não possui registros para importar.")
+        return redirect(url_for("contas_receber"))
+
+    conn = get_db_connection()
+    clientes = conn.execute(
+        "SELECT id, nome, telefone FROM clientes ORDER BY id"
+    ).fetchall()
+    clientes_por_id = {str(item["id"]): item for item in clientes}
+    clientes_por_telefone = {}
+    for item in clientes:
+        telefone = "".join(c for c in str(item["telefone"] or "") if c.isdigit())
+        if telefone:
+            clientes_por_telefone.setdefault(telefone, []).append(item)
+
+    registros = []
+    erros = []
+    for numero_linha, linha in enumerate(linhas, start=2):
+        cliente_id_texto = get_valor(linha, "cliente id", "cliente_id", "id cliente")
+        telefone = "".join(
+            c for c in get_valor(linha, "telefone", "whatsapp") if c.isdigit()
+        )
+        cliente = clientes_por_id.get(str(converter_int(cliente_id_texto))) if cliente_id_texto else None
+
+        if not cliente and telefone:
+            encontrados = clientes_por_telefone.get(telefone, [])
+            if len(encontrados) == 1:
+                cliente = encontrados[0]
+            elif len(encontrados) > 1:
+                erros.append(f"Linha {numero_linha}: telefone vinculado a mais de um cliente.")
+                continue
+
+        if not cliente:
+            erros.append(f"Linha {numero_linha}: cliente não encontrado por ID ou telefone.")
+            continue
+
+        try:
+            valor_centavos = converter_centavos(
+                get_valor(linha, "valor devido", "valor", "saldo")
+            )
+            data_referencia = normalizar_data_referencia(
+                get_valor(linha, "data de referencia", "data referência", "data")
+            )
+        except ValueError as erro:
+            erros.append(f"Linha {numero_linha}: {erro}")
+            continue
+
+        if valor_centavos <= 0:
+            erros.append(f"Linha {numero_linha}: o valor devido deve ser maior que zero.")
+            continue
+
+        registros.append({
+            "cliente": cliente,
+            "valor_centavos": valor_centavos,
+            "data_referencia": data_referencia,
+            "descricao": (
+                get_valor(linha, "descricao", "descrição") or "Saldo anterior"
+            )[:160],
+            "observacoes": get_valor(linha, "observacoes", "observações")[:1000] or None,
+            "token": f"{token_importacao}:{numero_linha}",
+        })
+
+    if erros:
+        conn.close()
+        detalhe = " ".join(erros[:5])
+        complemento = f" Há mais {len(erros) - 5} erro(s)." if len(erros) > 5 else ""
+        flash(f"Importação não realizada. {detalhe}{complemento}")
+        return redirect(url_for("contas_receber"))
+
+    usuario = usuario_logado()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        ja_importado = cursor.execute(
+            "SELECT 1 FROM contas_receber WHERE token_operacao LIKE ? LIMIT 1",
+            (f"{token_importacao}:%",)
+        ).fetchone()
+        if ja_importado:
+            conn.rollback()
+            conn.close()
+            flash("Esta planilha já foi importada.")
+            return redirect(url_for("contas_receber"))
+
+        for item in registros:
+            cursor.execute("""
+                INSERT INTO contas_receber (
+                    venda_id,
+                    cliente_id,
+                    valor_original_centavos,
+                    saldo_centavos,
+                    status,
+                    origem,
+                    descricao,
+                    data_referencia,
+                    observacoes,
+                    criado_por_id,
+                    criado_por_nome,
+                    token_operacao
+                ) VALUES (NULL, ?, ?, ?, 'ABERTA', 'SALDO_ANTERIOR', ?, ?, ?, ?, ?, ?)
+            """, (
+                item["cliente"]["id"],
+                item["valor_centavos"],
+                item["valor_centavos"],
+                item["descricao"],
+                item["data_referencia"],
+                item["observacoes"],
+                usuario["id"],
+                usuario["nome"],
+                item["token"],
+            ))
+
+        conn.commit()
+        conn.close()
+        registrar_log(
+            "CREDIARIO_SALDOS_IMPORTADOS",
+            "contas_receber",
+            None,
+            f"{len(registros)} saldo(s) anterior(es) importado(s)."
+        )
+        flash(f"{len(registros)} saldo(s) anterior(es) importado(s) com sucesso.")
+    except sqlite3.Error as erro:
+        conn.rollback()
+        conn.close()
+        flash(f"Não foi possível importar os saldos: {erro}")
+
+    return redirect(url_for("contas_receber"))
 
 
 @app.route(
@@ -2598,7 +2929,7 @@ def registrar_recebimento_cliente(cliente_id):
             WHERE cliente_id = ?
               AND saldo_centavos > 0
               AND status IN ('ABERTA', 'PARCIAL')
-            ORDER BY created_at ASC, id ASC
+            ORDER BY COALESCE(data_referencia, date(created_at)) ASC, id ASC
         """, (cliente_id,)).fetchall()
 
         saldo_total = sum(conta["saldo_centavos"] for conta in contas_abertas)
@@ -2712,7 +3043,10 @@ def recibo_recebimento_cliente(recebimento_id):
     alocacoes = conn.execute("""
         SELECT
             ra.valor_centavos,
+            cr.id AS conta_receber_id,
             cr.venda_id,
+            cr.origem,
+            cr.descricao,
             cr.saldo_centavos
         FROM recebimento_alocacoes ra
         INNER JOIN contas_receber cr ON cr.id = ra.conta_receber_id

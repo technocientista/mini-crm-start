@@ -5,6 +5,7 @@ Executa as operações em uma cópia temporária do banco local.
 
 import os
 import json
+import io
 import shutil
 import sqlite3
 import sys
@@ -17,6 +18,7 @@ if BASE_DIR not in sys.path:
 
 import app as crm  # noqa: E402
 from database.migrate_crediario import migrar  # noqa: E402
+from openpyxl import Workbook  # noqa: E402
 
 
 def validar():
@@ -268,11 +270,166 @@ def validar():
         assert entrada_mista["forma_pagamento"] == "PIX"
         assert entrada_mista["valor"] == 25
 
+        resposta = client.post(
+            f"/contas-receber/clientes/{cliente_id}/saldo-anterior",
+            data={
+                "_csrf_token": csrf,
+                "token_operacao": "saldo-anterior-manual-teste",
+                "valor_saldo_anterior": "45,00",
+                "data_referencia": "2025-01-10",
+                "descricao": "Compras anteriores à implantação",
+                "observacoes": "Validação automatizada",
+            },
+        )
+        assert resposta.status_code == 302
+
+        resposta = client.post(
+            f"/contas-receber/clientes/{cliente_id}/saldo-anterior",
+            data={
+                "_csrf_token": csrf,
+                "token_operacao": "saldo-anterior-manual-teste",
+                "valor_saldo_anterior": "45,00",
+                "data_referencia": "2025-01-10",
+                "descricao": "Tentativa duplicada",
+            },
+        )
+        assert resposta.status_code == 302
+
+        resposta = client.get("/contas-receber/modelo-saldos-anteriores")
+        assert resposta.status_code == 200
+        assert resposta.headers["Content-Type"].startswith(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+        wb = Workbook()
+        ws = wb.active
+        ws.append([
+            "Cliente ID",
+            "Telefone",
+            "Valor devido",
+            "Data de referência",
+            "Descrição",
+            "Observações",
+        ])
+        ws.append([
+            cliente_id,
+            "",
+            30,
+            "15/02/2025",
+            "Saldo importado",
+            "Validação automatizada",
+        ])
+        planilha = io.BytesIO()
+        wb.save(planilha)
+        planilha.seek(0)
+        resposta = client.post(
+            "/contas-receber/importar-saldos-anteriores",
+            data={
+                "_csrf_token": csrf,
+                "token_importacao": "importacao-saldos-teste",
+                "arquivo_saldos": (planilha, "saldos.xlsx"),
+            },
+            content_type="multipart/form-data",
+        )
+        assert resposta.status_code == 302
+
+        conn = crm.get_db_connection()
+        saldos_anteriores = conn.execute("""
+            SELECT id, venda_id, valor_original_centavos, saldo_centavos, origem
+            FROM contas_receber
+            WHERE cliente_id = ? AND origem = 'SALDO_ANTERIOR'
+            ORDER BY data_referencia, id
+        """, (cliente_id,)).fetchall()
+        conn.close()
+        assert len(saldos_anteriores) == 2
+        assert all(item["venda_id"] is None for item in saldos_anteriores)
+        assert [item["valor_original_centavos"] for item in saldos_anteriores] == [4500, 3000]
+
+        wb_invalido = Workbook()
+        ws_invalido = wb_invalido.active
+        ws_invalido.append([
+            "Cliente ID", "Telefone", "Valor devido",
+            "Data de referência", "Descrição", "Observações",
+        ])
+        ws_invalido.append([cliente_id, "", 10, "20/02/2025", "Válido", ""])
+        ws_invalido.append([99999999, "", 15, "20/02/2025", "Inválido", ""])
+        planilha_invalida = io.BytesIO()
+        wb_invalido.save(planilha_invalida)
+        planilha_invalida.seek(0)
+        resposta = client.post(
+            "/contas-receber/importar-saldos-anteriores",
+            data={
+                "_csrf_token": csrf,
+                "token_importacao": "importacao-saldos-invalida",
+                "arquivo_saldos": (planilha_invalida, "saldos_invalidos.xlsx"),
+            },
+            content_type="multipart/form-data",
+        )
+        assert resposta.status_code == 302
+        conn = crm.get_db_connection()
+        quantidade_saldos = conn.execute("""
+            SELECT COUNT(*) AS quantidade
+            FROM contas_receber
+            WHERE origem = 'SALDO_ANTERIOR'
+              AND cliente_id = ?
+        """, (cliente_id,)).fetchone()["quantidade"]
+        conn.close()
+        assert quantidade_saldos == 2
+
+        resposta = client.post(
+            f"/contas-receber/clientes/{cliente_id}/receber",
+            data={
+                "_csrf_token": csrf,
+                "token_operacao": "pagamento-saldo-anterior-teste",
+                "forma_pagamento": "PIX",
+                "valor_pagamento": "20,00",
+                "observacoes": "Pagamento de saldo anterior",
+            },
+        )
+        assert resposta.status_code == 302
+
+        conn = crm.get_db_connection()
+        saldo_manual = conn.execute(
+            "SELECT saldo_centavos, status FROM contas_receber WHERE id = ?",
+            (saldos_anteriores[0]["id"],),
+        ).fetchone()
+        recebimento_saldo = conn.execute("""
+            SELECT id
+            FROM recebimentos_clientes
+            WHERE token_operacao = 'pagamento-saldo-anterior-teste'
+        """).fetchone()
+        alocacao_saldo = conn.execute("""
+            SELECT cr.venda_id, cr.origem
+            FROM recebimento_alocacoes ra
+            INNER JOIN contas_receber cr ON cr.id = ra.conta_receber_id
+            WHERE ra.recebimento_id = ?
+        """, (recebimento_saldo["id"],)).fetchone()
+        conn.close()
+        assert saldo_manual["saldo_centavos"] == 2500
+        assert saldo_manual["status"] == "PARCIAL"
+        assert alocacao_saldo["venda_id"] is None
+        assert alocacao_saldo["origem"] == "SALDO_ANTERIOR"
+
+        resposta = client.get(
+            f"/contas-receber/recebimentos/{recebimento_saldo['id']}/recibo"
+        )
+        assert resposta.status_code == 200
+        assert b"Saldo importado" not in resposta.data
+        assert "Compras anteriores" in resposta.get_data(as_text=True)
+
+        for rota in (
+            f"/contas-receber/clientes/{cliente_id}",
+            f"/clientes/{cliente_id}",
+        ):
+            resposta = client.get(rota)
+            assert resposta.status_code == 200, (rota, resposta.status_code)
+
         conn = crm.get_db_connection()
         resumo_antes_fechamento = crm.calcular_resumo_caixa(conn, caixa_id)
         conn.close()
         assert resumo_antes_fechamento["total_vendas"] == 260
-        assert resumo_antes_fechamento["total_pix"] == 25
+        assert resumo_antes_fechamento["total_recebimentos_crediario"] == 20
+        assert resumo_antes_fechamento["total_pix"] == 45
         assert resumo_antes_fechamento["valor_esperado"] == 50
 
         resposta = client.post("/caixa", data={
@@ -298,8 +455,8 @@ def validar():
         conn.close()
         assert caixa_fechado["status"] == "FECHADO"
         assert caixa_fechado["total_vendas"] == 260
-        assert caixa_fechado["total_pix"] == 25
-        assert caixa_fechado["total_recebimentos_crediario"] == 0
+        assert caixa_fechado["total_pix"] == 45
+        assert caixa_fechado["total_recebimentos_crediario"] == 20
         assert caixa_fechado["valor_esperado"] == 50
         assert caixa_fechado["diferenca"] == 0
 

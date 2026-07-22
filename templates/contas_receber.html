@@ -17,6 +17,14 @@
                     <p>Acompanhe vendas no crediário, saldos e pagamentos dos clientes.</p>
                 </div>
                 <div class="management-topbar-actions">
+                    {% if usuario.perfil == 'ADMIN' %}
+                        <button type="button" class="ui-command-action ui-icon-upload" onclick="abrirModalPorId('modalImportarSaldosAnteriores')">
+                            Importar saldos
+                        </button>
+                        <a href="{{ url_for('modelo_saldos_anteriores') }}" class="ui-command-action ui-icon-download">
+                            Baixar modelo
+                        </a>
+                    {% endif %}
                     <a href="{{ url_for('vendas') }}" class="ui-command-action ui-icon-cart">
                         Abrir PDV
                     </a>
@@ -145,5 +153,32 @@
             </section>
         </main>
     </div>
+    {% if usuario.perfil == 'ADMIN' %}
+        <div id="modalImportarSaldosAnteriores" class="modal-overlay" aria-hidden="true">
+            <div class="modal-card receivable-import-modal" role="dialog" aria-modal="true" aria-labelledby="tituloImportarSaldos">
+                <div class="modal-header">
+                    <div>
+                        <h2 id="tituloImportarSaldos">Importar saldos anteriores</h2>
+                        <p>Cadastre dívidas existentes sem criar vendas ou movimentar estoque.</p>
+                    </div>
+                    <button type="button" class="modal-close" onclick="fecharModalPorId('modalImportarSaldosAnteriores')" aria-label="Fechar">×</button>
+                </div>
+                <form method="POST" action="{{ url_for('importar_saldos_anteriores') }}" enctype="multipart/form-data" class="receivable-import-form">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="token_importacao" value="{{ token_importacao_saldos }}">
+                    <div class="form-group">
+                        <label for="arquivo_saldos">Planilha CSV ou XLSX</label>
+                        <input id="arquivo_saldos" name="arquivo_saldos" type="file" accept=".csv,.xlsx" required>
+                        <small class="field-help">Identifique cada cliente pelo ID ou telefone. Se houver qualquer erro, nenhum lançamento será importado.</small>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="button-secondary ui-command-action ui-icon-close" onclick="fecharModalPorId('modalImportarSaldosAnteriores')">Cancelar</button>
+                        <button type="submit" class="ui-command-action ui-icon-upload">Importar saldos</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+    <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
 </body>
 </html>
