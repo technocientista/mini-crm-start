@@ -51,6 +51,7 @@
         {% set total_pix = resumo_atual.total_pix %}
         {% set total_cartao = resumo_atual.total_cartao %}
         {% set total_outros = resumo_atual.total_outros %}
+        {% set total_recebimentos_crediario = resumo_atual.total_recebimentos_crediario %}
         {% set entradas_manuais = resumo_atual.entradas_manuais %}
         {% set saidas_manuais = resumo_atual.saidas_manuais %}
         {% set valor_esperado = resumo_atual.valor_esperado %}
@@ -62,6 +63,7 @@
         {% set total_pix = caixa.total_pix %}
         {% set total_cartao = caixa.total_cartao %}
         {% set total_outros = caixa.total_outros %}
+        {% set total_recebimentos_crediario = caixa.total_recebimentos_crediario %}
         {% set entradas_manuais = caixa.entradas_manuais %}
         {% set saidas_manuais = caixa.saidas_manuais %}
         {% set valor_esperado = caixa.valor_esperado %}
@@ -110,6 +112,10 @@
             <tr>
                 <td>Outros</td>
                 <td>R$ {{ "%.2f"|format(total_outros or 0) }}</td>
+            </tr>
+            <tr>
+                <td>Recebimentos do crediário</td>
+                <td>R$ {{ "%.2f"|format(total_recebimentos_crediario or 0) }}</td>
             </tr>
             <tr>
                 <td>Entradas manuais</td>

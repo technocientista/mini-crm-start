@@ -119,6 +119,10 @@
                                 <td>R$ {{ "%.2f"|format(resumo_atual.total_outros or 0) }}</td>
                             </tr>
                             <tr>
+                                <td>Recebimentos do crediário</td>
+                                <td>R$ {{ "%.2f"|format(resumo_atual.total_recebimentos_crediario or 0) }}</td>
+                            </tr>
+                            <tr>
                                 <td>Entradas manuais</td>
                                 <td>R$ {{ "%.2f"|format(resumo_atual.entradas_manuais or 0) }}</td>
                             </tr>
@@ -146,6 +150,10 @@
                             <tr>
                                 <td>Outros</td>
                                 <td>R$ {{ "%.2f"|format(caixa.total_outros or 0) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Recebimentos do crediário</td>
+                                <td>R$ {{ "%.2f"|format(caixa.total_recebimentos_crediario or 0) }}</td>
                             </tr>
                             <tr>
                                 <td>Entradas manuais</td>
