@@ -503,6 +503,74 @@ def centavos_para_float(valor_centavos):
     return float(Decimal(int(valor_centavos)) / Decimal(100))
 
 
+def converter_percentual(valor):
+    if valor is None or str(valor).strip() == "":
+        return Decimal("0")
+
+    texto = str(valor).strip().replace("%", "").replace(" ", "")
+
+    if "," in texto:
+        texto = texto.replace(".", "").replace(",", ".")
+
+    try:
+        percentual = Decimal(texto)
+    except (InvalidOperation, ValueError):
+        raise ValueError("Percentual inválido.")
+
+    if not percentual.is_finite():
+        raise ValueError("Percentual inválido.")
+
+    return percentual
+
+
+def calcular_desconto_centavos(subtotal_centavos, desconto_tipo, valor_informado):
+    subtotal_centavos = int(subtotal_centavos)
+    desconto_tipo = (desconto_tipo or "valor").strip().lower()
+
+    if subtotal_centavos < 0:
+        raise ValueError("O subtotal da venda não pode ser negativo.")
+
+    if desconto_tipo == "percentual":
+        percentual = converter_percentual(valor_informado)
+
+        if percentual < 0 or percentual > 100:
+            raise ValueError(
+                "O desconto percentual deve estar entre 0% e 100%."
+            )
+
+        desconto_centavos = int((
+            Decimal(subtotal_centavos)
+            * percentual
+            / Decimal("100")
+        ).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    elif desconto_tipo == "total_final":
+        total_final_centavos = converter_centavos(valor_informado)
+
+        if total_final_centavos < 0:
+            raise ValueError("O total final não pode ser negativo.")
+
+        if total_final_centavos > subtotal_centavos:
+            raise ValueError(
+                "O total final não pode ser maior que o subtotal da venda."
+            )
+
+        desconto_centavos = subtotal_centavos - total_final_centavos
+    elif desconto_tipo == "valor":
+        desconto_centavos = converter_centavos(valor_informado)
+    else:
+        raise ValueError("Selecione um tipo de desconto válido.")
+
+    if desconto_centavos < 0:
+        raise ValueError("O desconto não pode ser negativo.")
+
+    if desconto_centavos > subtotal_centavos:
+        raise ValueError(
+            "O desconto não pode ser maior que o valor da venda."
+        )
+
+    return desconto_centavos
+
+
 def obter_csrf_token():
     token = session.get("_csrf_token")
 
@@ -4100,16 +4168,11 @@ def vendas():
         cliente_id = request.form.get("cliente_id")
         vendedor_id = request.form.get("vendedor_id")
         forma_pagamento = request.form.get("forma_pagamento", "").strip().upper()
+        desconto_tipo = request.form.get("desconto_tipo", "valor").strip().lower()
+        desconto_informado = request.form.get("desconto_informado", "0")
 
-        try:
-            desconto_total = centavos_para_float(
-                converter_centavos(request.form.get("desconto_total"))
-            )
-        except ValueError:
-            return finalizar_com_erro("Informe um desconto válido.")
-
-        if desconto_total < 0:
-            return finalizar_com_erro("O desconto não pode ser negativo.")
+        if desconto_tipo not in {"valor", "percentual", "total_final"}:
+            return finalizar_com_erro("Selecione um tipo de desconto válido.")
 
         observacoes = request.form.get("observacoes")
         itens_json = request.form.get("itens_json")
@@ -4286,13 +4349,22 @@ def vendas():
                 "custo_item": custo_item
             })
 
-        valor_total = round(subtotal_bruto - desconto_total, 2)
-        lucro_total = round(valor_total - custo_total, 2)
+        subtotal_centavos = converter_centavos(subtotal_bruto)
 
-        if valor_total < 0:
-            return finalizar_com_erro(
-                "O desconto não pode ser maior que o valor da venda."
+        try:
+            desconto_centavos = calcular_desconto_centavos(
+                subtotal_centavos,
+                desconto_tipo,
+                desconto_informado
             )
+        except ValueError as erro:
+            return finalizar_com_erro(str(erro))
+
+        desconto_total = centavos_para_float(desconto_centavos)
+        valor_total = centavos_para_float(
+            subtotal_centavos - desconto_centavos
+        )
+        lucro_total = round(valor_total - custo_total, 2)
 
         if pagamento_dividido:
             if any(valor < 0 for valor in valores_pagamento.values()):
