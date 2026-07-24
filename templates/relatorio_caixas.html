@@ -121,7 +121,7 @@
                 <article class="cash-overview-card cash-overview-card--sales">
                     <span>Vendas consolidadas</span>
                     <strong>{{ resumo.total_vendas|moeda_br }}</strong>
-                    <small>Recebimentos das sessões fechadas</small>
+                    <small>Faturamento das vendas registradas</small>
                 </article>
                 <article class="cash-overview-card cash-overview-card--expected">
                     <span>Dinheiro esperado</span>
@@ -142,8 +142,8 @@
                     <header class="cash-panel-heading">
                         <div>
                             <span class="cash-eyebrow">Recebimentos</span>
-                            <h2>Composição das vendas</h2>
-                            <p>Distribuição dos pagamentos nas sessões consolidadas.</p>
+                            <h2>Composição dos recebimentos</h2>
+                            <p>Valores recebidos nas vendas e no crediário.</p>
                         </div>
                     </header>
 
@@ -167,6 +167,11 @@
                             <span class="cash-summary-icon cash-summary-icon--other" aria-hidden="true"></span>
                             <div><strong>Outras formas</strong><small>Demais recebimentos</small></div>
                             <b>{{ resumo.total_outros|moeda_br }}</b>
+                        </div>
+                        <div class="cash-report-breakdown-item">
+                            <span class="cash-summary-icon cash-summary-icon--entry" aria-hidden="true"></span>
+                            <div><strong>Crediário recebido</strong><small>Incluído nas formas acima</small></div>
+                            <b>{{ resumo.total_recebimentos_crediario|moeda_br }}</b>
                         </div>
                     </div>
 

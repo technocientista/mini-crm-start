@@ -92,6 +92,13 @@
                 <span>Total</span>
                 <strong>R$ {{ "%.2f"|format(venda.valor_total) }}</strong>
             </div>
+
+            {% if venda.credito_original_centavos %}
+                <div class="total-row">
+                    <span>Saldo registrado no crediário</span>
+                    <strong>{{ (venda.credito_original_centavos / 100)|moeda_br }}</strong>
+                </div>
+            {% endif %}
         </div>
 
         {% if config.mensagem_recibo %}

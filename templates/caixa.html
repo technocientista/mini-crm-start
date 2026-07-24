@@ -140,6 +140,11 @@
                             </div>
                             <div class="cash-summary-row cash-summary-row--entry">
                                 <span class="cash-summary-icon cash-summary-icon--entry" aria-hidden="true"></span>
+                                <div><strong>Recebimentos do crediário</strong><small>Pagamentos de vendas anteriores</small></div>
+                                <b>+ {{ resumo_caixa.total_recebimentos_crediario|moeda_br }}</b>
+                            </div>
+                            <div class="cash-summary-row cash-summary-row--entry">
+                                <span class="cash-summary-icon cash-summary-icon--entry" aria-hidden="true"></span>
                                 <div><strong>Entradas manuais</strong><small>Reforços registrados</small></div>
                                 <b>+ {{ resumo_caixa.entradas_manuais|moeda_br }}</b>
                             </div>
