@@ -16,6 +16,8 @@ def migrar():
             cidade TEXT,
             instagram TEXT,
             mensagem_recibo TEXT,
+            aplicar_lucro_minimo INTEGER NOT NULL DEFAULT 0,
+            lucro_minimo_percentual REAL NOT NULL DEFAULT 60,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)

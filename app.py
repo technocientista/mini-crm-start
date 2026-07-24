@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta, timezone
 from openpyxl import Workbook, load_workbook
 from functools import wraps
 from werkzeug.utils import secure_filename
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_HALF_UP
 import sqlite3
 import os
 import json
@@ -571,6 +571,33 @@ def calcular_desconto_centavos(subtotal_centavos, desconto_tipo, valor_informado
     return desconto_centavos
 
 
+def calcular_total_minimo_lucro_centavos(itens, percentual_lucro):
+    percentual = converter_percentual(percentual_lucro)
+
+    if percentual < 0:
+        raise ValueError("O lucro mínimo sobre o custo não pode ser negativo.")
+
+    fator = (Decimal("100") + percentual) / Decimal("100")
+    total_minimo_centavos = 0
+
+    for item in itens:
+        custo_unitario_centavos = int(item["custo_unitario_centavos"])
+        quantidade = int(item["quantidade"])
+
+        if custo_unitario_centavos <= 0 or quantidade <= 0:
+            raise ValueError(
+                "Não foi possível validar a política comercial desta venda."
+            )
+
+        custo_item_centavos = custo_unitario_centavos * quantidade
+        minimo_item_centavos = int((
+            Decimal(custo_item_centavos) * fator
+        ).quantize(Decimal("1"), rounding=ROUND_CEILING))
+        total_minimo_centavos += minimo_item_centavos
+
+    return total_minimo_centavos
+
+
 def obter_csrf_token():
     token = session.get("_csrf_token")
 
@@ -906,7 +933,9 @@ def configuracoes():
             instagram,
             mensagem_recibo,
             logo_path,
-            login_logo_path
+            login_logo_path,
+            aplicar_lucro_minimo,
+            lucro_minimo_percentual
         FROM configuracoes_loja
         WHERE id = 1
     """).fetchone()
@@ -918,6 +947,34 @@ def configuracoes():
         cidade = request.form.get("cidade")
         instagram = request.form.get("instagram")
         mensagem_recibo = request.form.get("mensagem_recibo")
+        aplicar_lucro_minimo = (
+            1 if request.form.get("aplicar_lucro_minimo") == "1" else 0
+        )
+
+        try:
+            lucro_minimo_decimal = converter_percentual(
+                request.form.get("lucro_minimo_percentual")
+            )
+        except ValueError:
+            flash("Informe um percentual válido para o lucro mínimo.")
+            conn.close()
+            return redirect(url_for("configuracoes"))
+
+        if lucro_minimo_decimal < 0:
+            flash("O lucro mínimo sobre o custo não pode ser negativo.")
+            conn.close()
+            return redirect(url_for("configuracoes"))
+
+        lucro_minimo_percentual = float(
+            lucro_minimo_decimal.quantize(
+                Decimal("0.01"),
+                rounding=ROUND_HALF_UP
+            )
+        )
+        politica_anterior = (
+            int(config["aplicar_lucro_minimo"] or 0),
+            float(config["lucro_minimo_percentual"] or 0)
+        )
 
         logo_path = config["logo_path"] if config and config["logo_path"] else None
         login_logo_path = config["login_logo_path"] if config and config["login_logo_path"] else None
@@ -975,10 +1032,12 @@ def configuracoes():
                 mensagem_recibo,
                 logo_path,
                 login_logo_path,
+                aplicar_lucro_minimo,
+                lucro_minimo_percentual,
                 updated_at
             )
             VALUES (
-                1, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
+                1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
             )
             ON CONFLICT(id) DO UPDATE SET
                 nome_loja = excluded.nome_loja,
@@ -989,6 +1048,8 @@ def configuracoes():
                 mensagem_recibo = excluded.mensagem_recibo,
                 logo_path = excluded.logo_path,
                 login_logo_path = excluded.login_logo_path,
+                aplicar_lucro_minimo = excluded.aplicar_lucro_minimo,
+                lucro_minimo_percentual = excluded.lucro_minimo_percentual,
                 updated_at = CURRENT_TIMESTAMP
         """, (
             nome_loja,
@@ -998,11 +1059,26 @@ def configuracoes():
             instagram,
             mensagem_recibo,
             logo_path,
-            login_logo_path
+            login_logo_path,
+            aplicar_lucro_minimo,
+            lucro_minimo_percentual
         ))
 
         conn.commit()
         conn.close()
+
+        registrar_log(
+            "POLITICA_DESCONTO_ATUALIZADA",
+            "configuracoes_loja",
+            1,
+            (
+                "Lucro mínimo sobre o custo alterado de "
+                f"{politica_anterior[1]:.2f}% "
+                f"({'ativo' if politica_anterior[0] else 'inativo'}) para "
+                f"{lucro_minimo_percentual:.2f}% "
+                f"({'ativo' if aplicar_lucro_minimo else 'inativo'})."
+            )
+        )
 
         flash("Configurações atualizadas com sucesso.")
         return redirect(url_for("configuracoes"))
@@ -4330,8 +4406,11 @@ def vendas():
             preco_unitario = centavos_para_float(
                 converter_centavos(produto["preco_venda"])
             )
+            preco_custo_unitario_centavos = converter_centavos(
+                produto["preco_custo"]
+            )
             preco_custo_unitario = centavos_para_float(
-                converter_centavos(produto["preco_custo"])
+                preco_custo_unitario_centavos
             )
 
             subtotal_item = round(preco_unitario * quantidade, 2)
@@ -4345,6 +4424,7 @@ def vendas():
                 "quantidade": quantidade,
                 "preco_unitario": preco_unitario,
                 "preco_custo_unitario": preco_custo_unitario,
+                "preco_custo_unitario_centavos": preco_custo_unitario_centavos,
                 "subtotal_item": subtotal_item,
                 "custo_item": custo_item
             })
@@ -4365,6 +4445,51 @@ def vendas():
             subtotal_centavos - desconto_centavos
         )
         lucro_total = round(valor_total - custo_total, 2)
+
+        politica_desconto = conn.execute("""
+            SELECT
+                aplicar_lucro_minimo,
+                lucro_minimo_percentual
+            FROM configuracoes_loja
+            WHERE id = 1
+        """).fetchone()
+
+        if (
+            desconto_centavos > 0
+            and politica_desconto
+            and int(politica_desconto["aplicar_lucro_minimo"] or 0) == 1
+        ):
+            itens_politica = [
+                {
+                    "custo_unitario_centavos": item[
+                        "preco_custo_unitario_centavos"
+                    ],
+                    "quantidade": item["quantidade"]
+                }
+                for item in produtos_validados
+            ]
+
+            try:
+                total_minimo_centavos = calcular_total_minimo_lucro_centavos(
+                    itens_politica,
+                    politica_desconto["lucro_minimo_percentual"]
+                )
+            except ValueError:
+                return finalizar_com_erro(
+                    "O desconto informado não está autorizado pela "
+                    "política comercial da loja.",
+                    422
+                )
+
+            if (
+                subtotal_centavos - desconto_centavos
+                < total_minimo_centavos
+            ):
+                return finalizar_com_erro(
+                    "O desconto informado não está autorizado pela "
+                    "política comercial da loja.",
+                    422
+                )
 
         if pagamento_dividido:
             if any(valor < 0 for valor in valores_pagamento.values()):

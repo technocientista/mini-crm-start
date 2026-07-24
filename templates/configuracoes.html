@@ -123,6 +123,53 @@
                         >
                     </div>
 
+                    <section class="settings-policy-card full" aria-labelledby="politica-descontos-titulo">
+                        <div class="settings-policy-heading">
+                            <div>
+                                <h2 id="politica-descontos-titulo">Política de descontos</h2>
+                                <p>Proteja o resultado das vendas usando o custo cadastrado dos produtos.</p>
+                            </div>
+
+                            <label class="settings-policy-toggle" for="aplicar_lucro_minimo">
+                                <input
+                                    type="checkbox"
+                                    id="aplicar_lucro_minimo"
+                                    name="aplicar_lucro_minimo"
+                                    value="1"
+                                    {% if config.aplicar_lucro_minimo %}checked{% endif %}
+                                >
+                                <span>Aplicar limite de desconto</span>
+                            </label>
+                        </div>
+
+                        <div class="settings-policy-grid">
+                            <div class="form-group">
+                                <label for="lucro_minimo_percentual">Lucro mínimo sobre o custo (%)</label>
+                                <input
+                                    type="number"
+                                    id="lucro_minimo_percentual"
+                                    name="lucro_minimo_percentual"
+                                    value="{{ '%.2f'|format(config.lucro_minimo_percentual if config.lucro_minimo_percentual is not none else 60) }}"
+                                    min="0"
+                                    step="0.01"
+                                    inputmode="decimal"
+                                    required
+                                >
+                                <small class="field-help">
+                                    Exemplo: custo de R$ 100,00 com 60% resulta em preço mínimo de R$ 160,00.
+                                </small>
+                            </div>
+
+                            <div class="settings-policy-note">
+                                <strong>Aplicação no PDV</strong>
+                                <p>
+                                    O limite não será mostrado ao vendedor. Tentativas fora da política
+                                    serão recusadas com uma mensagem genérica.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
                     <div class="form-group full">
                         <label for="mensagem_recibo">Mensagem padrão para recibo</label>
                         <textarea 
