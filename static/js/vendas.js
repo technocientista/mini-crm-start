@@ -711,11 +711,23 @@
                     "Accept": "application/json"
                 }
             });
-            const resultado = await resposta.json();
+            const tipoConteudo = resposta.headers.get("content-type") || "";
+            let resultado = null;
 
-            if (!resposta.ok || !resultado.sucesso) {
+            if (tipoConteudo.includes("application/json")) {
+                resultado = await resposta.json();
+            } else {
+                await resposta.text();
                 throw new Error(
-                    resultado.mensagem
+                    resposta.status >= 500
+                        ? "O servidor não conseguiu concluir a venda. Tente novamente ou contate o administrador."
+                        : "O servidor retornou uma resposta inesperada."
+                );
+            }
+
+            if (!resposta.ok || !resultado?.sucesso) {
+                throw new Error(
+                    resultado?.mensagem
                     || "Não foi possível finalizar a venda."
                 );
             }

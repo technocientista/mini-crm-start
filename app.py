@@ -4446,13 +4446,20 @@ def vendas():
         )
         lucro_total = round(valor_total - custo_total, 2)
 
-        politica_desconto = conn.execute("""
-            SELECT
-                aplicar_lucro_minimo,
-                lucro_minimo_percentual
-            FROM configuracoes_loja
-            WHERE id = 1
-        """).fetchone()
+        try:
+            politica_desconto = conn.execute("""
+                SELECT
+                    aplicar_lucro_minimo,
+                    lucro_minimo_percentual
+                FROM configuracoes_loja
+                WHERE id = 1
+            """).fetchone()
+        except sqlite3.OperationalError:
+            return finalizar_com_erro(
+                "A atualização da política comercial ainda não foi aplicada. "
+                "Contate o administrador.",
+                503
+            )
 
         if (
             desconto_centavos > 0

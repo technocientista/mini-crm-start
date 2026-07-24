@@ -12,8 +12,9 @@ def coluna_existe(cursor, tabela, coluna):
 
 
 def migrar(caminho_banco=DATABASE):
-    conn = sqlite3.connect(caminho_banco)
+    conn = sqlite3.connect(caminho_banco, timeout=30)
     cursor = conn.cursor()
+    cursor.execute("PRAGMA busy_timeout = 30000")
 
     if not coluna_existe(
         cursor,
