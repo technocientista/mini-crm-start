@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Recibo de recebimento #{{ recebimento.id }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/print/recibo_termico.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/print/recibo_crediario.css') }}">
+</head>
+<body
+    class="{% if auto_impressao %}receipt-auto-mode{% else %}receipt-preview-mode{% endif %}"
+    data-auto-print="{{ '1' if auto_impressao else '0' }}"
+    data-return-url="{{ url_for('conta_receber_cliente', cliente_id=recebimento.cliente_id) }}"
+>
+    {% if auto_impressao %}
+        <main class="auto-print-status" aria-live="polite">
+            <span class="auto-print-icon" aria-hidden="true"></span>
+            <h1>Preparando impressão</h1>
+            <p>O recibo de recebimento #{{ recebimento.id }} será enviado para o diálogo de impressão.</p>
+            <div>
+                <button type="button" onclick="window.print()">Imprimir novamente</button>
+                <a href="{{ url_for('conta_receber_cliente', cliente_id=recebimento.cliente_id) }}">Voltar ao extrato</a>
+            </div>
+        </main>
+    {% endif %}
+
+    <main class="receipt-shell">
+        <article class="thermal-receipt">
+            <header class="receipt-store-header">
+                <strong>{{ config.nome_loja or "Start Eletrônicos" }}</strong>
+                {% if config.endereco %}
+                    <span>{{ config.endereco }}</span>
+                {% endif %}
+                {% if config.cidade %}
+                    <span>{{ config.cidade }}</span>
+                {% endif %}
+                {% if config.telefone %}
+                    <span>WhatsApp: {{ config.telefone }}</span>
+                {% endif %}
+                {% if config.instagram %}
+                    <span>Instagram: {{ config.instagram }}</span>
+                {% endif %}
+            </header>
+
+            <div class="receipt-divider strong"></div>
+
+            <section class="receipt-document-title">
+                <strong>RECIBO DE RECEBIMENTO</strong>
+                <span>CREDIÁRIO · DOCUMENTO NÃO FISCAL</span>
+            </section>
+
+            {% if recebimento.status == "ESTORNADO" %}
+                <div class="receipt-cancelled">
+                    RECEBIMENTO ESTORNADO
+                    {% if recebimento.motivo_estorno %}
+                        <small>{{ recebimento.motivo_estorno }}</small>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <div class="receipt-divider"></div>
+
+            <section class="receipt-meta">
+                <div>
+                    <span>Recebimento</span>
+                    <strong>#{{ recebimento.id }}</strong>
+                </div>
+                <div>
+                    <span>Data</span>
+                    <strong>{{ recebimento.created_at|datetime_br }}</strong>
+                </div>
+                <div>
+                    <span>Recebido por</span>
+                    <strong>{{ recebimento.usuario_nome or "-" }}</strong>
+                </div>
+                <div>
+                    <span>Caixa</span>
+                    <strong>#{{ recebimento.caixa_id }}</strong>
+                </div>
+                <div>
+                    <span>Status</span>
+                    <strong>{% if recebimento.status == "CONFIRMADO" %}Confirmado{% else %}Estornado{% endif %}</strong>
+                </div>
+            </section>
+
+            <div class="receipt-divider"></div>
+
+            <section class="receipt-client">
+                <h2>CLIENTE</h2>
+                <strong>{{ recebimento.cliente_nome }}</strong>
+                {% if recebimento.cliente_telefone %}
+                    <span>Telefone: {{ recebimento.cliente_telefone }}</span>
+                {% endif %}
+                {% if recebimento.cliente_endereco %}
+                    <span>{{ recebimento.cliente_endereco }}</span>
+                {% endif %}
+            </section>
+
+            <div class="receipt-divider"></div>
+
+            <section class="receipt-payments receipt-accounts">
+                <h2>CONTAS ABATIDAS</h2>
+                {% for alocacao in alocacoes %}
+                    <div>
+                        <span>
+                            {% if alocacao.venda_id %}
+                                Venda #{{ alocacao.venda_id }}
+                            {% else %}
+                                {{ alocacao.descricao or ('Saldo anterior #' ~ alocacao.conta_receber_id) }}
+                            {% endif %}
+                        </span>
+                        <strong>{{ (alocacao.valor_centavos / 100)|moeda_br }}</strong>
+                    </div>
+                {% else %}
+                    <div class="receipt-empty">Nenhuma conta vinculada.</div>
+                {% endfor %}
+            </section>
+
+            <div class="receipt-divider strong"></div>
+
+            <section class="receipt-totals">
+                <div>
+                    <span>Forma de pagamento</span>
+                    <strong>{{ recebimento.forma_pagamento|replace("_", " ")|title }}</strong>
+                </div>
+                {% if recebimento.forma_pagamento == "DINHEIRO" and recebimento.valor_recebido_centavos > recebimento.valor_centavos %}
+                    <div>
+                        <span>Valor recebido</span>
+                        <strong>{{ (recebimento.valor_recebido_centavos / 100)|moeda_br }}</strong>
+                    </div>
+                {% endif %}
+                {% if troco_centavos > 0 %}
+                    <div>
+                        <span>Troco</span>
+                        <strong>{{ (troco_centavos / 100)|moeda_br }}</strong>
+                    </div>
+                {% endif %}
+                <div class="grand-total">
+                    <span>PAGAMENTO</span>
+                    <strong>{{ (recebimento.valor_centavos / 100)|moeda_br }}</strong>
+                </div>
+                <div class="receipt-remaining-balance">
+                    <span>Saldo restante</span>
+                    <strong>{{ (saldo_cliente_centavos / 100)|moeda_br }}</strong>
+                </div>
+            </section>
+
+            {% if recebimento.observacoes %}
+                <div class="receipt-divider"></div>
+                <section class="receipt-notes">
+                    <h2>OBSERVAÇÕES</h2>
+                    <p>{{ recebimento.observacoes }}</p>
+                </section>
+            {% endif %}
+
+            <div class="receipt-divider"></div>
+
+            <footer class="receipt-footer">
+                <strong>
+                    {% if recebimento.status == "ESTORNADO" %}
+                        Documento sem valor de quitação
+                    {% else %}
+                        Pagamento recebido. Obrigado!
+                    {% endif %}
+                </strong>
+                <span>Este documento comprova o recebimento indicado acima.</span>
+                <small>RECEBIMENTO-{{ "%06d"|format(recebimento.id) }}</small>
+            </footer>
+        </article>
+
+        {% if not auto_impressao %}
+            <nav class="receipt-actions" aria-label="Ações do recibo">
+                <button type="button" class="primary" onclick="window.print()">
+                    Imprimir recibo
+                </button>
+                <a href="{{ url_for('conta_receber_cliente', cliente_id=recebimento.cliente_id) }}">
+                    Voltar ao extrato
+                </a>
+            </nav>
+        {% endif %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/recibo_crediario.js') }}" defer></script>
+</body>
+</html>

@@ -31,6 +31,7 @@ def migrar():
             total_pix REAL NOT NULL DEFAULT 0,
             total_cartao REAL NOT NULL DEFAULT 0,
             total_outros REAL NOT NULL DEFAULT 0,
+            total_recebimentos_crediario REAL NOT NULL DEFAULT 0,
 
             entradas_manuais REAL NOT NULL DEFAULT 0,
             saidas_manuais REAL NOT NULL DEFAULT 0,
@@ -45,6 +46,12 @@ def migrar():
             status TEXT NOT NULL DEFAULT 'ABERTO'
         )
     """)
+
+    if not coluna_existe(cursor, "caixas", "total_recebimentos_crediario"):
+        cursor.execute("""
+            ALTER TABLE caixas
+            ADD COLUMN total_recebimentos_crediario REAL NOT NULL DEFAULT 0
+        """)
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS caixa_movimentacoes (

@@ -398,6 +398,7 @@
         }
 
         const formasSelecionadas = obterFormasPagamentoSelecionadas();
+        const vendaCrediario = formasSelecionadas.includes("CREDIARIO");
 
         if (formasSelecionadas.length === 0) {
             mostrarToast(
@@ -410,6 +411,11 @@
 
         const formaPagamentoInput = document.getElementById("forma_pagamento");
         const pagamentoDivididoInput = document.getElementById("pagamento_dividido");
+        const vendaCrediarioInput = document.getElementById("venda_crediario");
+
+        if (vendaCrediarioInput) {
+            vendaCrediarioInput.value = vendaCrediario ? "1" : "0";
+        }
 
         if (formasSelecionadas.length === 1) {
             if (formaPagamentoInput) {
@@ -436,7 +442,16 @@
 
             const diferencaPagamentos = totalVenda - totalPagamentos;
 
-            if (diferencaPagamentos > 0.009) {
+            if (vendaCrediario && diferencaPagamentos <= 0.009) {
+                mostrarToast(
+                    "Para usar o crediário, deve existir um saldo maior que zero.",
+                    "warning",
+                    "Saldo do crediário"
+                );
+                return false;
+            }
+
+            if (!vendaCrediario && diferencaPagamentos > 0.009) {
                 mostrarToast(
                     `Falta informar ${formatarMoeda(diferencaPagamentos)} para concluir a venda.`,
                     "warning",
@@ -464,6 +479,16 @@
                 "Vendedor obrigatório"
             );
             document.getElementById("vendedor_id")?.focus();
+            return false;
+        }
+
+        if (vendaCrediario && !clienteIdInput?.value) {
+            mostrarToast(
+                "Selecione o cliente que ficará responsável pelo saldo.",
+                "warning",
+                "Cliente obrigatório no crediário"
+            );
+            clienteBuscaInput?.focus();
             return false;
         }
 
@@ -1088,6 +1113,12 @@
             finalizarVendaButton.title = "Selecione uma forma de pagamento";
         } else if (!vendedorSelecionado) {
             finalizarVendaButton.title = "Selecione o vendedor responsável";
+        } else if (formasSelecionadas.includes("CREDIARIO")) {
+            const totalInformado = calcularTotalPagamentosSelecionados(formasSelecionadas);
+            const possuiSaldoCrediario = totalInformado < totalVenda - 0.009;
+            finalizarVendaButton.title = possuiSaldoCrediario
+                ? "Finalizar venda no crediário"
+                : "Informe um saldo para o crediário";
         } else if (formasSelecionadas.length > 1) {
             const totalInformado = calcularTotalPagamentosSelecionados(formasSelecionadas);
             const pagamentoFechado = Math.abs(totalVenda - totalInformado) <= 0.009;
@@ -1101,6 +1132,11 @@
 
     function atualizarResumoPagamentos() {
         const formasSelecionadas = obterFormasPagamentoSelecionadas();
+        const vendaCrediario = formasSelecionadas.includes("CREDIARIO");
+        const totalVenda = converterCampoMoedaParaNumero(valorFinalInput?.value);
+        const totalInformado = calcularTotalPagamentosSelecionados(formasSelecionadas);
+
+        atualizarResumoCrediario(vendaCrediario, totalVenda, totalInformado);
         atualizarTrocoDinheiro(formasSelecionadas);
 
         if (formasSelecionadas.length <= 1) {
@@ -1108,10 +1144,8 @@
             return;
         }
 
-        const totalVenda = converterCampoMoedaParaNumero(valorFinalInput?.value);
-        const totalInformado = calcularTotalPagamentosSelecionados(formasSelecionadas);
         const diferenca = totalVenda - totalInformado;
-        const pagamentosFechados = Math.abs(diferenca) <= 0.009;
+        const pagamentosFechados = !vendaCrediario && Math.abs(diferenca) <= 0.009;
 
         const totalInformadoEl = document.getElementById("total_pagamentos_informado");
         const restanteEl = document.getElementById("total_pagamentos_restante");
@@ -1124,7 +1158,14 @@
         if (restanteEl) {
             restanteEl.classList.remove("text-danger", "text-success", "text-warning");
 
-            if (pagamentosFechados) {
+            if (vendaCrediario && diferenca > 0.009) {
+                restanteEl.textContent = formatarValorMonetario(diferenca);
+                restanteEl.classList.add("text-warning");
+
+                if (labelRestanteEl) {
+                    labelRestanteEl.textContent = "Saldo no crediário";
+                }
+            } else if (pagamentosFechados) {
                 restanteEl.textContent = formatarValorMonetario(0);
                 restanteEl.classList.add("text-success");
 
@@ -1149,6 +1190,41 @@
         }
 
         atualizarEstadoFinalizacao(formasSelecionadas);
+    }
+
+    function atualizarResumoCrediario(ativo, totalVenda, totalEntrada) {
+        const resumo = document.getElementById("crediario_resumo");
+        const entradaEl = document.getElementById("crediario_entrada_total");
+        const saldoEl = document.getElementById("crediario_saldo");
+        const vendaCrediarioInput = document.getElementById("venda_crediario");
+        const clienteOpcional = document.getElementById("cliente_label_opcional");
+
+        if (resumo) {
+            resumo.hidden = !ativo;
+        }
+
+        if (vendaCrediarioInput) {
+            vendaCrediarioInput.value = ativo ? "1" : "0";
+        }
+
+        if (clienteOpcional) {
+            clienteOpcional.textContent = ativo ? "Obrigatório" : "Opcional";
+            clienteOpcional.classList.toggle("required", ativo);
+        }
+
+        if (entradaEl) {
+            entradaEl.textContent = formatarValorMonetario(totalEntrada);
+        }
+
+        if (saldoEl) {
+            saldoEl.textContent = formatarValorMonetario(
+                Math.max(totalVenda - totalEntrada, 0)
+            );
+            saldoEl.classList.toggle(
+                "text-danger",
+                ativo && totalEntrada >= totalVenda - 0.009
+            );
+        }
     }
 
     function atualizarTrocoDinheiro(formasSelecionadas) {
@@ -1196,11 +1272,13 @@
 
         const pagamentoDivididoInput = document.getElementById("pagamento_dividido");
         const formaPagamentoInput = document.getElementById("forma_pagamento");
+        const vendaCrediarioInput = document.getElementById("venda_crediario");
         const areaDividida = document.getElementById("pagamento_dividido_area");
         const areaDinheiro = document.getElementById("pagamento_dinheiro_area");
         const campoRecebido = document.getElementById("valor_recebido_dinheiro");
 
         const ehPagamentoDividido = formasSelecionadas.length > 1;
+        const vendaCrediario = formasSelecionadas.includes("CREDIARIO");
         const dinheiroUnico = (
             formasSelecionadas.length === 1
             && formasSelecionadas[0] === "DINHEIRO"
@@ -1212,6 +1290,10 @@
 
         if (formaPagamentoInput) {
             formaPagamentoInput.value = formasSelecionadas.length === 1 ? formasSelecionadas[0] : "";
+        }
+
+        if (vendaCrediarioInput) {
+            vendaCrediarioInput.value = vendaCrediario ? "1" : "0";
         }
 
         if (areaDividida) {

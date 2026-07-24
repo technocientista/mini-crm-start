@@ -220,7 +220,7 @@
                                 <div class="form-group client-search-group">
                                     <label for="cliente_busca">
                                         Cliente
-                                        <span class="field-label-optional">Opcional</span>
+                                        <span id="cliente_label_opcional" class="field-label-optional">Opcional</span>
                                     </label>
 
                                     <input
@@ -295,6 +295,7 @@
                                 <div class="payment-area full">
                                     <input type="hidden" id="pagamento_dividido" name="pagamento_dividido" value="0">
                                     <input type="hidden" id="forma_pagamento" name="forma_pagamento" value="">
+                                    <input type="hidden" id="venda_crediario" name="venda_crediario" value="0">
 
                                     <label class="payment-main-label">Forma de pagamento</label>
 
@@ -331,6 +332,37 @@
                                             >
                                             <span>Cartão</span>
                                         </label>
+
+                                        <label class="payment-toggle payment-method-option payment-method-credit">
+                                            <input
+                                                type="checkbox"
+                                                class="payment-method-check"
+                                                id="pagamento_crediario_check"
+                                                value="CREDIARIO"
+                                                data-payment-method="CREDIARIO"
+                                            >
+                                            <span>Fiado</span>
+                                        </label>
+                                    </div>
+
+                                    <div id="crediario_resumo" class="credit-sale-summary" hidden>
+                                        <div class="credit-sale-summary-heading">
+                                            <div>
+                                                <strong>Venda no crediário</strong>
+                                                <span>O cliente poderá pagar valores livres posteriormente.</span>
+                                            </div>
+                                            <span class="credit-sale-badge">Cliente obrigatório</span>
+                                        </div>
+                                        <div class="credit-sale-values">
+                                            <div>
+                                                <span>Entrada paga agora</span>
+                                                <strong id="crediario_entrada_total">0,00</strong>
+                                            </div>
+                                            <div>
+                                                <span>Saldo no crediário</span>
+                                                <strong id="crediario_saldo">0,00</strong>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div id="pagamento_dinheiro_area" class="single-cash-area" style="display: none;">

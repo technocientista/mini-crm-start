@@ -142,10 +142,17 @@
                             </div>
                         {% endif %}
                     {% endfor %}
-                {% else %}
+                {% elif not venda.credito_original_centavos %}
                     <div>
                         <span>{{ venda.forma_pagamento|replace("_", " ")|title }}</span>
                         <strong>{{ venda.valor_total|moeda_br }}</strong>
+                    </div>
+                {% endif %}
+
+                {% if venda.credito_original_centavos %}
+                    <div>
+                        <span>Saldo no crediário</span>
+                        <strong>{{ (venda.credito_original_centavos / 100)|moeda_br }}</strong>
                     </div>
                 {% endif %}
 
