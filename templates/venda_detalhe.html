@@ -56,7 +56,7 @@
                     >
                         Cupom fiscal
                     </a>
-                    {% if venda.status != 'CANCELADA' %}
+                    {% if usuario.perfil == 'ADMIN' and venda.status != 'CANCELADA' %}
                         <button
                             type="button"
                             class="ui-command-action ui-icon-block sale-detail-cancel-action"
@@ -353,53 +353,55 @@
         </main>
     </div>
 
-    <div id="modalCancelamentoVenda" class="modal-overlay">
-        <div class="modal-card sale-detail-cancel-modal">
-            <div class="modal-header">
-                <div>
-                    <h2>Cancelar venda</h2>
-                    <p>Esta ação devolverá os produtos ao estoque.</p>
-                </div>
-                <button
-                    type="button"
-                    class="modal-close"
-                    onclick="fecharModalCancelamento()"
-                    aria-label="Fechar"
-                >
-                    ×
-                </button>
-            </div>
-
-            <form method="POST" action="{{ url_for('cancelar_venda', venda_id=venda.id) }}">
-                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-
-                <div class="form-group">
-                    <label for="motivo_cancelamento">Motivo do cancelamento</label>
-                    <textarea
-                        id="motivo_cancelamento"
-                        name="motivo_cancelamento"
-                        rows="4"
-                        required
-                        placeholder="Ex.: cliente desistiu da compra ou venda lançada incorretamente"
-                    ></textarea>
-                    <small class="field-help">O motivo ficará registrado no histórico da venda.</small>
-                </div>
-
-                <div class="modal-actions">
+    {% if usuario.perfil == 'ADMIN' %}
+        <div id="modalCancelamentoVenda" class="modal-overlay">
+            <div class="modal-card sale-detail-cancel-modal">
+                <div class="modal-header">
+                    <div>
+                        <h2>Cancelar venda</h2>
+                        <p>Esta ação devolverá os produtos ao estoque.</p>
+                    </div>
                     <button
                         type="button"
-                        class="button-secondary ui-command-action ui-icon-back"
+                        class="modal-close"
                         onclick="fecharModalCancelamento()"
+                        aria-label="Fechar"
                     >
-                        Voltar
-                    </button>
-                    <button type="submit" class="danger-button ui-command-action ui-icon-block">
-                        Confirmar cancelamento
+                        ×
                     </button>
                 </div>
-            </form>
+
+                <form method="POST" action="{{ url_for('cancelar_venda', venda_id=venda.id) }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="form-group">
+                        <label for="motivo_cancelamento">Motivo do cancelamento</label>
+                        <textarea
+                            id="motivo_cancelamento"
+                            name="motivo_cancelamento"
+                            rows="4"
+                            required
+                            placeholder="Ex.: cliente desistiu da compra ou venda lançada incorretamente"
+                        ></textarea>
+                        <small class="field-help">O motivo ficará registrado no histórico da venda.</small>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button
+                            type="button"
+                            class="button-secondary ui-command-action ui-icon-back"
+                            onclick="fecharModalCancelamento()"
+                        >
+                            Voltar
+                        </button>
+                        <button type="submit" class="danger-button ui-command-action ui-icon-block">
+                            Confirmar cancelamento
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
-    </div>
+    {% endif %}
 
     <script src="{{ url_for('static', filename='js/modals.js') }}" defer></script>
 </body>
